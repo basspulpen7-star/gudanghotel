@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Transaction } from '../types';
+import { Transaction, Item } from '../types';
 import { 
   FileText, 
   Download, 
@@ -10,7 +10,9 @@ import {
   TrendingUp,
   TrendingDown,
   ArrowDownCircle,
-  ArrowUpCircle
+  ArrowUpCircle,
+  Package,
+  Inbox
 } from 'lucide-react';
 import { 
   format, 
@@ -33,18 +35,75 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type ReportType = 'daily' | 'monthly';
+type ReportCategory = 'stock' | 'incoming' | 'outgoing';
 
 export function Reports() {
   const [reportType, setReportType] = useState<ReportType>('daily');
+  const [reportCategory, setReportCategory] = useState<ReportCategory>('stock');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [itemStats, setItemStats] = useState<Record<string, { in: number, out: number }>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchTransactions();
-  }, [reportType, currentDate]);
+    if (reportCategory === 'stock') {
+      fetchStockData();
+    } else {
+      fetchTransactions();
+    }
+  }, [reportType, currentDate, reportCategory]);
+
+  const fetchStockData = async () => {
+    setLoading(true);
+    let start, end;
+
+    if (reportType === 'daily') {
+      start = startOfDay(currentDate);
+      end = endOfDay(currentDate);
+    } else {
+      start = startOfMonth(currentDate);
+      end = endOfMonth(currentDate);
+    }
+
+    try {
+      // Fetch all items
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('items')
+        .select('*')
+        .order('name');
+
+      if (itemsError) throw itemsError;
+
+      // Fetch transactions for the period to calculate movements
+      const { data: transData, error: transError } = await supabase
+        .from('transactions')
+        .select('*')
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString());
+
+      if (transError) throw transError;
+
+      const stats: Record<string, { in: number, out: number }> = {};
+      transData?.forEach(t => {
+        if (!stats[t.item_id]) stats[t.item_id] = { in: 0, out: 0 };
+        if (t.type === 'IN') stats[t.item_id].in += t.quantity;
+        else stats[t.item_id].out += t.quantity;
+      });
+
+      setItems(itemsData || []);
+      setItemStats(stats);
+    } catch (error: any) {
+      console.error('Error fetching stock data:', error);
+      alert('Gagal mengambil data stok: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -59,12 +118,20 @@ export function Reports() {
     }
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('transactions')
         .select('*, items(*)')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString())
         .order('created_at', { ascending: false });
+
+      if (reportCategory === 'incoming') {
+        query = query.eq('type', 'IN');
+      } else if (reportCategory === 'outgoing') {
+        query = query.eq('type', 'OUT');
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       if (data) setTransactions(data);
@@ -92,6 +159,64 @@ export function Reports() {
     }
   };
 
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    const periodStr = reportType === 'daily' ? format(currentDate, 'dd MMMM yyyy') : format(currentDate, 'MMMM yyyy');
+    let categoryStr = '';
+    if (reportCategory === 'stock') categoryStr = 'Stok Barang';
+    else if (reportCategory === 'incoming') categoryStr = 'Barang Masuk';
+    else categoryStr = 'Barang Keluar';
+
+    const title = `Laporan ${categoryStr} - ${periodStr}`;
+    
+    doc.setFontSize(18);
+    doc.text('Gudang Alia', 14, 22);
+    doc.setFontSize(12);
+    doc.text(title, 14, 30);
+
+    if (reportCategory === 'stock') {
+      const tableData = items.map(item => {
+        const stats = itemStats[item.id] || { in: 0, out: 0 };
+        return [
+          item.name,
+          item.department,
+          (item.initial_stock || 0).toString(),
+          stats.in.toString(),
+          stats.out.toString(),
+          item.current_stock.toString(),
+          item.unit
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 40,
+        head: [['Nama Barang', 'Dept', 'Awal', 'Masuk', 'Keluar', 'Akhir', 'Satuan']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] },
+      });
+    } else {
+      doc.text(`Total ${reportCategory === 'incoming' ? 'Masuk' : 'Keluar'}: ${reportCategory === 'incoming' ? totalIn : totalOut} items`, 14, 40);
+      
+      const tableData = transactions.map(tx => [
+        format(new Date(tx.created_at), 'dd/MM HH:mm'),
+        tx.items?.name || '-',
+        tx.quantity.toString(),
+        tx.notes || '-'
+      ]);
+
+      autoTable(doc, {
+        startY: 50,
+        head: [['Waktu', 'Barang', 'Jumlah', 'Catatan']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] },
+      });
+    }
+
+    doc.save(`Laporan_${categoryStr}_${format(currentDate, 'yyyyMMdd')}.pdf`);
+  };
+
   const totalIn = transactions.filter(t => t.type === 'IN').reduce((acc, t) => acc + t.quantity, 0);
   const totalOut = transactions.filter(t => t.type === 'OUT').reduce((acc, t) => acc + t.quantity, 0);
 
@@ -115,19 +240,44 @@ export function Reports() {
           <h2 className="text-2xl md:text-3xl font-bold text-white">Laporan Inventaris</h2>
           <p className="text-brand-text-muted">Analisis pergerakan stok barang</p>
         </div>
-        <div className="flex gap-2 bg-brand-card p-1 rounded-xl border border-brand-border w-full md:w-auto">
-          <button 
-            onClick={() => setReportType('daily')}
-            className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all ${reportType === 'daily' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
-          >
-            Harian
-          </button>
-          <button 
-            onClick={() => setReportType('monthly')}
-            className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-bold transition-all ${reportType === 'monthly' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
-          >
-            Bulanan
-          </button>
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+          <div className="flex gap-2 bg-brand-card p-1 rounded-xl border border-brand-border w-full sm:w-auto">
+            <button 
+              onClick={() => setReportCategory('stock')}
+              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${reportCategory === 'stock' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+            >
+              <Package className="w-4 h-4" />
+              Stok
+            </button>
+            <button 
+              onClick={() => setReportCategory('incoming')}
+              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${reportCategory === 'incoming' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+            >
+              <Inbox className="w-4 h-4" />
+              Masuk
+            </button>
+            <button 
+              onClick={() => setReportCategory('outgoing')}
+              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${reportCategory === 'outgoing' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+            >
+              <ArrowUpCircle className="w-4 h-4" />
+              Keluar
+            </button>
+          </div>
+          <div className="flex gap-2 bg-brand-card p-1 rounded-xl border border-brand-border w-full sm:w-auto">
+            <button 
+              onClick={() => setReportType('daily')}
+              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${reportType === 'daily' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+            >
+              Harian
+            </button>
+            <button 
+              onClick={() => setReportType('monthly')}
+              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${reportType === 'monthly' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+            >
+              Bulanan
+            </button>
+          </div>
         </div>
       </div>
 
@@ -160,7 +310,10 @@ export function Reports() {
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
-        <button className="w-full sm:w-auto bg-brand-accent/10 text-brand-accent hover:bg-brand-accent hover:text-white px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all">
+        <button 
+          onClick={exportToPDF}
+          className="w-full sm:w-auto bg-brand-accent/10 text-brand-accent hover:bg-brand-accent hover:text-white px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
+        >
           <Download className="w-4 h-4" />
           Export PDF
         </button>
@@ -213,44 +366,70 @@ export function Reports() {
 
       {/* Detailed Table */}
       <div className="bg-brand-card rounded-2xl border border-brand-border overflow-hidden">
-        <div className="p-4 md:p-6 border-b border-brand-border">
-          <h3 className="font-bold text-white">Rincian Transaksi</h3>
+        <div className="p-4 md:p-6 border-b border-brand-border flex justify-between items-center">
+          <h3 className="font-bold text-white">
+            {reportCategory === 'stock' ? 'Rincian Stok Barang' : 
+             reportCategory === 'incoming' ? 'Rincian Barang Masuk' : 'Rincian Barang Keluar'}
+          </h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
               <tr className="bg-brand-dark/50 text-brand-text-muted text-xs font-bold uppercase tracking-wider">
-                <th className="px-6 py-4">Waktu</th>
-                <th className="px-6 py-4">Barang</th>
-                <th className="px-6 py-4">Tipe</th>
-                <th className="px-6 py-4">Jumlah</th>
-                <th className="px-6 py-4">Catatan</th>
+                {reportCategory === 'stock' ? (
+                  <>
+                    <th className="px-6 py-4">Nama Barang</th>
+                    <th className="px-6 py-4">Departemen</th>
+                    <th className="px-6 py-4">Awal</th>
+                    <th className="px-6 py-4">Masuk</th>
+                    <th className="px-6 py-4">Keluar</th>
+                    <th className="px-6 py-4">Akhir</th>
+                    <th className="px-6 py-4">Satuan</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="px-6 py-4">Waktu</th>
+                    <th className="px-6 py-4">Barang</th>
+                    <th className="px-6 py-4">Jumlah</th>
+                    <th className="px-6 py-4">Catatan</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border">
               {loading ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-brand-text-muted">Loading...</td></tr>
-              ) : transactions.length === 0 ? (
-                <tr><td colSpan={5} className="px-6 py-8 text-center text-brand-text-muted">Tidak ada transaksi di periode ini.</td></tr>
-              ) : transactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-brand-dark/30 transition-colors">
-                  <td className="px-6 py-4 text-brand-text-muted font-mono text-sm">
-                    {format(new Date(tx.created_at), 'dd/MM HH:mm')}
-                  </td>
-                  <td className="px-6 py-4 font-medium text-white">{tx.items?.name}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase ${
-                      tx.type === 'IN' ? 'bg-blue-500/20 text-blue-500' : 'bg-purple-500/20 text-purple-500'
-                    }`}>
-                      {tx.type === 'IN' ? 'Masuk' : 'Keluar'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 font-bold text-white">
-                    {tx.type === 'IN' ? '+' : '-'}{tx.quantity}
-                  </td>
-                  <td className="px-6 py-4 text-brand-text-muted text-sm italic">{tx.notes || '-'}</td>
-                </tr>
-              ))}
+                <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-brand-text-muted">Loading...</td></tr>
+              ) : (reportCategory === 'stock' ? items : transactions).length === 0 ? (
+                <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-brand-text-muted">Tidak ada data di periode ini.</td></tr>
+              ) : reportCategory === 'stock' ? (
+                items.map((item) => {
+                  const stats = itemStats[item.id] || { in: 0, out: 0 };
+                  return (
+                    <tr key={item.id} className="hover:bg-brand-dark/30 transition-colors">
+                      <td className="px-6 py-4 font-medium text-white">{item.name}</td>
+                      <td className="px-6 py-4 text-brand-text-muted">{item.department}</td>
+                      <td className="px-6 py-4 text-brand-text-muted">{item.initial_stock || 0}</td>
+                      <td className="px-6 py-4 text-blue-400">+{stats.in}</td>
+                      <td className="px-6 py-4 text-purple-400">-{stats.out}</td>
+                      <td className="px-6 py-4 font-bold text-white">{item.current_stock}</td>
+                      <td className="px-6 py-4 text-brand-text-muted">{item.unit}</td>
+                    </tr>
+                  );
+                })
+              ) : (
+                transactions.map((tx) => (
+                  <tr key={tx.id} className="hover:bg-brand-dark/30 transition-colors">
+                    <td className="px-6 py-4 text-brand-text-muted font-mono text-sm">
+                      {format(new Date(tx.created_at), 'dd/MM HH:mm')}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-white">{tx.items?.name}</td>
+                    <td className="px-6 py-4 font-bold text-white">
+                      {tx.type === 'IN' ? '+' : '-'}{tx.quantity}
+                    </td>
+                    <td className="px-6 py-4 text-brand-text-muted text-sm italic">{tx.notes || '-'}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

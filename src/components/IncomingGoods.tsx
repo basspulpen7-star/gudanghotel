@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Item, Transaction } from '../types';
-import { ArrowDownCircle, Search, Plus, Calendar as CalendarIcon, Package, Activity, AlertCircle } from 'lucide-react';
+import { ArrowDownCircle, Search, Plus, Calendar as CalendarIcon, Package, Activity, AlertCircle, Edit2, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface IncomingGoodsProps {
@@ -14,6 +14,8 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   // Sync local search with global search
@@ -82,53 +84,103 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        alert('Sesi berakhir, silakan login kembali.');
         setIsSubmitting(false);
         return;
       }
 
-      // 1. Record transaction
-      const { error: transError } = await supabase.from('transactions').insert([{
-        id: crypto.randomUUID(),
-        item_id: selectedItemId,
-        type: 'IN',
-        quantity,
-        department,
-        notes,
-        user_id: user.id
-      }]);
+      if (editingTransaction) {
+        // 1. Update transaction
+        const { error: transError } = await supabase.from('transactions').update({
+          item_id: selectedItemId,
+          quantity,
+          department,
+          notes
+        }).eq('id', editingTransaction.id);
 
-      if (transError) {
-        console.error('Transaction error:', transError);
-        alert('Gagal menyimpan transaksi: ' + transError.message + '\n\nPastikan kolom "department" sudah ada di tabel transactions.');
-        setIsSubmitting(false);
-        return;
-      }
+        if (transError) throw transError;
 
-      // 2. Update stock
-      const item = items.find(i => i.id === selectedItemId);
-      if (item) {
-        const { error: updateError } = await supabase.from('items').update({
-          current_stock: item.current_stock + quantity
-        }).eq('id', item.id);
-        
-        if (updateError) {
-          console.error('Update stock error:', updateError);
-          alert('Transaksi tersimpan, namun gagal memperbarui stok: ' + updateError.message);
+        // 2. Update stock (revert old, add new)
+        const item = items.find(i => i.id === selectedItemId);
+        if (item) {
+          const diff = quantity - editingTransaction.quantity;
+          const { error: updateError } = await supabase.from('items').update({
+            current_stock: item.current_stock + diff
+          }).eq('id', item.id);
+          if (updateError) throw updateError;
+        }
+      } else {
+        // 1. Record transaction
+        const { error: transError } = await supabase.from('transactions').insert([{
+          id: crypto.randomUUID(),
+          item_id: selectedItemId,
+          type: 'IN',
+          quantity,
+          department,
+          notes,
+          user_id: user.id
+        }]);
+
+        if (transError) throw transError;
+
+        // 2. Update stock
+        const item = items.find(i => i.id === selectedItemId);
+        if (item) {
+          const { error: updateError } = await supabase.from('items').update({
+            current_stock: item.current_stock + quantity
+          }).eq('id', item.id);
+          if (updateError) throw updateError;
         }
       }
 
       setIsModalOpen(false);
-      setSelectedItemId('');
-      setQuantity(0);
-      setDepartment('Housekeeping');
-      setNotes('');
+      setEditingTransaction(null);
+      resetForm();
       fetchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Submit error:', error);
-      alert('Terjadi kesalahan sistem.');
+      alert('Gagal menyimpan transaksi: ' + (error.message || 'Error tidak diketahui'));
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedItemId('');
+    setQuantity(0);
+    setDepartment('Housekeeping');
+    setNotes('');
+  };
+
+  const handleEdit = (tx: Transaction) => {
+    setEditingTransaction(tx);
+    setSelectedItemId(tx.item_id);
+    setQuantity(tx.quantity);
+    setDepartment(tx.department || 'Housekeeping');
+    setNotes(tx.notes || '');
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!transactionToDelete) return;
+    try {
+      // 1. Delete transaction
+      const { error: deleteError } = await supabase.from('transactions').delete().eq('id', transactionToDelete.id);
+      if (deleteError) throw deleteError;
+
+      // 2. Revert stock
+      const item = items.find(i => i.id === transactionToDelete.item_id);
+      if (item) {
+        const { error: updateError } = await supabase.from('items').update({
+          current_stock: item.current_stock - transactionToDelete.quantity
+        }).eq('id', item.id);
+        if (updateError) throw updateError;
+      }
+
+      setTransactionToDelete(null);
+      fetchData();
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      alert('Gagal menghapus transaksi: ' + error.message);
     }
   };
 
@@ -199,15 +251,16 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
                 <th className="px-6 py-4">Jumlah</th>
                 <th className="px-6 py-4">Satuan</th>
                 <th className="px-6 py-4">Catatan</th>
+                <th className="px-6 py-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border">
               {loading ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-brand-text-muted">Loading...</td></tr>
+                <tr><td colSpan={7} className="px-6 py-8 text-center text-brand-text-muted">Loading...</td></tr>
               ) : filteredTransactions.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-brand-text-muted">Belum ada transaksi masuk.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-8 text-center text-brand-text-muted">Belum ada transaksi masuk.</td></tr>
               ) : filteredTransactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-brand-dark/30 transition-colors">
+                <tr key={tx.id} className="hover:bg-brand-dark/30 transition-colors group">
                   <td className="px-6 py-4 text-brand-text-muted font-mono text-sm">
                     {format(new Date(tx.created_at), 'dd MMM yyyy HH:mm')}
                   </td>
@@ -222,6 +275,22 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
                   </td>
                   <td className="px-6 py-4 text-brand-text-muted">{tx.items?.unit}</td>
                   <td className="px-6 py-4 text-brand-text-muted text-sm italic">{tx.notes || '-'}</td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => handleEdit(tx)}
+                        className="p-2 hover:bg-brand-accent/20 text-brand-accent rounded-lg transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setTransactionToDelete(tx)}
+                        className="p-2 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -234,8 +303,8 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden">
             <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30">
-              <h3 className="text-xl font-bold text-white">Catat Barang Masuk</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-brand-text-muted hover:text-white p-2">✕</button>
+              <h3 className="text-xl font-bold text-white">{editingTransaction ? 'Edit Barang Masuk' : 'Catat Barang Masuk'}</h3>
+              <button onClick={() => { setIsModalOpen(false); setEditingTransaction(null); resetForm(); }} className="text-brand-text-muted hover:text-white p-2">✕</button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div>
@@ -304,11 +373,40 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
                       <span>Menyimpan...</span>
                     </>
                   ) : (
-                    'Simpan Transaksi'
+                    editingTransaction ? 'Simpan Perubahan' : 'Simpan Transaksi'
                   )}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {transactionToDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-brand-card w-full max-w-sm rounded-2xl border border-brand-border shadow-2xl p-6 space-y-6 animate-in zoom-in duration-200">
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Hapus Transaksi?</h3>
+              <p className="text-brand-text-muted text-sm">Stok barang akan dikurangi kembali sesuai jumlah transaksi ini.</p>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setTransactionToDelete(null)}
+                className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleDelete}
+                className="flex-1 bg-red-500 hover:bg-red-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-red-500/20"
+              >
+                Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}

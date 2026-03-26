@@ -3,6 +3,7 @@ export interface Item {
   name: string;
   department: string;
   unit: string;
+  initial_stock: number;
   current_stock: number;
   min_stock: number;
   created_at: string;

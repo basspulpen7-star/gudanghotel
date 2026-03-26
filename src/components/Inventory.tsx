@@ -10,11 +10,13 @@ interface InventoryProps {
 
 export function Inventory({ globalSearch = '' }: InventoryProps) {
   const [items, setItems] = useState<Item[]>([]);
+  const [itemStats, setItemStats] = useState<Record<string, { in: number, out: number }>>({});
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   // Sync local search with global search
   useEffect(() => {
@@ -27,6 +29,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('Housekeeping');
   const [unit, setUnit] = useState('');
+  const [initialStock, setInitialStock] = useState(0);
   const [minStock, setMinStock] = useState(0);
 
   const departments = ['Housekeeping', 'Resto', 'Tekhnisi', 'Front Office', 'General'];
@@ -68,9 +71,21 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   const fetchItems = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('items').select('*').order('name');
-      if (error) throw error;
-      if (data) setItems(data);
+      const { data: itemsData, error: itemsError } = await supabase.from('items').select('*').order('name');
+      if (itemsError) throw itemsError;
+
+      const { data: transData, error: transError } = await supabase.from('transactions').select('item_id, type, quantity');
+      if (transError) throw transError;
+
+      const stats: Record<string, { in: number, out: number }> = {};
+      transData?.forEach(tx => {
+        if (!stats[tx.item_id]) stats[tx.item_id] = { in: 0, out: 0 };
+        if (tx.type === 'IN') stats[tx.item_id].in += tx.quantity;
+        if (tx.type === 'OUT') stats[tx.item_id].out += tx.quantity;
+      });
+
+      setItemStats(stats);
+      if (itemsData) setItems(itemsData);
     } catch (error: any) {
       console.error('Error fetching items:', error);
       alert('Gagal mengambil data barang: ' + (error.message || 'Error tidak diketahui'));
@@ -82,7 +97,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const itemData = { name, department, unit, min_stock: minStock };
+    const itemData = { name, department, unit, initial_stock: initialStock, min_stock: minStock };
 
     try {
       if (editingItem) {
@@ -92,7 +107,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
         const { error } = await supabase.from('items').insert([{ 
           id: crypto.randomUUID(),
           ...itemData, 
-          current_stock: 0 
+          current_stock: initialStock 
         }]);
         if (error) {
           throw error;
@@ -116,6 +131,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
     setName('');
     setDepartment('Housekeeping');
     setUnit('');
+    setInitialStock(0);
     setMinStock(0);
   };
 
@@ -124,19 +140,19 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
     setName(item.name);
     setDepartment(item.department);
     setUnit(item.unit);
+    setInitialStock(item.initial_stock || 0);
     setMinStock(item.min_stock);
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm('Apakah Anda yakin ingin menghapus barang ini?')) {
-      try {
-        await supabase.from('items').delete().eq('id', id);
-        fetchItems();
-      } catch (error) {
-        console.error('Error deleting item:', error);
-        alert('Gagal menghapus barang.');
-      }
+  const handleDelete = async () => {
+    if (!itemToDelete) return;
+    try {
+      await supabase.from('items').delete().eq('id', itemToDelete);
+      setItemToDelete(null);
+      fetchItems();
+    } catch (error) {
+      console.error('Error deleting item:', error);
     }
   };
 
@@ -200,18 +216,20 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
               <tr className="bg-brand-dark/50 text-brand-text-muted text-xs font-bold uppercase tracking-wider">
                 <th className="px-6 py-4">Nama Barang</th>
                 <th className="px-6 py-4">Departemen</th>
-                <th className="px-6 py-4">Stok Saat Ini</th>
-                <th className="px-6 py-4">Min. Stok</th>
+                <th className="px-6 py-4">Stok Awal</th>
+                <th className="px-6 py-4">Masuk</th>
+                <th className="px-6 py-4">Keluar</th>
+                <th className="px-6 py-4">Stok Akhir</th>
                 <th className="px-6 py-4">Satuan</th>
                 <th className="px-6 py-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border">
               {loading ? (
-                <tr><td colSpan={6} className="px-6 py-8 text-center text-brand-text-muted">Loading...</td></tr>
+                <tr><td colSpan={8} className="px-6 py-8 text-center text-brand-text-muted">Loading...</td></tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <p className="text-brand-text-muted">Tidak ada data ditemukan.</p>
                       <div className="p-4 bg-brand-dark/50 rounded-xl border border-brand-border max-w-md text-xs text-brand-text-muted text-left">
@@ -235,6 +253,7 @@ ALTER TABLE items ALTER COLUMN id SET DEFAULT gen_random_uuid();
 
 -- Tambahkan kolom jika belum ada
 ALTER TABLE items ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'General';
+ALTER TABLE items ADD COLUMN IF NOT EXISTS initial_stock NUMERIC DEFAULT 0;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'General';
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
                             </pre>
@@ -244,47 +263,52 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
                     </div>
                   </td>
                 </tr>
-              ) : filteredItems.map((item) => (
-                <tr key={item.id} className="hover:bg-brand-dark/30 transition-colors group">
-                  <td className="px-6 py-4 font-medium text-white">{item.name}</td>
-                  <td className="px-6 py-4 text-brand-text-muted">
-                    <span className="px-2 py-1 bg-brand-dark rounded-md text-[10px] font-bold uppercase border border-brand-border">
-                      {item.department}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "font-bold",
-                        item.current_stock <= item.min_stock ? "text-orange-500" : "text-white"
-                      )}>
-                        {item.current_stock}
+              ) : filteredItems.map((item) => {
+                const stats = itemStats[item.id] || { in: 0, out: 0 };
+                return (
+                  <tr key={item.id} className="hover:bg-brand-dark/30 transition-colors group">
+                    <td className="px-6 py-4 font-medium text-white">{item.name}</td>
+                    <td className="px-6 py-4 text-brand-text-muted">
+                      <span className="px-2 py-1 bg-brand-dark rounded-md text-[10px] font-bold uppercase border border-brand-border">
+                        {item.department}
                       </span>
-                      {item.current_stock <= item.min_stock && (
-                        <AlertCircle className="w-4 h-4 text-orange-500" />
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-brand-text-muted">{item.min_stock}</td>
-                  <td className="px-6 py-4 text-brand-text-muted">{item.unit}</td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => handleEdit(item)}
-                        className="p-2 hover:bg-brand-accent/20 text-brand-accent rounded-lg transition-colors"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDelete(item.id)}
-                        className="p-2 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 text-brand-text-muted">{item.initial_stock || 0}</td>
+                    <td className="px-6 py-4 text-blue-400">+{stats.in}</td>
+                    <td className="px-6 py-4 text-purple-400">-{stats.out}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "font-bold",
+                          item.current_stock <= item.min_stock ? "text-orange-500" : "text-white"
+                        )}>
+                          {item.current_stock}
+                        </span>
+                        {item.current_stock <= item.min_stock && (
+                          <AlertCircle className="w-4 h-4 text-orange-500" title={`Stok rendah! Min: ${item.min_stock}`} />
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-brand-text-muted">{item.unit}</td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => handleEdit(item)}
+                          className="p-2 hover:bg-brand-accent/20 text-brand-accent rounded-lg transition-colors"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => setItemToDelete(item.id)}
+                          className="p-2 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -335,15 +359,27 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-brand-text-muted mb-1">Min. Stok (Peringatan)</label>
-                <input 
-                  type="number" 
-                  value={minStock} 
-                  onChange={(e) => setMinStock(Number(e.target.value))} 
-                  className="w-full" 
-                  required 
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-brand-text-muted mb-1">Stok Awal</label>
+                  <input 
+                    type="number" 
+                    value={initialStock} 
+                    onChange={(e) => setInitialStock(Number(e.target.value))} 
+                    className="w-full" 
+                    required 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-brand-text-muted mb-1">Min. Stok (Peringatan)</label>
+                  <input 
+                    type="number" 
+                    value={minStock} 
+                    onChange={(e) => setMinStock(Number(e.target.value))} 
+                    className="w-full" 
+                    required 
+                  />
+                </div>
               </div>
               <div className="pt-4 flex flex-col sm:flex-row gap-3">
                 <button 
@@ -369,6 +405,34 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {itemToDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+          <div className="bg-brand-card w-full max-w-sm rounded-2xl border border-brand-border shadow-2xl p-6 space-y-6 animate-in zoom-in duration-200">
+            <div className="text-center space-y-2">
+              <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white">Hapus Barang?</h3>
+              <p className="text-brand-text-muted text-sm">Tindakan ini tidak dapat dibatalkan. Semua data terkait barang ini akan dihapus.</p>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setItemToDelete(null)}
+                className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleDelete}
+                className="flex-1 bg-red-500 hover:bg-red-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-red-500/20"
+              >
+                Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}
