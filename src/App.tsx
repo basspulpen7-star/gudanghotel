@@ -7,13 +7,15 @@ import { Suppliers } from './components/Suppliers';
 import { IncomingGoods } from './components/IncomingGoods';
 import { OutgoingGoods } from './components/OutgoingGoods';
 import { Reports } from './components/Reports';
+import { Settings } from './components/Settings';
 import { Login } from './components/Login';
 
-type View = 'dashboard' | 'inventory' | 'suppliers' | 'incoming' | 'outgoing' | 'reports';
+type View = 'dashboard' | 'inventory' | 'suppliers' | 'incoming' | 'outgoing' | 'reports' | 'settings';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
   const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [globalSearch, setGlobalSearch] = useState('');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -36,24 +38,32 @@ export default function App() {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard />;
+        return <Dashboard user={session.user} />;
       case 'inventory':
-        return <Inventory />;
+        return <Inventory globalSearch={globalSearch} />;
       case 'suppliers':
-        return <Suppliers />;
+        return <Suppliers globalSearch={globalSearch} />;
       case 'incoming':
-        return <IncomingGoods />;
+        return <IncomingGoods globalSearch={globalSearch} />;
       case 'outgoing':
-        return <OutgoingGoods />;
+        return <OutgoingGoods globalSearch={globalSearch} />;
       case 'reports':
         return <Reports />;
+      case 'settings':
+        return <Settings user={session.user} />;
       default:
-        return <Dashboard />;
+        return <Dashboard user={session.user} />;
     }
   };
 
   return (
-    <Layout currentView={currentView} setView={setCurrentView} user={session.user}>
+    <Layout 
+      currentView={currentView} 
+      setView={setCurrentView} 
+      user={session.user}
+      searchTerm={globalSearch}
+      setSearchTerm={setGlobalSearch}
+    >
       {renderView()}
     </Layout>
   );

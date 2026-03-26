@@ -1,14 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Supplier } from '../types';
-import { Plus, Search, Edit2, Trash2, Phone, User, MapPin } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Phone, User, MapPin, Activity } from 'lucide-react';
 
-export function Suppliers() {
+interface SuppliersProps {
+  globalSearch?: string;
+}
+
+export function Suppliers({ globalSearch = '' }: SuppliersProps) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+
+  // Sync local search with global search
+  useEffect(() => {
+    if (globalSearch) {
+      setSearchTerm(globalSearch);
+    }
+  }, [globalSearch]);
 
   // Form state
   const [name, setName] = useState('');
@@ -22,25 +34,46 @@ export function Suppliers() {
 
   const fetchSuppliers = async () => {
     setLoading(true);
-    const { data } = await supabase.from('suppliers').select('*').order('name');
-    if (data) setSuppliers(data);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase.from('suppliers').select('*').order('name');
+      if (error) throw error;
+      if (data) setSuppliers(data);
+    } catch (error: any) {
+      console.error('Error fetching suppliers:', error);
+      alert('Gagal mengambil data supplier: ' + (error.message || 'Error tidak diketahui'));
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     const supplierData = { name, contact_person: contactPerson, phone, address };
 
-    if (editingSupplier) {
-      await supabase.from('suppliers').update(supplierData).eq('id', editingSupplier.id);
-    } else {
-      await supabase.from('suppliers').insert([supplierData]);
-    }
+    try {
+      if (editingSupplier) {
+        const { error } = await supabase.from('suppliers').update(supplierData).eq('id', editingSupplier.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('suppliers').insert([{
+          id: crypto.randomUUID(),
+          ...supplierData
+        }]);
+        if (error) throw error;
+      }
 
-    setIsModalOpen(false);
-    setEditingSupplier(null);
-    resetForm();
-    fetchSuppliers();
+      setIsModalOpen(false);
+      setEditingSupplier(null);
+      resetForm();
+      fetchSuppliers();
+    } catch (error: any) {
+      console.error('Error saving supplier:', error);
+      alert('Gagal menyimpan data supplier: ' + (error.message || 'Error tidak diketahui') + 
+            '\n\nPastikan tabel "suppliers" sudah ada di database Supabase Anda.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -61,8 +94,13 @@ export function Suppliers() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Apakah Anda yakin ingin menghapus supplier ini?')) {
-      await supabase.from('suppliers').delete().eq('id', id);
-      fetchSuppliers();
+      try {
+        await supabase.from('suppliers').delete().eq('id', id);
+        fetchSuppliers();
+      } catch (error) {
+        console.error('Error deleting supplier:', error);
+        alert('Gagal menghapus supplier.');
+      }
     }
   };
 
@@ -72,19 +110,28 @@ export function Suppliers() {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 animate-in fade-in duration-500 p-4 md:p-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-white">Data Supplier</h2>
+          <h2 className="text-2xl md:text-3xl font-bold text-white">Data Supplier</h2>
           <p className="text-brand-text-muted">Kelola daftar vendor dan supplier hotel</p>
         </div>
-        <button 
-          onClick={() => { resetForm(); setEditingSupplier(null); setIsModalOpen(true); }}
-          className="bg-brand-accent hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-brand-accent/20"
-        >
-          <Plus className="w-5 h-5" />
-          Tambah Supplier
-        </button>
+        <div className="flex gap-2 w-full md:w-auto">
+          <button 
+            onClick={fetchSuppliers}
+            className="flex-1 md:flex-none bg-brand-card text-white px-4 py-3 rounded-xl border border-brand-border hover:bg-brand-dark transition-all flex items-center justify-center gap-2"
+          >
+            <Activity className="w-5 h-5" />
+            <span>Refresh</span>
+          </button>
+          <button 
+            onClick={() => { resetForm(); setEditingSupplier(null); setIsModalOpen(true); }}
+            className="flex-1 md:flex-none bg-brand-accent hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-brand-accent/20"
+          >
+            <Plus className="w-5 h-5" />
+            Tambah Supplier
+          </button>
+        </div>
       </div>
 
       <div className="relative">
@@ -92,13 +139,13 @@ export function Suppliers() {
         <input 
           type="text" 
           placeholder="Cari supplier atau kontak..." 
-          className="w-full pl-10"
+          className="w-full pl-10 py-2 text-sm bg-brand-dark border border-brand-border rounded-lg text-white focus:ring-1 focus:ring-brand-accent outline-none"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {loading ? (
           <div className="col-span-full text-center py-12 text-brand-text-muted">Loading...</div>
         ) : filteredSuppliers.length === 0 ? (
@@ -138,12 +185,12 @@ export function Suppliers() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200">
-            <div className="p-6 border-b border-brand-border flex justify-between items-center">
+          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden">
+            <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30">
               <h3 className="text-xl font-bold text-white">{editingSupplier ? 'Edit Supplier' : 'Tambah Supplier Baru'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-brand-text-muted hover:text-white">✕</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-brand-text-muted hover:text-white p-2">✕</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-brand-text-muted mb-1">Nama Perusahaan</label>
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full" required />
@@ -160,10 +207,21 @@ export function Suppliers() {
                 <label className="block text-sm font-medium text-brand-text-muted mb-1">Alamat</label>
                 <textarea value={address} onChange={(e) => setAddress(e.target.value)} className="w-full h-24 resize-none" required />
               </div>
-              <div className="pt-4 flex gap-3">
+              <div className="pt-4 flex flex-col sm:flex-row gap-3">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all">Batal</button>
-                <button type="submit" className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20">
-                  {editingSupplier ? 'Simpan Perubahan' : 'Tambah Supplier'}
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    editingSupplier ? 'Simpan Perubahan' : 'Tambah Supplier'
+                  )}
                 </button>
               </div>
             </form>
