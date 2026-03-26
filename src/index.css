@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-dark: #0f172a;
+  --color-brand-card: #1e293b;
+  --color-brand-accent: #3b82f6;
+  --color-brand-text-muted: #94a3b8;
+  --color-brand-border: #334155;
+}
+
+body {
+  background-color: var(--color-brand-dark);
+  color: white;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  input, select, textarea {
+    @apply bg-brand-card border border-brand-border rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-accent;
+  }
+}
