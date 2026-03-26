@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { LogIn, Hotel } from 'lucide-react';
 
 export function Login() {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -13,8 +13,31 @@ export function Login() {
     setLoading(true);
     setError(null);
 
+    let loginEmail = identifier;
+
+    // If identifier doesn't look like an email, try to resolve it from a profiles table
+    if (!identifier.includes('@')) {
+      try {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('username', identifier)
+          .single();
+        
+        if (profileError) {
+          // If profile not found, we'll still try to log in with the identifier as email
+          // (it will likely fail, but that's the expected behavior for invalid credentials)
+          console.warn('Profile not found for username:', identifier);
+        } else if (profile?.email) {
+          loginEmail = profile.email;
+        }
+      } catch (err) {
+        console.error('Error resolving username:', err);
+      }
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: loginEmail,
       password,
     });
 
@@ -37,13 +60,13 @@ export function Login() {
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-brand-text-muted mb-2">Email Address</label>
+            <label className="block text-sm font-medium text-brand-text-muted mb-2">Email atau Nama Pengguna</label>
             <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               className="w-full"
-              placeholder="admin@hotelalia.com"
+              placeholder="admin atau admin@hotelalia.com"
               required
             />
           </div>

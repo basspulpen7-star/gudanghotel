@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { User, Mail, Shield, Camera, Save, Loader2 } from 'lucide-react';
+import { User, Mail, Shield, Camera, Save, Loader2, LogOut } from 'lucide-react';
 
 interface SettingsProps {
   user: any;
@@ -11,6 +11,10 @@ export function Settings({ user }: SettingsProps) {
   const [avatarUrl, setAvatarUrl] = useState(user?.user_metadata?.avatar_url || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,9 +158,15 @@ export function Settings({ user }: SettingsProps) {
           <div className="bg-brand-card border border-brand-border rounded-2xl p-6 md:p-8">
             <h4 className="text-lg font-bold text-white mb-4">Keamanan Akun</h4>
             <p className="text-brand-text-muted text-sm mb-6">Untuk mengubah kata sandi, silakan hubungi administrator sistem atau gunakan fitur reset password di halaman login.</p>
-            <button className="text-brand-accent font-semibold hover:underline text-sm">
-              Pelajari tentang kebijakan keamanan kami
-            </button>
+            <div className="pt-4 border-t border-brand-border">
+              <button 
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-red-400 hover:text-red-300 font-semibold transition-colors"
+              >
+                <LogOut className="w-5 h-5" />
+                <span>Keluar dari Akun</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

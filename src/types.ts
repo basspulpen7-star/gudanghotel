@@ -15,6 +15,7 @@ export interface Supplier {
   contact_person: string;
   phone: string;
   address: string;
+  category: string;
   created_at: string;
 }
 

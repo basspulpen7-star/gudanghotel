@@ -18,6 +18,17 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Month & Year Filter
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  const months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
+
   // Sync local search with global search
   useEffect(() => {
     if (globalSearch) {
@@ -192,11 +203,14 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
 
   const selectedItem = items.find(i => i.id === selectedItemId);
 
-  const filteredTransactions = transactions.filter(tx => 
-    tx.items?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tx.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tx.notes?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredTransactions = transactions.filter(tx => {
+    const txDate = new Date(tx.created_at);
+    const matchesMonth = txDate.getMonth() === selectedMonth && txDate.getFullYear() === selectedYear;
+    const matchesSearch = tx.items?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         tx.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         tx.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesMonth && matchesSearch;
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 p-4 md:p-0">
@@ -235,8 +249,8 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
             <ArrowUpCircle className="w-5 h-5 text-purple-500" />
             Riwayat Distribusi
           </h3>
-          <div className="w-full md:w-auto">
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-text-muted" />
               <input 
                 type="text" 
@@ -245,6 +259,26 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full md:w-64 pl-10 py-2 text-sm bg-brand-dark border border-brand-border rounded-lg text-white focus:ring-1 focus:ring-brand-accent outline-none" 
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <select 
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                className="bg-brand-dark border border-brand-border text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-brand-accent"
+              >
+                {months.map((month, index) => (
+                  <option key={index} value={index}>{month}</option>
+                ))}
+              </select>
+              <select 
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="bg-brand-dark border border-brand-border text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-brand-accent"
+              >
+                {years.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -284,7 +318,7 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
                   <td className="px-6 py-4 text-brand-text-muted">{tx.items?.unit}</td>
                   <td className="px-6 py-4 text-brand-text-muted text-sm italic">{tx.notes || '-'}</td>
                   <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => handleEdit(tx)}
                         className="p-2 hover:bg-brand-accent/20 text-brand-accent rounded-lg transition-colors"
@@ -308,13 +342,13 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden">
-            <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
+          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
+            <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30 flex-shrink-0">
               <h3 className="text-xl font-bold text-white">{editingTransaction ? 'Edit Barang Keluar' : 'Catat Barang Keluar'}</h3>
               <button onClick={() => { setIsModalOpen(false); setEditingTransaction(null); resetForm(); }} className="text-brand-text-muted hover:text-white p-2">✕</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form id="outgoing-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow">
               <div>
                 <label className="block text-sm font-medium text-brand-text-muted mb-1">Pilih Barang</label>
                 <select 
@@ -386,31 +420,31 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
                   <span>Jumlah melebihi stok yang tersedia!</span>
                 </div>
               )}
-
-              <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => { setIsModalOpen(false); setEditingTransaction(null); resetForm(); }}
-                  className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all"
-                >
-                  Batal
-                </button>
-                <button 
-                  type="submit"
-                  disabled={isSubmitting || !selectedItem || quantity <= 0 || quantity > (selectedItem.current_stock + (editingTransaction?.quantity || 0))}
-                  className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Menyimpan...</span>
-                    </>
-                  ) : (
-                    editingTransaction ? 'Simpan Perubahan' : 'Simpan Transaksi'
-                  )}
-                </button>
-              </div>
             </form>
+            <div className="p-6 border-t border-brand-border bg-brand-dark/30 flex flex-col sm:flex-row gap-3 flex-shrink-0">
+              <button 
+                type="button" 
+                onClick={() => { setIsModalOpen(false); setEditingTransaction(null); resetForm(); }}
+                className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all"
+              >
+                Batal
+              </button>
+              <button 
+                type="submit"
+                form="outgoing-form"
+                disabled={isSubmitting || !selectedItem || quantity <= 0 || quantity > (selectedItem.current_stock + (editingTransaction?.quantity || 0))}
+                className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  editingTransaction ? 'Simpan Perubahan' : 'Simpan Transaksi'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

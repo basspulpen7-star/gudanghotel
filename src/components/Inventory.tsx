@@ -10,13 +10,24 @@ interface InventoryProps {
 
 export function Inventory({ globalSearch = '' }: InventoryProps) {
   const [items, setItems] = useState<Item[]>([]);
-  const [itemStats, setItemStats] = useState<Record<string, { in: number, out: number }>>({});
+  const [itemStats, setItemStats] = useState<Record<string, { initial: number, in: number, out: number, final: number }>>({});
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
+  // Month & Year Filter
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  const months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
 
   // Sync local search with global search
   useEffect(() => {
@@ -39,29 +50,38 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   useEffect(() => {
     fetchItems();
     checkDatabase();
-  }, []);
+  }, [selectedMonth, selectedYear]);
 
   const checkDatabase = async () => {
     try {
-      // Check for department column
-      const { error: deptError } = await supabase.from('items').select('department').limit(1);
+      // Check for required columns in items table
+      const { error: itemsError } = await supabase.from('items').select('department, initial_stock').limit(1);
       
-      if (deptError) {
-        if (deptError.message.includes('column "department" does not exist')) {
+      if (itemsError) {
+        if (itemsError.message.includes('column "initial_stock" does not exist')) {
+          setDbStatus({ ok: false, message: 'Kolom "initial_stock" belum ada di tabel items. Silakan jalankan SQL update.' });
+          return;
+        } else if (itemsError.message.includes('column "department" does not exist')) {
           setDbStatus({ ok: false, message: 'Kolom "department" belum ada di tabel items. Silakan jalankan SQL update.' });
           return;
-        } else if (deptError.message.includes('relation "items" does not exist')) {
+        } else if (itemsError.message.includes('relation "items" does not exist')) {
           setDbStatus({ ok: false, message: 'Tabel "items" belum dibuat di Supabase.' });
           return;
         } else {
-          setDbStatus({ ok: false, message: 'Error database: ' + deptError.message });
+          setDbStatus({ ok: false, message: 'Error database items: ' + itemsError.message });
           return;
         }
       }
 
-      // If we reach here, basic check passed. 
-      // Let's try to detect if ID is using auth.uid() by checking if we can insert multiple items
-      // (This is hard to check directly without looking at schema, but we can warn about common errors)
+      // Check for required columns in transactions table
+      const { error: transError } = await supabase.from('transactions').select('department, notes').limit(1);
+      if (transError) {
+        if (transError.message.includes('column "department" does not exist') || transError.message.includes('column "notes" does not exist')) {
+          setDbStatus({ ok: false, message: 'Kolom "department" atau "notes" belum ada di tabel transactions.' });
+          return;
+        }
+      }
+
       setDbStatus({ ok: true, message: 'Database terhubung dengan benar.' });
     } catch (err) {
       setDbStatus({ ok: false, message: 'Gagal mengecek status database.' });
@@ -74,14 +94,44 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
       const { data: itemsData, error: itemsError } = await supabase.from('items').select('*').order('name');
       if (itemsError) throw itemsError;
 
-      const { data: transData, error: transError } = await supabase.from('transactions').select('item_id, type, quantity');
+      const { data: transData, error: transError } = await supabase.from('transactions').select('item_id, type, quantity, created_at');
       if (transError) throw transError;
 
-      const stats: Record<string, { in: number, out: number }> = {};
-      transData?.forEach(tx => {
-        if (!stats[tx.item_id]) stats[tx.item_id] = { in: 0, out: 0 };
-        if (tx.type === 'IN') stats[tx.item_id].in += tx.quantity;
-        if (tx.type === 'OUT') stats[tx.item_id].out += tx.quantity;
+      const startDate = new Date(selectedYear, selectedMonth, 1);
+      const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
+
+      const stats: Record<string, { initial: number, in: number, out: number, final: number }> = {};
+      
+      itemsData?.forEach(item => {
+        // Calculate initial stock for the selected month
+        // Initial = item.initial_stock + sum(IN before) - sum(OUT before)
+        let beforeIn = 0;
+        let beforeOut = 0;
+        let currentIn = 0;
+        let currentOut = 0;
+
+        transData?.forEach(tx => {
+          if (tx.item_id === item.id) {
+            const txDate = new Date(tx.created_at);
+            if (txDate < startDate) {
+              if (tx.type === 'IN') beforeIn += tx.quantity;
+              if (tx.type === 'OUT') beforeOut += tx.quantity;
+            } else if (txDate >= startDate && txDate <= endDate) {
+              if (tx.type === 'IN') currentIn += tx.quantity;
+              if (tx.type === 'OUT') currentOut += tx.quantity;
+            }
+          }
+        });
+
+        const initialForMonth = (item.initial_stock || 0) + beforeIn - beforeOut;
+        const finalForMonth = initialForMonth + currentIn - currentOut;
+
+        stats[item.id] = {
+          initial: initialForMonth,
+          in: currentIn,
+          out: currentOut,
+          final: finalForMonth
+        };
       });
 
       setItemStats(stats);
@@ -203,6 +253,26 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <div className="flex items-center gap-2">
+          <select 
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+            className="bg-brand-dark border border-brand-border text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-brand-accent"
+          >
+            {months.map((month, index) => (
+              <option key={index} value={index}>{month}</option>
+            ))}
+          </select>
+          <select 
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+            className="bg-brand-dark border border-brand-border text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-brand-accent"
+          >
+            {years.map((year) => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+        </div>
         <button className="bg-brand-card border border-brand-border px-4 py-2 rounded-lg text-brand-text-muted hover:text-white flex items-center justify-center gap-2">
           <Filter className="w-4 h-4" />
           Filter
@@ -264,7 +334,7 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
                   </td>
                 </tr>
               ) : filteredItems.map((item) => {
-                const stats = itemStats[item.id] || { in: 0, out: 0 };
+                const stats = itemStats[item.id] || { initial: 0, in: 0, out: 0, final: 0 };
                 return (
                   <tr key={item.id} className="hover:bg-brand-dark/30 transition-colors group">
                     <td className="px-6 py-4 font-medium text-white">{item.name}</td>
@@ -273,38 +343,38 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
                         {item.department}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-brand-text-muted">{item.initial_stock || 0}</td>
+                    <td className="px-6 py-4 text-brand-text-muted">{stats.initial}</td>
                     <td className="px-6 py-4 text-blue-400">+{stats.in}</td>
                     <td className="px-6 py-4 text-purple-400">-{stats.out}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <span className={cn(
                           "font-bold",
-                          item.current_stock <= item.min_stock ? "text-orange-500" : "text-white"
+                          stats.final <= item.min_stock ? "text-orange-500" : "text-white"
                         )}>
-                          {item.current_stock}
+                          {stats.final}
                         </span>
-                        {item.current_stock <= item.min_stock && (
+                        {stats.final <= item.min_stock && (
                           <AlertCircle className="w-4 h-4 text-orange-500" title={`Stok rendah! Min: ${item.min_stock}`} />
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-brand-text-muted">{item.unit}</td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={() => handleEdit(item)}
-                          className="p-2 hover:bg-brand-accent/20 text-brand-accent rounded-lg transition-colors"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => setItemToDelete(item.id)}
-                          className="p-2 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                    <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => handleEdit(item)}
+                        className="p-2 hover:bg-brand-accent/20 text-brand-accent rounded-lg transition-colors"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setItemToDelete(item.id)}
+                        className="p-2 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                     </td>
                   </tr>
                 );
@@ -316,13 +386,13 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden">
-            <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
+          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
+            <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30 flex-shrink-0">
               <h3 className="text-xl font-bold text-white">{editingItem ? 'Edit Barang' : 'Tambah Barang Baru'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-brand-text-muted hover:text-white p-2">✕</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            <form id="inventory-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow">
               <div>
                 <label className="block text-sm font-medium text-brand-text-muted mb-1">Nama Barang</label>
                 <input 
@@ -381,30 +451,31 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
                   />
                 </div>
               </div>
-              <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                <button 
-                  type="button" 
-                  onClick={() => setIsModalOpen(false)}
-                  className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all"
-                >
-                  Batal
-                </button>
-                <button 
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Menyimpan...</span>
-                    </>
-                  ) : (
-                    editingItem ? 'Simpan Perubahan' : 'Tambah Barang'
-                  )}
-                </button>
-              </div>
             </form>
+            <div className="p-6 border-t border-brand-border bg-brand-dark/30 flex flex-col sm:flex-row gap-3 flex-shrink-0">
+              <button 
+                type="button" 
+                onClick={() => setIsModalOpen(false)}
+                className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all"
+              >
+                Batal
+              </button>
+              <button 
+                type="submit"
+                form="inventory-form"
+                disabled={isSubmitting}
+                className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  editingItem ? 'Simpan Perubahan' : 'Tambah Barang'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -27,10 +27,26 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
   const [contactPerson, setContactPerson] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [category, setCategory] = useState('');
 
   useEffect(() => {
     fetchSuppliers();
+    checkDatabase();
   }, []);
+
+  const checkDatabase = async () => {
+    try {
+      const { data, error } = await supabase.from('suppliers').select('category').limit(1);
+      if (error && error.code === 'PGRST116') {
+        // This is fine, just means no data
+      } else if (error && error.message.includes('column "category" does not exist')) {
+        console.warn('Kolom "category" tidak ditemukan di tabel suppliers. Silakan tambahkan kolom tersebut di Supabase.');
+        alert('Peringatan: Kolom "category" (Keterangan Barang) belum ada di database. Anda mungkin tidak bisa menyimpan data supplier baru sampai kolom ini ditambahkan di tabel "suppliers" di Supabase.');
+      }
+    } catch (e) {
+      // Ignore
+    }
+  };
 
   const fetchSuppliers = async () => {
     setLoading(true);
@@ -49,9 +65,24 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    const supplierData = { name, contact_person: contactPerson, phone, address };
-
+    
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('Anda harus login untuk menyimpan data.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const supplierData = { 
+        name, 
+        contact_person: contactPerson, 
+        phone, 
+        address, 
+        category,
+        user_id: user.id
+      };
+
       if (editingSupplier) {
         const { error } = await supabase.from('suppliers').update(supplierData).eq('id', editingSupplier.id);
         if (error) throw error;
@@ -69,8 +100,15 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
       fetchSuppliers();
     } catch (error: any) {
       console.error('Error saving supplier:', error);
-      alert('Gagal menyimpan data supplier: ' + (error.message || 'Error tidak diketahui') + 
-            '\n\nPastikan tabel "suppliers" sudah ada di database Supabase Anda.');
+      let errorMessage = 'Gagal menyimpan data supplier: ' + (error.message || 'Error tidak diketahui');
+      
+      if (error.message?.includes('column "category" does not exist')) {
+        errorMessage = 'Gagal menyimpan: Kolom "category" belum ada di tabel "suppliers" di Supabase. Silakan tambahkan kolom tersebut.';
+      } else if (error.message?.includes('relation "suppliers" does not exist')) {
+        errorMessage = 'Gagal menyimpan: Tabel "suppliers" belum ada di database Supabase Anda.';
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -81,6 +119,7 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
     setContactPerson('');
     setPhone('');
     setAddress('');
+    setCategory('');
   };
 
   const handleEdit = (supplier: Supplier) => {
@@ -89,6 +128,7 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
     setContactPerson(supplier.contact_person);
     setPhone(supplier.phone);
     setAddress(supplier.address);
+    setCategory(supplier.category || '');
     setIsModalOpen(true);
   };
 
@@ -106,7 +146,8 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
 
   const filteredSuppliers = suppliers.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.contact_person.toLowerCase().includes(searchTerm.toLowerCase())
+    s.contact_person.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (s.category && s.category.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
@@ -153,7 +194,10 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
         ) : filteredSuppliers.map((supplier) => (
           <div key={supplier.id} className="bg-brand-card p-6 rounded-2xl border border-brand-border hover:border-brand-accent transition-all group">
             <div className="flex justify-between items-start mb-4">
-              <h3 className="text-lg font-bold text-white">{supplier.name}</h3>
+              <div>
+                <h3 className="text-lg font-bold text-white">{supplier.name}</h3>
+                <p className="text-xs text-brand-accent font-medium mt-1">{supplier.category || 'Kategori belum diatur'}</p>
+              </div>
               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => handleEdit(supplier)} className="p-1.5 hover:bg-brand-accent/20 text-brand-accent rounded-lg">
                   <Edit2 className="w-4 h-4" />
@@ -184,13 +228,14 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden">
-            <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
+          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
+            <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30 flex-shrink-0">
               <h3 className="text-xl font-bold text-white">{editingSupplier ? 'Edit Supplier' : 'Tambah Supplier Baru'}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-brand-text-muted hover:text-white p-2">✕</button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+            
+            <form id="supplier-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow">
               <div>
                 <label className="block text-sm font-medium text-brand-text-muted mb-1">Nama Perusahaan</label>
                 <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full" required />
@@ -207,24 +252,37 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
                 <label className="block text-sm font-medium text-brand-text-muted mb-1">Alamat</label>
                 <textarea value={address} onChange={(e) => setAddress(e.target.value)} className="w-full h-24 resize-none" required />
               </div>
-              <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all">Batal</button>
-                <button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      <span>Menyimpan...</span>
-                    </>
-                  ) : (
-                    editingSupplier ? 'Simpan Perubahan' : 'Tambah Supplier'
-                  )}
-                </button>
+              <div>
+                <label className="block text-sm font-medium text-brand-text-muted mb-1">Keterangan Barang (Suplier barang apa)</label>
+                <input 
+                  type="text" 
+                  value={category} 
+                  onChange={(e) => setCategory(e.target.value)} 
+                  className="w-full" 
+                  placeholder="Contoh: Sayuran, Alat Tulis, Linen, dll"
+                  required 
+                />
               </div>
             </form>
+
+            <div className="p-6 border-t border-brand-border bg-brand-dark/30 flex flex-col sm:flex-row gap-3 flex-shrink-0">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all">Batal</button>
+              <button 
+                type="submit" 
+                form="supplier-form"
+                disabled={isSubmitting}
+                className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Menyimpan...</span>
+                  </>
+                ) : (
+                  editingSupplier ? 'Simpan Perubahan' : 'Tambah Supplier'
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

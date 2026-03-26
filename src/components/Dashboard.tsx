@@ -30,7 +30,7 @@ export function Dashboard({ user }: { user: any }) {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: itemsData, error: itemsError } = await supabase.from('items').select('*');
+      const { data: itemsData, error: itemsError } = await supabase.from('items').select('*').order('name');
       if (itemsError) throw itemsError;
 
       const { data: transData, error: transError } = await supabase
