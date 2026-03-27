@@ -14,7 +14,10 @@ import {
   Truck,
   Menu,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Users,
+  ShoppingCart,
+  Database
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
@@ -40,8 +43,25 @@ export function Layout({ children, currentView, setView, user, searchTerm, setSe
     { id: 'suppliers', label: 'Data Supplier', icon: Truck },
     { id: 'incoming', label: 'Barang Masuk', icon: ArrowDownCircle },
     { id: 'outgoing', label: 'Barang Keluar', icon: ArrowUpCircle },
+    { id: 'purchase_orders', label: 'Purchase Order', icon: ShoppingCart },
     { id: 'reports', label: 'Laporan', icon: FileText },
+    { id: 'database_setup', label: 'Database Setup', icon: Database },
   ];
+
+  const isAdmin = user?.email === 'admin@hotelalia.com' || user?.email === 'satriabertopi7@gmail.com';
+
+  if (isAdmin) {
+    // Already added database_setup in menuItems, but let's make sure user_management is there too
+    if (!menuItems.find(m => m.id === 'user_management')) {
+      menuItems.push({ id: 'user_management', label: 'Manajemen User', icon: Users });
+    }
+  } else {
+    // Remove admin only items if not admin
+    const adminOnly = ['user_management', 'database_setup'];
+    const filtered = menuItems.filter(item => !adminOnly.includes(item.id));
+    menuItems.length = 0;
+    menuItems.push(...filtered);
+  }
 
   useEffect(() => {
     fetchNotifications();
@@ -129,10 +149,11 @@ export function Layout({ children, currentView, setView, user, searchTerm, setSe
 
         <div className="p-4 space-y-2 border-t border-brand-border">
           <button 
-            onClick={() => handleSetView('reports')}
-            className="w-full bg-brand-accent/10 text-brand-accent hover:bg-brand-accent hover:text-white font-semibold py-3 rounded-xl transition-all mb-4"
+            onClick={() => handleSetView('purchase_orders')}
+            className="w-full bg-brand-accent hover:bg-blue-600 text-white font-bold py-3 rounded-xl transition-all mb-4 shadow-lg shadow-brand-accent/20 flex items-center justify-center gap-2"
           >
-            Buat Laporan
+            <ShoppingCart className="w-5 h-5" />
+            Buat Purchase Order
           </button>
           
           <button 
@@ -230,7 +251,7 @@ export function Layout({ children, currentView, setView, user, searchTerm, setSe
                   {user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'}
                 </p>
                 <p className="text-xs text-brand-text-muted uppercase tracking-wider">
-                  {user?.email === 'admin@hotelalia.com' ? 'Administrator' : 'Staff Gudang'}
+                  {isAdmin ? 'Administrator' : 'Staff Gudang'}
                 </p>
               </div>
               <button 

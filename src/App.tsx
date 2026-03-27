@@ -7,10 +7,13 @@ import { Suppliers } from './components/Suppliers';
 import { IncomingGoods } from './components/IncomingGoods';
 import { OutgoingGoods } from './components/OutgoingGoods';
 import { Reports } from './components/Reports';
+import { PurchaseOrders } from './components/PurchaseOrders';
+import { UserManagement } from './components/UserManagement';
+import { DatabaseSetup } from './components/DatabaseSetup';
 import { Settings } from './components/Settings';
 import { Login } from './components/Login';
 
-type View = 'dashboard' | 'inventory' | 'suppliers' | 'incoming' | 'outgoing' | 'reports' | 'settings';
+type View = 'dashboard' | 'inventory' | 'suppliers' | 'incoming' | 'outgoing' | 'reports' | 'settings' | 'purchase_orders' | 'user_management' | 'database_setup';
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
@@ -49,6 +52,12 @@ export default function App() {
         return <OutgoingGoods globalSearch={globalSearch} />;
       case 'reports':
         return <Reports />;
+      case 'purchase_orders':
+        return <PurchaseOrders />;
+      case 'user_management':
+        return <UserManagement />;
+      case 'database_setup':
+        return <DatabaseSetup />;
       case 'settings':
         return <Settings user={session.user} />;
       default:

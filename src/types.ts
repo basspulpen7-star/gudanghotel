@@ -35,6 +35,28 @@ export interface Transaction {
 export interface UserProfile {
   id: string;
   full_name: string;
-  role: string;
+  role: 'admin' | 'staff';
   avatar_url?: string;
+  username?: string;
+  email?: string;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  supplier_id: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  total_amount: number;
+  created_at: string;
+  user_id: string;
+  supplier?: Supplier;
+  items?: PurchaseOrderItem[];
+}
+
+export interface PurchaseOrderItem {
+  id: string;
+  purchase_order_id: string;
+  item_id: string;
+  quantity: number;
+  price: number;
+  item?: Item;
 }
