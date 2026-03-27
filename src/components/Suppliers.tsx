@@ -36,12 +36,15 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
 
   const checkDatabase = async () => {
     try {
-      const { data, error } = await supabase.from('suppliers').select('category').limit(1);
-      if (error && error.code === 'PGRST116') {
-        // This is fine, just means no data
-      } else if (error && error.message.includes('column "category" does not exist')) {
-        console.warn('Kolom "category" tidak ditemukan di tabel suppliers. Silakan tambahkan kolom tersebut di Supabase.');
-        alert('Peringatan: Kolom "category" (Keterangan Barang) belum ada di database. Anda mungkin tidak bisa menyimpan data supplier baru sampai kolom ini ditambahkan di tabel "suppliers" di Supabase.');
+      const { error } = await supabase.from('suppliers').select('category, user_id').limit(1);
+      if (error) {
+        let missingCols = [];
+        if (error.message.includes('column "category" does not exist')) missingCols.push('"category" (TEXT)');
+        if (error.message.includes('column "user_id" does not exist')) missingCols.push('"user_id" (UUID)');
+        
+        if (missingCols.length > 0) {
+          alert(`Peringatan: Kolom ${missingCols.join(' dan ')} belum ada di tabel "suppliers".\n\nSilakan jalankan perintah SQL ini di Supabase SQL Editor:\n\nALTER TABLE suppliers ADD COLUMN IF NOT EXISTS category TEXT;\nALTER TABLE suppliers ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);`);
+        }
       }
     } catch (e) {
       // Ignore
@@ -104,6 +107,8 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
       
       if (error.message?.includes('column "category" does not exist')) {
         errorMessage = 'Gagal menyimpan: Kolom "category" belum ada di tabel "suppliers" di Supabase. Silakan tambahkan kolom tersebut.';
+      } else if (error.message?.includes('column "user_id" does not exist')) {
+        errorMessage = 'Gagal menyimpan: Kolom "user_id" belum ada di tabel "suppliers" di Supabase. Silakan tambahkan kolom tersebut.';
       } else if (error.message?.includes('relation "suppliers" does not exist')) {
         errorMessage = 'Gagal menyimpan: Tabel "suppliers" belum ada di database Supabase Anda.';
       }

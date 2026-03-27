@@ -16,6 +16,7 @@ export interface Supplier {
   phone: string;
   address: string;
   category: string;
+  user_id: string;
   created_at: string;
 }
 
