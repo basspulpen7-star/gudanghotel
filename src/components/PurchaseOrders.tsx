@@ -16,7 +16,8 @@ import {
   Download,
   Printer,
   Eye,
-  X
+  X,
+  Edit2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -32,6 +33,7 @@ export function PurchaseOrders() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedPo, setExpandedPo] = useState<string | null>(null);
   const [viewingPo, setViewingPo] = useState<PurchaseOrder | null>(null);
+  const [editingPoId, setEditingPoId] = useState<string | null>(null);
 
   // Form state
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
@@ -108,36 +110,68 @@ export function PurchaseOrders() {
       if (!user) throw new Error('User not authenticated');
 
       const totalAmount = poItems.reduce((acc, item) => acc + (item.quantity * item.price), 0);
-      const poId = crypto.randomUUID();
+      
+      if (editingPoId) {
+        // UPDATE EXISTING PO
+        // 1. Update PO header
+        const { error: poError } = await supabase.from('purchase_orders').update({
+          supplier_id: selectedSupplierId,
+          total_amount: totalAmount,
+        }).eq('id', editingPoId);
 
-      // 1. Create PO
-      const { error: poError } = await supabase.from('purchase_orders').insert([{
-        id: poId,
-        supplier_id: selectedSupplierId,
-        user_id: user.id,
-        total_amount: totalAmount,
-        status: 'pending'
-      }]);
+        if (poError) throw poError;
 
-      if (poError) throw poError;
+        // 2. Delete old items
+        const { error: deleteItemsError } = await supabase
+          .from('purchase_order_items')
+          .delete()
+          .eq('purchase_order_id', editingPoId);
+        
+        if (deleteItemsError) throw deleteItemsError;
 
-      // 2. Create PO Items
-      const { error: itemsError } = await supabase.from('purchase_order_items').insert(
-        poItems.map(item => ({
-          id: crypto.randomUUID(),
-          purchase_order_id: poId,
-          ...item
-        }))
-      );
+        // 3. Insert new items
+        const { error: itemsError } = await supabase.from('purchase_order_items').insert(
+          poItems.map(item => ({
+            id: crypto.randomUUID(),
+            purchase_order_id: editingPoId,
+            ...item
+          }))
+        );
 
-      if (itemsError) throw itemsError;
+        if (itemsError) throw itemsError;
+      } else {
+        // CREATE NEW PO
+        const poId = crypto.randomUUID();
+
+        // 1. Create PO
+        const { error: poError } = await supabase.from('purchase_orders').insert([{
+          id: poId,
+          supplier_id: selectedSupplierId,
+          user_id: user.id,
+          total_amount: totalAmount,
+          status: 'pending'
+        }]);
+
+        if (poError) throw poError;
+
+        // 2. Create PO Items
+        const { error: itemsError } = await supabase.from('purchase_order_items').insert(
+          poItems.map(item => ({
+            id: crypto.randomUUID(),
+            purchase_order_id: poId,
+            ...item
+          }))
+        );
+
+        if (itemsError) throw itemsError;
+      }
 
       setIsModalOpen(false);
       resetForm();
       fetchData();
     } catch (error: any) {
       console.error('Error saving PO:', error);
-      alert('Gagal menyimpan PO: ' + error.message + '\n\nPastikan tabel "purchase_orders" dan "purchase_order_items" sudah ada.');
+      alert('Gagal menyimpan PO: ' + error.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -146,6 +180,40 @@ export function PurchaseOrders() {
   const resetForm = () => {
     setSelectedSupplierId('');
     setPoItems([{ item_id: '', quantity: 1, price: 0 }]);
+    setEditingPoId(null);
+  };
+
+  const handleEdit = (po: PurchaseOrder) => {
+    setEditingPoId(po.id);
+    setSelectedSupplierId(po.supplier_id);
+    if (po.items && po.items.length > 0) {
+      setPoItems(po.items.map(item => ({
+        item_id: item.item_id,
+        quantity: item.quantity,
+        price: item.price
+      })));
+    } else {
+      setPoItems([{ item_id: '', quantity: 1, price: 0 }]);
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus Purchase Order ini? Data yang dihapus tidak dapat dikembalikan.')) {
+      return;
+    }
+
+    try {
+      // Items will be deleted automatically if cascade is set, 
+      // but let's be explicit just in case
+      await supabase.from('purchase_order_items').delete().eq('purchase_order_id', id);
+      const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
+      
+      if (error) throw error;
+      fetchData();
+    } catch (error: any) {
+      alert('Gagal menghapus PO: ' + error.message);
+    }
   };
 
   const updateStatus = async (id: string, status: 'completed' | 'cancelled') => {
@@ -330,6 +398,20 @@ export function PurchaseOrders() {
                     Lihat Detail
                   </button>
                   <button 
+                    onClick={() => handleEdit(po)}
+                    className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-blue-400 hover:bg-brand-card transition-all"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit PO
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(po.id)}
+                    className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-red-400 hover:bg-brand-card transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Hapus PO
+                  </button>
+                  <button 
                     onClick={() => exportToPDF(po)}
                     className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-white hover:bg-brand-card transition-all"
                   >
@@ -404,8 +486,10 @@ export function PurchaseOrders() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
           <div className="bg-brand-card w-full max-w-2xl rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
             <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30">
-              <h3 className="text-xl font-bold text-white">Buat Purchase Order Baru</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-brand-text-muted hover:text-white p-2">✕</button>
+              <h3 className="text-xl font-bold text-white">
+                {editingPoId ? 'Edit Purchase Order' : 'Buat Purchase Order Baru'}
+              </h3>
+              <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-brand-text-muted hover:text-white p-2">✕</button>
             </div>
             
             <form id="po-form" onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-grow">
