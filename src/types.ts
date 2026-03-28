@@ -50,6 +50,7 @@ export interface PurchaseOrder {
   user_id: string;
   supplier?: Supplier;
   items?: PurchaseOrderItem[];
+  user_profile?: UserProfile;
 }
 
 export interface PurchaseOrderItem {

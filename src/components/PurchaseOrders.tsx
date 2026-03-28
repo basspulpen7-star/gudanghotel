@@ -49,7 +49,7 @@ export function PurchaseOrders() {
     setLoading(true);
     try {
       const [posRes, suppliersRes, itemsRes] = await Promise.all([
-        supabase.from('purchase_orders').select('*, supplier:suppliers(*)').order('created_at', { ascending: false }),
+        supabase.from('purchase_orders').select('*, supplier:suppliers(*), user_profile:profiles(*)').order('created_at', { ascending: false }),
         supabase.from('suppliers').select('*').order('name'),
         supabase.from('items').select('*').order('name')
       ]);
@@ -241,6 +241,7 @@ export function PurchaseOrders() {
     doc.text(`PO Number: ${po.id.slice(0, 8).toUpperCase()}`, 140, 35);
     doc.text(`Date: ${format(new Date(po.created_at), 'dd/MM/yyyy')}`, 140, 40);
     doc.text(`Status: ${po.status.toUpperCase()}`, 140, 45);
+    doc.text(`By: ${po.user_profile?.full_name || 'Admin'}`, 140, 50);
 
     doc.setFontSize(12);
     doc.text('Supplier:', 14, 60);

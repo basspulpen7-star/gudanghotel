@@ -75,7 +75,7 @@ export function PurchaseOrderDocument({ po, supplier }: PurchaseOrderDocumentPro
           <tbody>
             <tr>
               <td className="px-3 py-2 border-r border-gray-400 text-center">{format(new Date(po.created_at), 'dd/MM/yyyy')}</td>
-              <td className="px-3 py-2 border-r border-gray-400 text-center">Admin</td>
+              <td className="px-3 py-2 border-r border-gray-400 text-center">{po.user_profile?.full_name || 'Admin'}</td>
               <td className="px-3 py-2 border-r border-gray-400 text-center">-</td>
               <td className="px-3 py-2 text-center">Net 30</td>
             </tr>
