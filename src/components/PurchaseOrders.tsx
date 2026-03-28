@@ -14,11 +14,14 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
-  Printer
+  Printer,
+  Eye,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { PurchaseOrderDocument } from './PurchaseOrderDocument';
 
 export function PurchaseOrders() {
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
@@ -28,6 +31,7 @@ export function PurchaseOrders() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedPo, setExpandedPo] = useState<string | null>(null);
+  const [viewingPo, setViewingPo] = useState<PurchaseOrder | null>(null);
 
   // Form state
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
@@ -198,6 +202,40 @@ export function PurchaseOrders() {
     doc.save(`PO_${po.id.slice(0, 8)}.pdf`);
   };
 
+  const handlePrint = () => {
+    const printContent = document.getElementById('po-document');
+    if (!printContent) return;
+
+    const originalContents = document.body.innerHTML;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Purchase Order - ${viewingPo?.id.slice(0, 8)}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @media print {
+              body { margin: 0; padding: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body class="bg-white p-0">
+          ${printContent.outerHTML}
+          <script>
+            window.onload = () => {
+              window.print();
+              window.onafterprint = () => window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 p-4 md:p-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -285,6 +323,13 @@ export function PurchaseOrders() {
 
                 <div className="flex flex-wrap gap-3 justify-end">
                   <button 
+                    onClick={() => setViewingPo(po)}
+                    className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-white hover:bg-brand-card transition-all"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Lihat Detail
+                  </button>
+                  <button 
                     onClick={() => exportToPDF(po)}
                     className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-white hover:bg-brand-card transition-all"
                   >
@@ -315,6 +360,44 @@ export function PurchaseOrders() {
           </div>
         ))}
       </div>
+
+      {/* Modal Preview PO */}
+      {viewingPo && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[110] p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col max-h-[95vh]">
+            <div className="p-4 bg-gray-100 border-b border-gray-200 flex justify-between items-center no-print">
+              <div className="flex items-center gap-4">
+                <h3 className="text-lg font-bold text-gray-800">Preview Purchase Order</h3>
+                <span className="px-3 py-1 bg-brand-accent/10 text-brand-accent rounded-full text-xs font-bold">
+                  #{viewingPo.id.slice(0, 8).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={handlePrint}
+                  className="flex items-center gap-2 px-4 py-2 bg-brand-accent text-white rounded-lg hover:bg-blue-600 transition-all font-bold text-sm"
+                >
+                  <Printer className="w-4 h-4" />
+                  Cetak / Print
+                </button>
+                <button 
+                  onClick={() => setViewingPo(null)} 
+                  className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-grow overflow-y-auto p-4 md:p-8 bg-gray-200">
+              <PurchaseOrderDocument 
+                po={viewingPo} 
+                supplier={suppliers.find(s => s.id === viewingPo.supplier_id)} 
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Buat PO */}
       {isModalOpen && (

@@ -100,6 +100,20 @@ export function Login() {
               </>
             )}
           </button>
+
+          <div className="pt-4 border-t border-brand-border mt-6">
+            <button
+              type="button"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                localStorage.clear();
+                window.location.reload();
+              }}
+              className="w-full text-xs text-brand-text-muted hover:text-white transition-all underline"
+            >
+              Masalah Login? Reset Sesi
+            </button>
+          </div>
         </form>
       </div>
     </div>

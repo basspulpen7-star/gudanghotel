@@ -21,14 +21,36 @@ export default function App() {
   const [globalSearch, setGlobalSearch] = useState('');
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) {
+          if (error.message.includes('Refresh Token Not Found') || error.message.includes('invalid_grant')) {
+            // Force local logout if refresh token is invalid
+            await supabase.auth.signOut();
+            localStorage.clear();
+            setSession(null);
+          } else {
+            console.error('Session check error:', error);
+          }
+        } else {
+          setSession(session);
+        }
+      } catch (err) {
+        console.error('Unexpected session check error:', err);
+      }
+    };
+
+    checkSession();
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setSession(session);
+      }
     });
 
     return () => subscription.unsubscribe();

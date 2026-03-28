@@ -106,6 +106,7 @@ export function Layout({ children, currentView, setView, user, searchTerm, setSe
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    localStorage.clear();
   };
 
   const handleSetView = (view: string) => {
