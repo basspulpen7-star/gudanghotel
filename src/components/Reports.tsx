@@ -79,24 +79,61 @@ export function Reports() {
 
       if (itemsError) throw itemsError;
 
-      // Fetch transactions for the period to calculate movements
+      // Fetch all transactions to calculate historical stock correctly
       const { data: transData, error: transError } = await supabase
         .from('transactions')
-        .select('*')
-        .gte('created_at', start.toISOString())
-        .lte('created_at', end.toISOString());
+        .select('item_id, type, quantity, created_at');
 
       if (transError) throw transError;
 
-      const stats: Record<string, { in: number, out: number }> = {};
-      transData?.forEach(t => {
-        if (!stats[t.item_id]) stats[t.item_id] = { in: 0, out: 0 };
-        if (t.type === 'IN') stats[t.item_id].in += t.quantity;
-        else stats[t.item_id].out += t.quantity;
+      const stats: Record<string, { initial: number, in: number, out: number, final: number }> = {};
+      
+      itemsData?.forEach(item => {
+        let beforeIn = 0;
+        let beforeOut = 0;
+        let currentIn = 0;
+        let currentOut = 0;
+
+        transData?.forEach(tx => {
+          if (tx.item_id === item.id) {
+            const txDate = new Date(tx.created_at);
+            if (txDate < start) {
+              if (tx.type === 'IN') beforeIn += tx.quantity;
+              if (tx.type === 'OUT') beforeOut += tx.quantity;
+            } else if (txDate >= start && txDate <= end) {
+              if (tx.type === 'IN') currentIn += tx.quantity;
+              if (tx.type === 'OUT') currentOut += tx.quantity;
+            }
+          }
+        });
+
+        const itemCreatedAt = new Date(item.created_at);
+        const itemCreatedMonth = startOfMonth(itemCreatedAt);
+        
+        let initialForPeriod = 0;
+        let finalForPeriod = 0;
+
+        // Only show stock if the selected period is the same or after the creation month
+        if (start >= itemCreatedMonth) {
+          initialForPeriod = (item.initial_stock || 0) + beforeIn - beforeOut;
+          finalForPeriod = initialForPeriod + currentIn - currentOut;
+        } else {
+          initialForPeriod = 0;
+          currentIn = 0;
+          currentOut = 0;
+          finalForPeriod = 0;
+        }
+
+        stats[item.id] = {
+          initial: initialForPeriod,
+          in: currentIn,
+          out: currentOut,
+          final: finalForPeriod
+        };
       });
 
       setItems(itemsData || []);
-      setItemStats(stats);
+      setItemStats(stats as any);
     } catch (error: any) {
       console.error('Error fetching stock data:', error);
       alert('Gagal mengambil data stok: ' + error.message);
@@ -176,14 +213,14 @@ export function Reports() {
 
     if (reportCategory === 'stock') {
       const tableData = items.map(item => {
-        const stats = itemStats[item.id] || { in: 0, out: 0 };
+        const stats = itemStats[item.id] as any || { initial: 0, in: 0, out: 0, final: 0 };
         return [
           item.name,
           item.department,
-          (item.initial_stock || 0).toString(),
+          stats.initial.toString(),
           stats.in.toString(),
           stats.out.toString(),
-          item.current_stock.toString(),
+          stats.final.toString(),
           item.unit
         ];
       });
@@ -320,25 +357,25 @@ export function Reports() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-        <div className="bg-brand-card p-6 rounded-2xl border border-brand-border">
+        <div className="bg-brand-card p-4 md:p-6 rounded-2xl border border-brand-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-500">
-              <ArrowDownCircle className="w-6 h-6" />
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-500">
+              <ArrowDownCircle className="w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
-              <p className="text-[10px] text-brand-text-muted uppercase font-bold tracking-wider">Total Barang Masuk</p>
-              <p className="text-xl md:text-2xl font-bold text-white">{totalIn} <span className="text-sm font-normal text-brand-text-muted">Items</span></p>
+              <p className="text-[9px] md:text-[10px] text-brand-text-muted uppercase font-bold tracking-wider">Total Barang Masuk</p>
+              <p className="text-lg md:text-2xl font-bold text-white">{totalIn} <span className="text-xs md:text-sm font-normal text-brand-text-muted">Items</span></p>
             </div>
           </div>
         </div>
-        <div className="bg-brand-card p-6 rounded-2xl border border-brand-border">
+        <div className="bg-brand-card p-4 md:p-6 rounded-2xl border border-brand-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-500">
-              <ArrowUpCircle className="w-6 h-6" />
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-500">
+              <ArrowUpCircle className="w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
-              <p className="text-[10px] text-brand-text-muted uppercase font-bold tracking-wider">Total Barang Keluar</p>
-              <p className="text-xl md:text-2xl font-bold text-white">{totalOut} <span className="text-sm font-normal text-brand-text-muted">Items</span></p>
+              <p className="text-[9px] md:text-[10px] text-brand-text-muted uppercase font-bold tracking-wider">Total Barang Keluar</p>
+              <p className="text-lg md:text-2xl font-bold text-white">{totalOut} <span className="text-xs md:text-sm font-normal text-brand-text-muted">Items</span></p>
             </div>
           </div>
         </div>
@@ -375,23 +412,23 @@ export function Reports() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
-              <tr className="bg-brand-dark/50 text-brand-text-muted text-xs font-bold uppercase tracking-wider">
+              <tr className="bg-brand-dark/50 text-brand-text-muted text-[10px] md:text-xs font-bold uppercase tracking-wider">
                 {reportCategory === 'stock' ? (
                   <>
-                    <th className="px-6 py-4">Nama Barang</th>
-                    <th className="px-6 py-4">Departemen</th>
-                    <th className="px-6 py-4">Awal</th>
-                    <th className="px-6 py-4">Masuk</th>
-                    <th className="px-6 py-4">Keluar</th>
-                    <th className="px-6 py-4">Akhir</th>
-                    <th className="px-6 py-4">Satuan</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Nama Barang</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Dept</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Awal</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Masuk</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Keluar</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Akhir</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Satuan</th>
                   </>
                 ) : (
                   <>
-                    <th className="px-6 py-4">Waktu</th>
-                    <th className="px-6 py-4">Barang</th>
-                    <th className="px-6 py-4">Jumlah</th>
-                    <th className="px-6 py-4">Catatan</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Waktu</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Barang</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Jumlah</th>
+                    <th className="px-3 md:px-6 py-3 md:py-4">Catatan</th>
                   </>
                 )}
               </tr>
@@ -403,30 +440,30 @@ export function Reports() {
                 <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-brand-text-muted">Tidak ada data di periode ini.</td></tr>
               ) : reportCategory === 'stock' ? (
                 items.map((item) => {
-                  const stats = itemStats[item.id] || { in: 0, out: 0 };
+                  const stats = itemStats[item.id] as any || { initial: 0, in: 0, out: 0, final: 0 };
                   return (
                     <tr key={item.id} className="hover:bg-brand-dark/30 transition-colors">
-                      <td className="px-6 py-4 font-medium text-white">{item.name}</td>
-                      <td className="px-6 py-4 text-brand-text-muted">{item.department}</td>
-                      <td className="px-6 py-4 text-brand-text-muted">{item.initial_stock || 0}</td>
-                      <td className="px-6 py-4 text-blue-400">+{stats.in}</td>
-                      <td className="px-6 py-4 text-purple-400">-{stats.out}</td>
-                      <td className="px-6 py-4 font-bold text-white">{item.current_stock}</td>
-                      <td className="px-6 py-4 text-brand-text-muted">{item.unit}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-white text-xs md:text-sm">{item.name}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm">{item.department}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm">{stats.initial}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-blue-400 text-xs md:text-sm">+{stats.in}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-purple-400 text-xs md:text-sm">-{stats.out}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 font-bold text-white text-xs md:text-sm">{stats.final}</td>
+                      <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm">{item.unit}</td>
                     </tr>
                   );
                 })
               ) : (
                 transactions.map((tx) => (
                   <tr key={tx.id} className="hover:bg-brand-dark/30 transition-colors">
-                    <td className="px-6 py-4 text-brand-text-muted font-mono text-sm">
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted font-mono text-[10px] md:text-sm">
                       {format(new Date(tx.created_at), 'dd/MM HH:mm')}
                     </td>
-                    <td className="px-6 py-4 font-medium text-white">{tx.items?.name}</td>
-                    <td className="px-6 py-4 font-bold text-white">
+                    <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-white text-xs md:text-sm">{tx.items?.name}</td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 font-bold text-white text-xs md:text-sm">
                       {tx.type === 'IN' ? '+' : '-'}{tx.quantity}
                     </td>
-                    <td className="px-6 py-4 text-brand-text-muted text-sm italic">{tx.notes || '-'}</td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm italic">{tx.notes || '-'}</td>
                   </tr>
                 ))
               )}

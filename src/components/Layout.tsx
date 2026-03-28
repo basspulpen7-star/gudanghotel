@@ -33,44 +33,50 @@ interface LayoutProps {
 }
 
 export function Layout({ children, currentView, setView, user, profile, searchTerm, setSearchTerm }: LayoutProps) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const notificationRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'inventory', label: 'Stok Barang', icon: Package },
-    { id: 'suppliers', label: 'Data Supplier', icon: Truck },
-    { id: 'incoming', label: 'Barang Masuk', icon: ArrowDownCircle },
-    { id: 'outgoing', label: 'Barang Keluar', icon: ArrowUpCircle },
-    { id: 'purchase_orders', label: 'Purchase Order', icon: ShoppingCart },
+    { id: 'inventory', label: 'Stok', icon: Package },
+    { id: 'incoming', label: 'Masuk', icon: ArrowDownCircle },
+    { id: 'outgoing', label: 'Keluar', icon: ArrowUpCircle },
+    { id: 'purchase_orders', label: 'PO', icon: ShoppingCart },
+    { id: 'suppliers', label: 'Supplier', icon: Truck },
     { id: 'reports', label: 'Laporan', icon: FileText },
-    { id: 'database_setup', label: 'Database Setup', icon: Database },
+    { id: 'database_setup', label: 'DB Setup', icon: Database },
   ];
 
-  const isAdmin = user?.email === 'admin@hotelalia.com' || user?.email === 'satriabertopi7@gmail.com';
+  const isAdmin = profile?.role === 'admin' || user?.email === 'admin@hotelalia.com' || user?.email === 'satriabertopi7@gmail.com';
 
   if (isAdmin) {
-    // Already added database_setup in menuItems, but let's make sure user_management is there too
     if (!menuItems.find(m => m.id === 'user_management')) {
-      menuItems.push({ id: 'user_management', label: 'Manajemen User', icon: Users });
+      menuItems.push({ id: 'user_management', label: 'Users', icon: Users });
     }
   } else {
-    // Remove admin only items if not admin
     const adminOnly = ['user_management', 'database_setup'];
     const filtered = menuItems.filter(item => !adminOnly.includes(item.id));
     menuItems.length = 0;
     menuItems.push(...filtered);
   }
 
+  // Define main items for bottom nav (max 4)
+  const mainMobileItems = menuItems.slice(0, 4);
+  const moreMobileItems = menuItems.slice(4);
+
   useEffect(() => {
     fetchNotifications();
     
-    // Close notifications when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setIsNotificationsOpen(false);
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setIsMoreMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -112,7 +118,8 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
 
   const handleSetView = (view: string) => {
     setView(view);
-    setIsMobileMenuOpen(false);
+    setIsMoreMenuOpen(false);
+    setIsMobileSearchOpen(false);
   };
 
   return (
@@ -126,9 +133,6 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
             <h1 className="text-xl font-bold text-white">Hotel Alia Matraman</h1>
             <p className="text-xs text-brand-text-muted">Warehouse Management</p>
           </div>
-          <button className="lg:hidden text-brand-text-muted" onClick={() => setIsMobileMenuOpen(false)}>
-            <X className="w-6 h-6" />
-          </button>
         </div>
 
         <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
@@ -149,30 +153,30 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
           ))}
         </nav>
 
-        <div className="p-4 space-y-2 border-t border-brand-border">
+        <div className="p-3 space-y-1 border-t border-brand-border">
           <button 
             onClick={() => handleSetView('purchase_orders')}
-            className="w-full bg-brand-accent hover:bg-blue-600 text-white font-bold py-3 rounded-xl transition-all mb-4 shadow-lg shadow-brand-accent/20 flex items-center justify-center gap-2"
+            className="w-full bg-brand-accent hover:bg-blue-600 text-white font-bold py-2.5 rounded-xl transition-all mb-3 shadow-lg shadow-brand-accent/20 flex items-center justify-center gap-2 text-sm"
           >
-            <ShoppingCart className="w-5 h-5" />
+            <ShoppingCart className="w-4 h-4" />
             Buat Purchase Order
           </button>
           
           <button 
             onClick={() => handleSetView('settings')}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all",
+              "w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all text-sm",
               currentView === 'settings' ? "text-white bg-brand-card" : "text-brand-text-muted hover:text-white"
             )}
           >
-            <Settings className="w-5 h-5" />
+            <Settings className="w-4 h-4" />
             <span>Settings</span>
           </button>
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2 text-brand-text-muted hover:text-red-400 transition-all"
+            className="w-full flex items-center gap-3 px-4 py-2 text-brand-text-muted hover:text-red-400 transition-all text-sm"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-4 h-4" />
             <span>Keluar</span>
           </button>
         </div>
@@ -181,18 +185,45 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="h-16 border-b border-brand-border flex items-center justify-between px-4 md:px-8 bg-brand-dark/50 backdrop-blur-md z-10">
-          <div className="flex items-center gap-4">
-            <div className="relative md:block w-full md:w-64 lg:w-96">
+        <header className="h-14 md:h-16 border-b border-brand-border flex items-center justify-between px-3 md:px-8 bg-brand-dark/50 backdrop-blur-md z-10">
+          <div className="flex items-center gap-2 md:gap-4 flex-1">
+            <div className={cn(
+              "relative md:block flex-1 max-w-md transition-all duration-300",
+              isMobileSearchOpen ? "flex" : "hidden md:flex"
+            )}>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-text-muted" />
               <input 
                 type="text" 
                 placeholder={`Cari di ${currentView}...`} 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 bg-brand-card/50 border border-brand-border/50 py-2 rounded-lg text-white focus:ring-1 focus:ring-brand-accent outline-none transition-all"
+                className="w-full pl-10 bg-brand-card/50 border border-brand-border/50 py-1.5 md:py-2 rounded-lg text-white focus:ring-1 focus:ring-brand-accent outline-none transition-all text-xs md:text-sm"
+                autoFocus={isMobileSearchOpen}
               />
+              {isMobileSearchOpen && (
+                <button 
+                  onClick={() => setIsMobileSearchOpen(false)}
+                  className="ml-2 p-2 md:hidden text-brand-text-muted"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
             </div>
+            
+            {!isMobileSearchOpen && (
+              <button 
+                onClick={() => setIsMobileSearchOpen(true)}
+                className="md:hidden p-2 text-brand-text-muted hover:text-white"
+              >
+                <Search className="w-5 h-5" />
+              </button>
+            )}
+
+            {!isMobileSearchOpen && (
+              <div className="md:hidden">
+                <h1 className="text-sm font-bold text-white truncate max-w-[120px]">Hotel Alia</h1>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3 md:gap-6">
@@ -282,12 +313,12 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
 
         {/* Mobile Bottom Navigation */}
         <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-brand-card/90 backdrop-blur-lg border-t border-brand-border flex justify-around items-center px-2 py-3 z-50">
-          {menuItems.map((item) => (
+          {mainMobileItems.map((item) => (
             <button
               key={item.id}
               onClick={() => handleSetView(item.id)}
               className={cn(
-                "flex flex-col items-center gap-1 transition-all px-2",
+                "flex flex-col items-center gap-1 transition-all px-2 min-w-[60px]",
                 currentView === item.id ? "text-brand-accent" : "text-brand-text-muted"
               )}
             >
@@ -295,16 +326,57 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
               <span className="text-[10px] font-medium">{item.label}</span>
             </button>
           ))}
-          <button
-            onClick={() => handleSetView('settings')}
-            className={cn(
-              "flex flex-col items-center gap-1 transition-all px-2",
-              currentView === 'settings' ? "text-brand-accent" : "text-brand-text-muted"
+          
+          <div className="relative" ref={moreMenuRef}>
+            <button
+              onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+              className={cn(
+                "flex flex-col items-center gap-1 transition-all px-2 min-w-[60px]",
+                isMoreMenuOpen ? "text-brand-accent" : "text-brand-text-muted"
+              )}
+            >
+              <Menu className={cn("w-6 h-6", isMoreMenuOpen && "animate-in zoom-in duration-300")} />
+              <span className="text-[10px] font-medium">Menu</span>
+            </button>
+
+            {isMoreMenuOpen && (
+              <div className="absolute bottom-full right-0 mb-4 w-48 bg-brand-card border border-brand-border rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-2 duration-200">
+                <div className="p-2 space-y-1">
+                  {moreMobileItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleSetView(item.id)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm",
+                        currentView === item.id ? "bg-brand-accent text-white" : "text-brand-text-muted hover:bg-brand-dark hover:text-white"
+                      )}
+                    >
+                      <item.icon className="w-4 h-4" />
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
+                  <div className="h-px bg-brand-border my-1" />
+                  <button
+                    onClick={() => handleSetView('settings')}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm",
+                      currentView === 'settings' ? "bg-brand-accent text-white" : "text-brand-text-muted hover:bg-brand-dark hover:text-white"
+                    )}
+                  >
+                    <Settings className="w-4 h-4" />
+                    <span>Settings</span>
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm text-red-400 hover:bg-red-400/10"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Keluar</span>
+                  </button>
+                </div>
+              </div>
             )}
-          >
-            <Settings className={cn("w-6 h-6", currentView === 'settings' && "animate-in zoom-in duration-300")} />
-            <span className="text-[10px] font-medium">Settings</span>
-          </button>
+          </div>
         </nav>
       </main>
     </div>

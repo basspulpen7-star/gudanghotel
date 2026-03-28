@@ -123,8 +123,23 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
           }
         });
 
-        const initialForMonth = (item.initial_stock || 0) + beforeIn - beforeOut;
-        const finalForMonth = initialForMonth + currentIn - currentOut;
+        const itemCreatedAt = new Date(item.created_at);
+        const itemCreatedMonth = new Date(itemCreatedAt.getFullYear(), itemCreatedAt.getMonth(), 1);
+        
+        let initialForMonth = 0;
+        let finalForMonth = 0;
+
+        // Only show stock if the selected month is the same or after the creation month
+        if (startDate >= itemCreatedMonth) {
+          initialForMonth = (item.initial_stock || 0) + beforeIn - beforeOut;
+          finalForMonth = initialForMonth + currentIn - currentOut;
+        } else {
+          // If month is before creation, everything is 0
+          initialForMonth = 0;
+          currentIn = 0;
+          currentOut = 0;
+          finalForMonth = 0;
+        }
 
         stats[item.id] = {
           initial: initialForMonth,
@@ -242,13 +257,13 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-2 md:gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-text-muted" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-brand-text-muted" />
           <input 
             type="text" 
             placeholder="Cari barang atau departemen..." 
-            className="w-full pl-10 py-2 text-sm bg-brand-dark border border-brand-border rounded-lg text-white focus:ring-1 focus:ring-brand-accent outline-none"
+            className="w-full pl-9 py-1.5 md:py-2 text-xs md:text-sm bg-brand-dark border border-brand-border rounded-lg text-white focus:ring-1 focus:ring-brand-accent outline-none"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -257,7 +272,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
           <select 
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-            className="bg-brand-dark border border-brand-border text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-brand-accent"
+            className="flex-1 bg-brand-dark border border-brand-border text-white text-xs md:text-sm rounded-lg px-2 md:px-3 py-1.5 md:py-2 outline-none focus:ring-1 focus:ring-brand-accent"
           >
             {months.map((month, index) => (
               <option key={index} value={index}>{month}</option>
@@ -266,32 +281,32 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
           <select 
             value={selectedYear}
             onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="bg-brand-dark border border-brand-border text-white text-sm rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-brand-accent"
+            className="bg-brand-dark border border-brand-border text-white text-xs md:text-sm rounded-lg px-2 md:px-3 py-1.5 md:py-2 outline-none focus:ring-1 focus:ring-brand-accent"
           >
             {years.map((year) => (
               <option key={year} value={year}>{year}</option>
             ))}
           </select>
+          <button className="bg-brand-card border border-brand-border px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-brand-text-muted hover:text-white flex items-center justify-center gap-2 text-xs md:text-sm">
+            <Filter className="w-3.5 h-3.5" />
+            Filter
+          </button>
         </div>
-        <button className="bg-brand-card border border-brand-border px-4 py-2 rounded-lg text-brand-text-muted hover:text-white flex items-center justify-center gap-2">
-          <Filter className="w-4 h-4" />
-          Filter
-        </button>
       </div>
 
       <div className="bg-brand-card rounded-2xl border border-brand-border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[600px]">
             <thead>
-              <tr className="bg-brand-dark/50 text-brand-text-muted text-xs font-bold uppercase tracking-wider">
-                <th className="px-6 py-4">Nama Barang</th>
-                <th className="px-6 py-4">Departemen</th>
-                <th className="px-6 py-4">Stok Awal</th>
-                <th className="px-6 py-4">Masuk</th>
-                <th className="px-6 py-4">Keluar</th>
-                <th className="px-6 py-4">Stok Akhir</th>
-                <th className="px-6 py-4">Satuan</th>
-                <th className="px-6 py-4 text-right">Aksi</th>
+              <tr className="bg-brand-dark/50 text-brand-text-muted text-[10px] md:text-xs font-bold uppercase tracking-wider">
+                <th className="px-3 md:px-6 py-3 md:py-4">Nama Barang</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Dept</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Awal</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Masuk</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Keluar</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Akhir</th>
+                <th className="px-3 md:px-6 py-3 md:py-4">Satuan</th>
+                <th className="px-3 md:px-6 py-3 md:py-4 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-brand-border">
@@ -337,42 +352,42 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
                 const stats = itemStats[item.id] || { initial: 0, in: 0, out: 0, final: 0 };
                 return (
                   <tr key={item.id} className="hover:bg-brand-dark/30 transition-colors group">
-                    <td className="px-6 py-4 font-medium text-white">{item.name}</td>
-                    <td className="px-6 py-4 text-brand-text-muted">
-                      <span className="px-2 py-1 bg-brand-dark rounded-md text-[10px] font-bold uppercase border border-brand-border">
+                    <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-white text-xs md:text-sm">{item.name}</td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted">
+                      <span className="px-1.5 py-0.5 bg-brand-dark rounded-md text-[9px] md:text-[10px] font-bold uppercase border border-brand-border">
                         {item.department}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-brand-text-muted">{stats.initial}</td>
-                    <td className="px-6 py-4 text-blue-400">+{stats.in}</td>
-                    <td className="px-6 py-4 text-purple-400">-{stats.out}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm">{stats.initial}</td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-blue-400 text-xs md:text-sm">+{stats.in}</td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-purple-400 text-xs md:text-sm">-{stats.out}</td>
+                    <td className="px-3 md:px-6 py-3 md:py-4">
+                      <div className="flex items-center gap-1 md:gap-2">
                         <span className={cn(
-                          "font-bold",
+                          "font-bold text-xs md:text-sm",
                           stats.final <= item.min_stock ? "text-orange-500" : "text-white"
                         )}>
                           {stats.final}
                         </span>
                         {stats.final <= item.min_stock && (
-                          <AlertCircle className="w-4 h-4 text-orange-500" title={`Stok rendah! Min: ${item.min_stock}`} />
+                          <AlertCircle className="w-3 h-3 md:w-4 md:h-4 text-orange-500" title={`Stok rendah! Min: ${item.min_stock}`} />
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-brand-text-muted">{item.unit}</td>
-                    <td className="px-6 py-4 text-right">
-                    <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm">{item.unit}</td>
+                    <td className="px-3 md:px-6 py-3 md:py-4 text-right">
+                    <div className="flex justify-end gap-1 md:gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => handleEdit(item)}
-                        className="p-2 hover:bg-brand-accent/20 text-brand-accent rounded-lg transition-colors"
+                        className="p-1.5 md:p-2 hover:bg-brand-accent/20 text-brand-accent rounded-lg transition-colors"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 className="w-3 h-3 md:w-4 md:h-4" />
                       </button>
                       <button 
                         onClick={() => setItemToDelete(item.id)}
-                        className="p-2 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
+                        className="p-1.5 md:p-2 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
                       </button>
                     </div>
                     </td>

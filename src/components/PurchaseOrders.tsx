@@ -36,6 +36,9 @@ export function PurchaseOrders() {
   const [viewingPo, setViewingPo] = useState<PurchaseOrder | null>(null);
   const [editingPoId, setEditingPoId] = useState<string | null>(null);
   const [deleteConfirmationPoId, setDeleteConfirmationPoId] = useState<string | null>(null);
+  const [filterMonth, setFilterMonth] = useState<number>(new Date().getMonth());
+  const [filterYear, setFilterYear] = useState<number>(new Date().getFullYear());
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Form state
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
@@ -348,6 +351,24 @@ export function PurchaseOrders() {
     printWindow.document.close();
   };
 
+  const filteredPos = pos.filter(po => {
+    const poDate = new Date(po.created_at);
+    const matchesMonth = filterMonth === -1 || poDate.getMonth() === filterMonth;
+    const matchesYear = filterYear === -1 || poDate.getFullYear() === filterYear;
+    const matchesSearch = searchTerm === '' || 
+      po.supplier?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      po.id.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    return matchesMonth && matchesYear && matchesSearch;
+  });
+
+  const months = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 p-4 md:p-0">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -364,15 +385,50 @@ export function PurchaseOrders() {
         </button>
       </div>
 
+      <div className="bg-brand-card p-4 rounded-2xl border border-brand-border flex flex-col md:flex-row gap-4 items-center">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-text-muted" />
+          <input 
+            type="text"
+            placeholder="Cari PO atau Supplier..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-brand-dark border border-brand-border rounded-xl py-2 pl-10 pr-4 text-white focus:outline-none focus:border-brand-accent transition-all"
+          />
+        </div>
+        <div className="flex gap-2 w-full md:w-auto">
+          <select 
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(parseInt(e.target.value))}
+            className="flex-1 md:w-40 bg-brand-dark border border-brand-border rounded-xl py-2 px-4 text-white focus:outline-none focus:border-brand-accent transition-all"
+          >
+            <option value={-1}>Semua Bulan</option>
+            {months.map((month, index) => (
+              <option key={month} value={index}>{month}</option>
+            ))}
+          </select>
+          <select 
+            value={filterYear}
+            onChange={(e) => setFilterYear(parseInt(e.target.value))}
+            className="flex-1 md:w-32 bg-brand-dark border border-brand-border rounded-xl py-2 px-4 text-white focus:outline-none focus:border-brand-accent transition-all"
+          >
+            <option value={-1}>Semua Tahun</option>
+            {years.map((year) => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4">
         {loading ? (
           <div className="text-center py-12 text-brand-text-muted">Loading...</div>
-        ) : pos.length === 0 ? (
+        ) : filteredPos.length === 0 ? (
           <div className="bg-brand-card p-12 rounded-2xl border border-brand-border text-center">
             <ShoppingCart className="w-12 h-12 text-brand-text-muted mx-auto mb-4 opacity-20" />
-            <p className="text-brand-text-muted">Belum ada data Purchase Order.</p>
+            <p className="text-brand-text-muted">Tidak ada data Purchase Order yang sesuai filter.</p>
           </div>
-        ) : pos.map((po) => (
+        ) : filteredPos.map((po) => (
           <div key={po.id} className="bg-brand-card rounded-2xl border border-brand-border overflow-hidden transition-all hover:border-brand-accent/50">
             <div 
               className="p-4 md:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer"

@@ -81,6 +81,14 @@ ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_order_items ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies first to avoid "already exists" errors
+DROP POLICY IF EXISTS "Allow all for authenticated" ON profiles;
+DROP POLICY IF EXISTS "Allow all for authenticated" ON suppliers;
+DROP POLICY IF EXISTS "Allow all for authenticated" ON items;
+DROP POLICY IF EXISTS "Allow all for authenticated" ON transactions;
+DROP POLICY IF EXISTS "Allow all for authenticated" ON purchase_orders;
+DROP POLICY IF EXISTS "Allow all for authenticated" ON purchase_order_items;
+
 -- Simple Policies (Allow all authenticated users for now to ensure app works)
 CREATE POLICY "Allow all for authenticated" ON profiles FOR ALL TO authenticated USING (true);
 CREATE POLICY "Allow all for authenticated" ON suppliers FOR ALL TO authenticated USING (true);
