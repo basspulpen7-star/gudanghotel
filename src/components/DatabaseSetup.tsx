@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Database, AlertTriangle, CheckCircle2, Copy, Terminal } from 'lucide-react';
 
 export function DatabaseSetup() {
-  const [status, setStatus] = useState<{ table: string; exists: boolean; columns: string[] }[]>([]);
+  const [status, setStatus] = useState<{ table: string; exists: boolean; columns: string[]; error?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS suppliers (
   user_id UUID REFERENCES auth.users(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS category TEXT;
+ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
 
 -- 3. Table Items (Inventory)
 CREATE TABLE IF NOT EXISTS items (
@@ -45,22 +47,29 @@ CREATE TABLE IF NOT EXISTS items (
   sku TEXT UNIQUE,
   category TEXT,
   unit TEXT,
+  department TEXT DEFAULT 'General',
   min_stock INTEGER DEFAULT 0,
+  initial_stock INTEGER DEFAULT 0,
   current_stock INTEGER DEFAULT 0,
   price DECIMAL(12,2),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE items ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'General';
+ALTER TABLE items ADD COLUMN IF NOT EXISTS initial_stock INTEGER DEFAULT 0;
 
 -- 4. Table Transactions (Incoming/Outgoing)
 CREATE TABLE IF NOT EXISTS transactions (
   id UUID PRIMARY KEY,
   item_id UUID REFERENCES items(id) ON DELETE CASCADE,
-  type TEXT CHECK (type IN ('in', 'out')),
+  type TEXT CHECK (type IN ('IN', 'OUT')),
   quantity INTEGER NOT NULL,
+  department TEXT,
   notes TEXT,
   user_id UUID REFERENCES auth.users(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS department TEXT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;
 
 -- 5. Table Purchase Orders
 CREATE TABLE IF NOT EXISTS purchase_orders (
@@ -114,8 +123,8 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
     const tables = [
       { name: 'profiles', cols: ['username', 'role'] },
       { name: 'suppliers', cols: ['category', 'user_id'] },
-      { name: 'items', cols: ['sku', 'current_stock', 'name'] },
-      { name: 'transactions', cols: ['type', 'quantity', 'item_id'] },
+      { name: 'items', cols: ['sku', 'current_stock', 'name', 'department', 'initial_stock'] },
+      { name: 'transactions', cols: ['type', 'quantity', 'item_id', 'department', 'notes'] },
       { name: 'purchase_orders', cols: ['status', 'total_amount'] },
       { name: 'purchase_order_items', cols: ['purchase_order_id', 'item_id'] }
     ];
@@ -124,12 +133,16 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
       try {
         const { error } = await supabase.from(t.name).select(t.cols.join(',')).limit(1);
         if (error) {
-          if (error.message.includes('does not exist')) {
+          console.error(`Error checking table ${t.name}:`, error);
+          if (error.message.includes('does not exist') || error.message.includes('relation') || error.code === '42P01') {
             return { table: t.name, exists: false, columns: [] };
           }
           // Check for missing columns
           const missing = t.cols.filter(c => error.message.includes(`column "${c}" does not exist`));
-          return { table: t.name, exists: true, columns: missing };
+          if (missing.length > 0) {
+            return { table: t.name, exists: true, columns: missing };
+          }
+          return { table: t.name, exists: true, columns: [], error: error.message };
         }
         return { table: t.name, exists: true, columns: [] };
       } catch (e) {
@@ -175,7 +188,7 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
             ) : status.map((s) => (
               <div key={s.table} className="bg-brand-card p-4 rounded-xl border border-brand-border flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {s.exists && s.columns.length === 0 ? (
+                  {s.exists && s.columns.length === 0 && !s.error ? (
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
                   ) : (
                     <AlertTriangle className="w-5 h-5 text-yellow-500" />
@@ -184,6 +197,8 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
                     <span className="font-mono font-bold text-white">{s.table}</span>
                     {!s.exists ? (
                       <p className="text-xs text-red-500">Tabel belum ada</p>
+                    ) : s.error ? (
+                      <p className="text-xs text-red-500">Error: {s.error}</p>
                     ) : s.columns.length > 0 ? (
                       <p className="text-xs text-yellow-500">Kolom hilang: {s.columns.join(', ')}</p>
                     ) : (

@@ -38,12 +38,10 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
     try {
       const { error } = await supabase.from('suppliers').select('category, user_id').limit(1);
       if (error) {
-        let missingCols = [];
-        if (error.message.includes('column "category" does not exist')) missingCols.push('"category" (TEXT)');
-        if (error.message.includes('column "user_id" does not exist')) missingCols.push('"user_id" (UUID)');
-        
-        if (missingCols.length > 0) {
-          alert(`Peringatan: Kolom ${missingCols.join(' dan ')} belum ada di tabel "suppliers".\n\nSilakan jalankan perintah SQL ini di Supabase SQL Editor:\n\nALTER TABLE suppliers ADD COLUMN IF NOT EXISTS category TEXT;\nALTER TABLE suppliers ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);`);
+        if (error.message.includes('column "category" does not exist') || error.message.includes('column "user_id" does not exist')) {
+          alert(`Peringatan: Kolom "category" atau "user_id" belum ada di tabel "suppliers".\n\nSilakan jalankan SQL update di menu Database Setup.`);
+        } else if (error.message.includes('does not exist') || error.message.includes('relation') || error.code === '42P01') {
+          console.error('Tabel suppliers belum ada');
         }
       }
     } catch (e) {

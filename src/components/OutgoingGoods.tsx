@@ -53,10 +53,12 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
 
   const checkDatabase = async () => {
     try {
-      const { error } = await supabase.from('transactions').select('department').limit(1);
+      const { error } = await supabase.from('transactions').select('department, notes').limit(1);
       if (error) {
-        if (error.message.includes('column "department" does not exist')) {
-          setDbStatus({ ok: false, message: 'Kolom "department" belum ada di tabel transactions. Silakan jalankan SQL update.' });
+        if (error.message.includes('column "department" does not exist') || error.message.includes('column "notes" does not exist')) {
+          setDbStatus({ ok: false, message: 'Kolom "department" atau "notes" belum ada di tabel transactions. Silakan jalankan SQL update.' });
+        } else if (error.message.includes('does not exist') || error.message.includes('relation') || error.code === '42P01') {
+          setDbStatus({ ok: false, message: 'Tabel "transactions" belum dibuat di Supabase.' });
         } else {
           setDbStatus({ ok: false, message: 'Error database: ' + error.message });
         }

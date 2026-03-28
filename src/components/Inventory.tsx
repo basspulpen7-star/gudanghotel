@@ -64,7 +64,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
         } else if (itemsError.message.includes('column "department" does not exist')) {
           setDbStatus({ ok: false, message: 'Kolom "department" belum ada di tabel items. Silakan jalankan SQL update.' });
           return;
-        } else if (itemsError.message.includes('relation "items" does not exist')) {
+        } else if (itemsError.message.includes('does not exist') || itemsError.message.includes('relation') || itemsError.code === '42P01') {
           setDbStatus({ ok: false, message: 'Tabel "items" belum dibuat di Supabase.' });
           return;
         } else {
