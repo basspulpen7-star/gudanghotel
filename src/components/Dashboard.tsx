@@ -17,7 +17,7 @@ import { Item, Transaction } from '../types';
 import { formatDistanceToNow, startOfDay, endOfDay } from 'date-fns';
 import { cn } from '../lib/utils';
 
-export function Dashboard({ user }: { user: any }) {
+export function Dashboard({ user, profile }: { user: any, profile: any }) {
   const [items, setItems] = useState<Item[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
   const [todayStats, setTodayStats] = useState({ in: 0, out: 0 });
@@ -95,7 +95,7 @@ export function Dashboard({ user }: { user: any }) {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold text-white">
-            Halo, {user?.user_metadata?.display_name || user?.email?.split('@')[0]}!
+            Halo, {profile?.full_name || user?.user_metadata?.display_name || user?.email?.split('@')[0]}!
           </h2>
           <p className="text-brand-text-muted">Ringkasan operasional Hotel Alia Matraman hari ini</p>
         </div>

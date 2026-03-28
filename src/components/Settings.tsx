@@ -4,11 +4,13 @@ import { User, Mail, Shield, Camera, Save, Loader2, LogOut } from 'lucide-react'
 
 interface SettingsProps {
   user: any;
+  profile: any;
+  onProfileUpdate: () => void;
 }
 
-export function Settings({ user }: SettingsProps) {
-  const [displayName, setDisplayName] = useState(user?.user_metadata?.display_name || '');
-  const [avatarUrl, setAvatarUrl] = useState(user?.user_metadata?.avatar_url || '');
+export function Settings({ user, profile, onProfileUpdate }: SettingsProps) {
+  const [displayName, setDisplayName] = useState(profile?.full_name || user?.user_metadata?.display_name || '');
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || user?.user_metadata?.avatar_url || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -22,14 +24,30 @@ export function Settings({ user }: SettingsProps) {
     setMessage(null);
 
     try {
-      const { error } = await supabase.auth.updateUser({
+      const { error: authError } = await supabase.auth.updateUser({
         data: { 
           display_name: displayName,
           avatar_url: avatarUrl
         }
       });
 
-      if (error) throw error;
+      if (authError) throw authError;
+
+      // Also update the profiles table
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ 
+          full_name: displayName,
+          avatar_url: avatarUrl 
+        })
+        .eq('id', user.id);
+
+      if (profileError) {
+        console.error('Error updating profiles table:', profileError);
+        // We don't throw here because auth update succeeded, but we should log it
+      }
+
+      onProfileUpdate();
       setMessage({ type: 'success', text: 'Profil berhasil diperbarui!' });
     } catch (error: any) {
       console.error('Error updating profile:', error);

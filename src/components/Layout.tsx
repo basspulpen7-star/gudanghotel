@@ -27,11 +27,12 @@ interface LayoutProps {
   currentView: string;
   setView: (view: any) => void;
   user: any;
+  profile: any;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
 }
 
-export function Layout({ children, currentView, setView, user, searchTerm, setSearchTerm }: LayoutProps) {
+export function Layout({ children, currentView, setView, user, profile, searchTerm, setSearchTerm }: LayoutProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -249,19 +250,19 @@ export function Layout({ children, currentView, setView, user, searchTerm, setSe
             <div className="flex items-center gap-3 pl-3 md:pl-6 border-l border-brand-border">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-semibold text-white truncate max-w-[150px]">
-                  {user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'}
+                  {profile?.full_name || user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'}
                 </p>
                 <p className="text-xs text-brand-text-muted uppercase tracking-wider">
-                  {isAdmin ? 'Administrator' : 'Staff Gudang'}
+                  {profile?.role === 'admin' ? 'Administrator' : 'Staff Gudang'}
                 </p>
               </div>
               <button 
                 onClick={() => handleSetView('settings')}
                 className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-brand-accent flex items-center justify-center overflow-hidden border-2 border-transparent hover:border-brand-accent transition-all"
               >
-                {user?.user_metadata?.avatar_url ? (
+                {profile?.avatar_url || user?.user_metadata?.avatar_url ? (
                   <img 
-                    src={user.user_metadata.avatar_url} 
+                    src={profile?.avatar_url || user?.user_metadata?.avatar_url} 
                     alt="Profile" 
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"

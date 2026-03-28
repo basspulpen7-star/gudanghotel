@@ -17,7 +17,8 @@ import {
   Printer,
   Eye,
   X,
-  Edit2
+  Edit2,
+  AlertTriangle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
@@ -34,6 +35,7 @@ export function PurchaseOrders() {
   const [expandedPo, setExpandedPo] = useState<string | null>(null);
   const [viewingPo, setViewingPo] = useState<PurchaseOrder | null>(null);
   const [editingPoId, setEditingPoId] = useState<string | null>(null);
+  const [deleteConfirmationPoId, setDeleteConfirmationPoId] = useState<string | null>(null);
 
   // Form state
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
@@ -49,7 +51,7 @@ export function PurchaseOrders() {
     setLoading(true);
     try {
       const [posRes, suppliersRes, itemsRes] = await Promise.all([
-        supabase.from('purchase_orders').select('*, supplier:suppliers(*), user_profile:profiles(*)').order('created_at', { ascending: false }),
+        supabase.from('purchase_orders').select('*, supplier:suppliers(*)').order('created_at', { ascending: false }),
         supabase.from('suppliers').select('*').order('name'),
         supabase.from('items').select('*').order('name')
       ]);
@@ -63,13 +65,25 @@ export function PurchaseOrders() {
       if (suppliersRes.error) throw suppliersRes.error;
       if (itemsRes.error) throw itemsRes.error;
 
-      // Fetch items for each PO
+      // Fetch all profiles to map them to POs
+      const { data: profilesData } = await supabase.from('profiles').select('*');
+      const profileMap = (profilesData || []).reduce((acc: any, profile) => {
+        acc[profile.id] = profile;
+        return acc;
+      }, {});
+
+      // Fetch items for each PO and attach profiles
       const posWithItems = await Promise.all((posRes.data || []).map(async (po) => {
         const { data: poItemsData } = await supabase
           .from('purchase_order_items')
           .select('*, item:items(*)')
           .eq('purchase_order_id', po.id);
-        return { ...po, items: poItemsData || [] };
+        
+        return { 
+          ...po, 
+          items: poItemsData || [],
+          user_profile: profileMap[po.user_id] || null
+        };
       }));
 
       setPos(posWithItems);
@@ -108,6 +122,32 @@ export function PurchaseOrders() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
+
+      // Double check profile exists to avoid FK error
+      const { data: profile, error: profileCheckError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileCheckError) {
+        console.error('Error checking profile:', profileCheckError);
+      }
+
+      if (!profile) {
+        console.log('Profile missing in PurchaseOrders, creating now...');
+        const { error: insertError } = await supabase.from('profiles').insert([{
+          id: user.id,
+          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          email: user.email,
+          role: 'staff'
+        }]);
+        
+        if (insertError) {
+          console.error('Failed to create profile in PurchaseOrders:', insertError);
+          throw new Error('Gagal membuat profil pengguna: ' + insertError.message);
+        }
+      }
 
       const totalAmount = poItems.reduce((acc, item) => acc + (item.quantity * item.price), 0);
       
@@ -199,17 +239,20 @@ export function PurchaseOrders() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Apakah Anda yakin ingin menghapus Purchase Order ini? Data yang dihapus tidak dapat dikembalikan.')) {
-      return;
-    }
+    setDeleteConfirmationPoId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteConfirmationPoId) return;
 
     try {
       // Items will be deleted automatically if cascade is set, 
       // but let's be explicit just in case
-      await supabase.from('purchase_order_items').delete().eq('purchase_order_id', id);
-      const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
+      await supabase.from('purchase_order_items').delete().eq('purchase_order_id', deleteConfirmationPoId);
+      const { error } = await supabase.from('purchase_orders').delete().eq('id', deleteConfirmationPoId);
       
       if (error) throw error;
+      setDeleteConfirmationPoId(null);
       fetchData();
     } catch (error: any) {
       alert('Gagal menghapus PO: ' + error.message);
@@ -582,7 +625,7 @@ export function PurchaseOrders() {
             </form>
 
             <div className="p-6 border-t border-brand-border bg-brand-dark/30 flex flex-col sm:flex-row gap-3">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all">Batal</button>
+              <button type="button" onClick={() => { setIsModalOpen(false); resetForm(); }} className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all">Batal</button>
               <button 
                 type="submit" 
                 form="po-form"
@@ -590,6 +633,37 @@ export function PurchaseOrders() {
                 className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSubmitting ? 'Menyimpan...' : 'Simpan & Cetak PO'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus */}
+      {deleteConfirmationPoId && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
+          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 p-6">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Hapus Purchase Order?</h3>
+                <p className="text-sm text-brand-text-muted">Tindakan ini tidak dapat dibatalkan.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setDeleteConfirmationPoId(null)}
+                className="flex-1 bg-brand-dark border border-brand-border py-2 rounded-lg text-white font-bold hover:bg-brand-card transition-all"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={confirmDelete}
+                className="flex-1 bg-red-500 hover:bg-red-600 py-2 rounded-lg text-white font-bold transition-all"
+              >
+                Ya, Hapus
               </button>
             </div>
           </div>

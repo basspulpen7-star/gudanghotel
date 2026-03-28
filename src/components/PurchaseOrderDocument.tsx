@@ -52,7 +52,7 @@ export function PurchaseOrderDocument({ po, supplier }: PurchaseOrderDocumentPro
         <div>
           <div className="bg-gray-200 px-3 py-1 border-b border-gray-400 font-bold text-sm">Ship To:</div>
           <div className="p-3 text-sm space-y-1 min-h-[120px]">
-            <p><span className="font-semibold">Name:</span> Receiving Dept</p>
+            <p><span className="font-semibold">Name:</span> {po.user_profile?.full_name || 'Receiving Dept'}</p>
             <p><span className="font-semibold">Company:</span> {hotelInfo.name}</p>
             <p><span className="font-semibold">Address:</span> {hotelInfo.address}</p>
             <p><span className="font-semibold">City, State, Zip:</span> {hotelInfo.city}, {hotelInfo.zip}</p>
@@ -77,7 +77,7 @@ export function PurchaseOrderDocument({ po, supplier }: PurchaseOrderDocumentPro
               <td className="px-3 py-2 border-r border-gray-400 text-center">{format(new Date(po.created_at), 'dd/MM/yyyy')}</td>
               <td className="px-3 py-2 border-r border-gray-400 text-center">{po.user_profile?.full_name || 'Admin'}</td>
               <td className="px-3 py-2 border-r border-gray-400 text-center">-</td>
-              <td className="px-3 py-2 text-center">Net 30</td>
+              <td className="px-3 py-2 text-center">-</td>
             </tr>
           </tbody>
         </table>

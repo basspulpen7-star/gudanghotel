@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './lib/supabase';
+import { UserProfile } from './types';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { Inventory } from './components/Inventory';
@@ -17,10 +18,70 @@ type View = 'dashboard' | 'inventory' | 'suppliers' | 'incoming' | 'outgoing' | 
 
 export default function App() {
   const [session, setSession] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
 
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return;
+      }
+      
+      if (data) {
+        setProfile(data);
+      }
+    } catch (err) {
+      console.error('Unexpected error in fetchProfile:', err);
+    }
+  };
+
   useEffect(() => {
+    const ensureProfile = async (user: any) => {
+      if (!user) return;
+      
+      try {
+        const { data: existingProfile, error: checkError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (checkError) {
+          console.error('Error checking profile in App:', checkError);
+          return;
+        }
+        
+        if (!existingProfile) {
+          console.log('Creating missing profile for user in App:', user.id);
+          const newProfile = {
+            id: user.id,
+            full_name: user.user_metadata?.full_name || user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
+            email: user.email,
+            role: 'staff'
+          };
+          const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
+          
+          if (insertError) {
+            console.error('Failed to create profile in App:', insertError);
+          } else {
+            setProfile(newProfile as UserProfile);
+          }
+        } else {
+          setProfile(existingProfile);
+        }
+      } catch (err) {
+        console.error('Unexpected error in ensureProfile:', err);
+      }
+    };
+
     const checkSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
@@ -30,11 +91,16 @@ export default function App() {
             await supabase.auth.signOut();
             localStorage.clear();
             setSession(null);
+            setProfile(null);
           } else {
             console.error('Session check error:', error);
           }
         } else {
           setSession(session);
+          if (session?.user) {
+            ensureProfile(session.user);
+            setupProfileSubscription(session.user.id);
+          }
         }
       } catch (err) {
         console.error('Unexpected session check error:', err);
@@ -43,17 +109,53 @@ export default function App() {
 
     checkSession();
 
+    let profileSubscription: any = null;
+
+    const setupProfileSubscription = (userId: string) => {
+      if (profileSubscription) profileSubscription.unsubscribe();
+      
+      profileSubscription = supabase
+        .channel(`profile-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${userId}`
+          },
+          (payload) => {
+            console.log('Profile changed in real-time:', payload);
+            if (payload.new) {
+              setProfile(payload.new as UserProfile);
+            }
+          }
+        )
+        .subscribe();
+    };
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT') {
         setSession(null);
+        setProfile(null);
+        if (profileSubscription) profileSubscription.unsubscribe();
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         setSession(session);
+        if (session?.user) {
+          ensureProfile(session.user);
+          setupProfileSubscription(session.user.id);
+        }
+      } else if (event === 'USER_UPDATED') {
+        if (session?.user) fetchProfile(session.user.id);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (profileSubscription) profileSubscription.unsubscribe();
+    };
   }, []);
 
   if (!session) {
@@ -63,7 +165,7 @@ export default function App() {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard user={session.user} />;
+        return <Dashboard user={session.user} profile={profile} />;
       case 'inventory':
         return <Inventory globalSearch={globalSearch} />;
       case 'suppliers':
@@ -81,9 +183,9 @@ export default function App() {
       case 'database_setup':
         return <DatabaseSetup />;
       case 'settings':
-        return <Settings user={session.user} />;
+        return <Settings user={session.user} profile={profile} onProfileUpdate={() => session.user && fetchProfile(session.user.id)} />;
       default:
-        return <Dashboard user={session.user} />;
+        return <Dashboard user={session.user} profile={profile} />;
     }
   };
 
@@ -92,6 +194,7 @@ export default function App() {
       currentView={currentView} 
       setView={setCurrentView} 
       user={session.user}
+      profile={profile}
       searchTerm={globalSearch}
       setSearchTerm={setGlobalSearch}
     >
