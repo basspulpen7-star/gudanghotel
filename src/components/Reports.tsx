@@ -381,26 +381,6 @@ export function Reports() {
         </div>
       </div>
 
-      {/* Chart */}
-      <div className="bg-brand-card p-4 md:p-6 rounded-2xl border border-brand-border">
-        <h3 className="font-bold text-white mb-6">Visualisasi Pergerakan Barang</h3>
-        <div className="h-64 md:h-80 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-              <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-              <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px' }}
-                itemStyle={{ color: '#fff' }}
-              />
-              <Bar dataKey="in" name="Masuk" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="out" name="Keluar" fill="#a855f7" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
       {/* Detailed Table */}
       <div className="bg-brand-card rounded-2xl border border-brand-border overflow-hidden">
         <div className="p-4 md:p-6 border-b border-brand-border flex justify-between items-center">

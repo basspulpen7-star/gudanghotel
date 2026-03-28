@@ -7,7 +7,15 @@ export function DatabaseSetup() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  const sqlSetup = `-- 1. Table Profiles (Untuk Manajemen User)
+  const sqlSetup = `-- 0. Reset Database (Opsional - Hapus tanda komentar jika ingin reset total)
+-- DROP TABLE IF EXISTS purchase_order_items CASCADE;
+-- DROP TABLE IF EXISTS purchase_orders CASCADE;
+-- DROP TABLE IF EXISTS transactions CASCADE;
+-- DROP TABLE IF EXISTS items CASCADE;
+-- DROP TABLE IF EXISTS suppliers CASCADE;
+-- DROP TABLE IF EXISTS profiles CASCADE;
+
+-- 1. Table Profiles (Untuk Manajemen User)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT,
@@ -18,7 +26,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. Table Suppliers (Update dengan category dan user_id)
+-- 2. Table Suppliers
 CREATE TABLE IF NOT EXISTS suppliers (
   id UUID PRIMARY KEY,
   name TEXT NOT NULL,
@@ -46,7 +54,7 @@ CREATE TABLE IF NOT EXISTS items (
 -- 4. Table Transactions (Incoming/Outgoing)
 CREATE TABLE IF NOT EXISTS transactions (
   id UUID PRIMARY KEY,
-  item_id UUID REFERENCES items(id),
+  item_id UUID REFERENCES items(id) ON DELETE CASCADE,
   type TEXT CHECK (type IN ('in', 'out')),
   quantity INTEGER NOT NULL,
   notes TEXT,
@@ -57,7 +65,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 -- 5. Table Purchase Orders
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id UUID PRIMARY KEY,
-  supplier_id UUID REFERENCES suppliers(id),
+  supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
   user_id UUID REFERENCES auth.users(id),
   total_amount DECIMAL(15,2),
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'cancelled')),
@@ -68,7 +76,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
 CREATE TABLE IF NOT EXISTS purchase_order_items (
   id UUID PRIMARY KEY,
   purchase_order_id UUID REFERENCES purchase_orders(id) ON DELETE CASCADE,
-  item_id UUID REFERENCES items(id),
+  item_id UUID REFERENCES items(id) ON DELETE CASCADE,
   quantity INTEGER NOT NULL,
   price DECIMAL(12,2) NOT NULL
 );
@@ -106,8 +114,8 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
     const tables = [
       { name: 'profiles', cols: ['username', 'role'] },
       { name: 'suppliers', cols: ['category', 'user_id'] },
-      { name: 'items', cols: ['sku', 'current_stock'] },
-      { name: 'transactions', cols: ['type', 'quantity'] },
+      { name: 'items', cols: ['sku', 'current_stock', 'name'] },
+      { name: 'transactions', cols: ['type', 'quantity', 'item_id'] },
       { name: 'purchase_orders', cols: ['status', 'total_amount'] },
       { name: 'purchase_order_items', cols: ['purchase_order_id', 'item_id'] }
     ];
