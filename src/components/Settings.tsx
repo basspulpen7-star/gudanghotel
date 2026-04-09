@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { User, Mail, Shield, Camera, Save, Loader2, LogOut } from 'lucide-react';
+import { User, Mail, Shield, Camera, Save, Loader2, LogOut, Smartphone } from 'lucide-react';
 
 interface SettingsProps {
   user: any;
@@ -171,6 +171,18 @@ export function Settings({ user, profile, onProfileUpdate }: SettingsProps) {
                 </button>
               </div>
             </form>
+          </div>
+
+          <div className="bg-brand-card border border-brand-border rounded-2xl p-6 md:p-8">
+            <h4 className="text-lg font-bold text-white mb-4">Aplikasi</h4>
+            <p className="text-brand-text-muted text-sm mb-6">Pasang aplikasi di layar utama untuk akses lebih cepat.</p>
+            <button 
+              onClick={() => (window as any).deferredPrompt?.prompt()}
+              className="flex items-center gap-2 bg-brand-accent/10 text-brand-accent hover:bg-brand-accent hover:text-white px-4 py-2 rounded-xl font-bold transition-all"
+            >
+              <Smartphone className="w-5 h-5" />
+              <span>Pasang Aplikasi</span>
+            </button>
           </div>
 
           <div className="bg-brand-card border border-brand-border rounded-2xl p-6 md:p-8">
