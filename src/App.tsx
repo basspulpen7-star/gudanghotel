@@ -13,6 +13,7 @@ import { UserManagement } from './components/UserManagement';
 import { DatabaseSetup } from './components/DatabaseSetup';
 import { Settings } from './components/Settings';
 import { Login } from './components/Login';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 
 type View = 'dashboard' | 'inventory' | 'suppliers' | 'incoming' | 'outgoing' | 'reports' | 'settings' | 'purchase_orders' | 'user_management' | 'database_setup';
 
@@ -199,6 +200,7 @@ export default function App() {
       setSearchTerm={setGlobalSearch}
     >
       {renderView()}
+      <PWAInstallPrompt />
     </Layout>
   );
 }

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Database, AlertTriangle, CheckCircle2, Copy, Terminal } from 'lucide-react';
+import { Database, AlertTriangle, CheckCircle2, Copy, Terminal, Activity } from 'lucide-react';
 
 export function DatabaseSetup() {
   const [status, setStatus] = useState<{ table: string; exists: boolean; columns: string[]; error?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  const sqlSetup = `-- 0. Reset Database (Opsional - Hapus tanda komentar jika ingin reset total)
+  const sqlSetup = `-- 0. Reset Database (Hapus tanda komentar jika ingin reset total)
+-- WARNING: Ini akan menghapus SEMUA data!
 -- DROP TABLE IF EXISTS purchase_order_items CASCADE;
 -- DROP TABLE IF EXISTS purchase_orders CASCADE;
 -- DROP TABLE IF EXISTS transactions CASCADE;
@@ -28,7 +29,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 -- 2. Table Suppliers
 CREATE TABLE IF NOT EXISTS suppliers (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   contact_person TEXT,
   phone TEXT,
@@ -42,7 +43,7 @@ ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.user
 
 -- 3. Table Items (Inventory)
 CREATE TABLE IF NOT EXISTS items (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   sku TEXT UNIQUE,
   category TEXT,
@@ -56,10 +57,13 @@ CREATE TABLE IF NOT EXISTS items (
 );
 ALTER TABLE items ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'General';
 ALTER TABLE items ADD COLUMN IF NOT EXISTS initial_stock INTEGER DEFAULT 0;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS current_stock INTEGER DEFAULT 0;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS min_stock INTEGER DEFAULT 0;
+ALTER TABLE items ADD COLUMN IF NOT EXISTS unit TEXT;
 
 -- 4. Table Transactions (Incoming/Outgoing)
 CREATE TABLE IF NOT EXISTS transactions (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   item_id UUID REFERENCES items(id) ON DELETE CASCADE,
   type TEXT CHECK (type IN ('IN', 'OUT')),
   quantity INTEGER NOT NULL,
@@ -73,7 +77,7 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;
 
 -- 5. Table Purchase Orders
 CREATE TABLE IF NOT EXISTS purchase_orders (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
   user_id UUID REFERENCES auth.users(id),
   total_amount DECIMAL(15,2),
@@ -83,7 +87,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
 
 -- 6. Table Purchase Order Items
 CREATE TABLE IF NOT EXISTS purchase_order_items (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   purchase_order_id UUID REFERENCES purchase_orders(id) ON DELETE CASCADE,
   item_id UUID REFERENCES items(id) ON DELETE CASCADE,
   quantity INTEGER NOT NULL,
@@ -122,9 +126,9 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
     setLoading(true);
     const tables = [
       { name: 'profiles', cols: ['username', 'role'] },
-      { name: 'suppliers', cols: ['category', 'user_id'] },
-      { name: 'items', cols: ['sku', 'current_stock', 'name', 'department', 'initial_stock'] },
-      { name: 'transactions', cols: ['type', 'quantity', 'item_id', 'department', 'notes'] },
+      { name: 'suppliers', cols: ['name', 'category'] },
+      { name: 'items', cols: ['name', 'sku', 'department', 'initial_stock', 'min_stock'] },
+      { name: 'transactions', cols: ['type', 'quantity', 'item_id', 'department'] },
       { name: 'purchase_orders', cols: ['status', 'total_amount'] },
       { name: 'purchase_order_items', cols: ['purchase_order_id', 'item_id'] }
     ];
@@ -184,25 +188,32 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
           
           <div className="space-y-3">
             {loading ? (
-              <div className="text-brand-text-muted">Mengecek database...</div>
+              <div className="text-brand-text-muted flex items-center gap-2">
+                <Activity className="w-4 h-4 animate-spin" />
+                Mengecek database...
+              </div>
             ) : status.map((s) => (
-              <div key={s.table} className="bg-brand-card p-4 rounded-xl border border-brand-border flex items-center justify-between">
+              <div key={s.table} className="bg-brand-card p-4 rounded-xl border border-brand-border flex items-center justify-between group hover:border-brand-accent/50 transition-all">
                 <div className="flex items-center gap-3">
                   {s.exists && s.columns.length === 0 && !s.error ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    </div>
                   ) : (
-                    <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                    <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                      <AlertTriangle className="w-5 h-5 text-yellow-500" />
+                    </div>
                   )}
                   <div>
-                    <span className="font-mono font-bold text-white">{s.table}</span>
+                    <span className="font-mono font-bold text-white text-sm">{s.table}</span>
                     {!s.exists ? (
-                      <p className="text-xs text-red-500">Tabel belum ada</p>
+                      <p className="text-[10px] text-red-500 font-medium">Tabel belum ada - Jalankan SQL!</p>
                     ) : s.error ? (
-                      <p className="text-xs text-red-500">Error: {s.error}</p>
+                      <p className="text-[10px] text-red-500 font-medium">Error: {s.error}</p>
                     ) : s.columns.length > 0 ? (
-                      <p className="text-xs text-yellow-500">Kolom hilang: {s.columns.join(', ')}</p>
+                      <p className="text-[10px] text-yellow-500 font-medium">Kolom hilang: {s.columns.join(', ')}</p>
                     ) : (
-                      <p className="text-xs text-green-500">Siap digunakan</p>
+                      <p className="text-[10px] text-green-500 font-medium">Siap digunakan</p>
                     )}
                   </div>
                 </div>

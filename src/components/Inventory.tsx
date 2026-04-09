@@ -351,7 +351,10 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
               ) : filteredItems.map((item) => {
                 const stats = itemStats[item.id] || { initial: 0, in: 0, out: 0, final: 0 };
                 return (
-                  <tr key={item.id} className="hover:bg-brand-dark/30 transition-colors group">
+                  <tr key={item.id} className={cn(
+                    "hover:bg-brand-dark/30 transition-colors group",
+                    stats.final <= item.min_stock && "bg-orange-500/5 border-l-2 border-l-orange-500"
+                  )}>
                     <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-white text-xs md:text-sm">{item.name}</td>
                     <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted">
                       <span className="px-1.5 py-0.5 bg-brand-dark rounded-md text-[9px] md:text-[10px] font-bold uppercase border border-brand-border">

@@ -38,13 +38,15 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-type ReportType = 'daily' | 'monthly';
+type ReportType = 'daily' | 'monthly' | 'custom';
 type ReportCategory = 'stock' | 'incoming' | 'outgoing';
 
 export function Reports() {
   const [reportType, setReportType] = useState<ReportType>('daily');
   const [reportCategory, setReportCategory] = useState<ReportCategory>('stock');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [itemStats, setItemStats] = useState<Record<string, { in: number, out: number }>>({});
@@ -56,7 +58,7 @@ export function Reports() {
     } else {
       fetchTransactions();
     }
-  }, [reportType, currentDate, reportCategory]);
+  }, [reportType, currentDate, reportCategory, startDate, endDate]);
 
   const fetchStockData = async () => {
     setLoading(true);
@@ -65,9 +67,12 @@ export function Reports() {
     if (reportType === 'daily') {
       start = startOfDay(currentDate);
       end = endOfDay(currentDate);
-    } else {
+    } else if (reportType === 'monthly') {
       start = startOfMonth(currentDate);
       end = endOfMonth(currentDate);
+    } else {
+      start = startOfDay(new Date(startDate));
+      end = endOfDay(new Date(endDate));
     }
 
     try {
@@ -149,9 +154,12 @@ export function Reports() {
     if (reportType === 'daily') {
       start = startOfDay(currentDate);
       end = endOfDay(currentDate);
-    } else {
+    } else if (reportType === 'monthly') {
       start = startOfMonth(currentDate);
       end = endOfMonth(currentDate);
+    } else {
+      start = startOfDay(new Date(startDate));
+      end = endOfDay(new Date(endDate));
     }
 
     try {
@@ -198,7 +206,11 @@ export function Reports() {
 
   const exportToPDF = () => {
     const doc = new jsPDF();
-    const periodStr = reportType === 'daily' ? format(currentDate, 'dd MMMM yyyy') : format(currentDate, 'MMMM yyyy');
+    let periodStr = '';
+    if (reportType === 'daily') periodStr = format(currentDate, 'dd MMMM yyyy');
+    else if (reportType === 'monthly') periodStr = format(currentDate, 'MMMM yyyy');
+    else periodStr = `${format(new Date(startDate), 'dd/MM/yy')} - ${format(new Date(endDate), 'dd/MM/yy')}`;
+
     let categoryStr = '';
     if (reportCategory === 'stock') categoryStr = 'Stok Barang';
     else if (reportCategory === 'incoming') categoryStr = 'Barang Masuk';
@@ -314,6 +326,12 @@ export function Reports() {
             >
               Bulanan
             </button>
+            <button 
+              onClick={() => setReportType('custom')}
+              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${reportType === 'custom' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+            >
+              Custom
+            </button>
           </div>
         </div>
       </div>
@@ -321,31 +339,59 @@ export function Reports() {
       {/* Date Selector */}
       <div className="flex flex-col sm:flex-row items-center justify-between bg-brand-card p-4 rounded-2xl border border-brand-border gap-4">
         <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
-          <button onClick={prevPeriod} className="p-2 hover:bg-brand-dark rounded-lg text-brand-text-muted hover:text-white">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div className="relative">
-            <label className="flex items-center gap-2 text-white font-bold cursor-pointer hover:text-brand-accent transition-colors">
-              <CalendarIcon className="w-5 h-5 text-brand-accent" />
-              {reportType === 'daily' ? format(currentDate, 'dd MMMM yyyy') : format(currentDate, 'MMMM yyyy')}
-              <input 
-                type={reportType === 'daily' ? "date" : "month"}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full"
-                value={reportType === 'daily' ? format(currentDate, 'yyyy-MM-dd') : format(currentDate, 'yyyy-MM')}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    const newDate = new Date(e.target.value);
-                    if (!isNaN(newDate.getTime())) {
-                      setCurrentDate(newDate);
+          {reportType !== 'custom' && (
+            <button onClick={prevPeriod} className="p-2 hover:bg-brand-dark rounded-lg text-brand-text-muted hover:text-white">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          )}
+          
+          <div className="relative flex-grow sm:flex-grow-0">
+            {reportType === 'custom' ? (
+              <div className="flex flex-col sm:flex-row items-center gap-2">
+                <div className="relative w-full sm:w-auto">
+                  <input 
+                    type="date"
+                    className="w-full bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-white text-xs font-bold focus:outline-none focus:border-brand-accent"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <span className="text-brand-text-muted text-xs font-bold">s/d</span>
+                <div className="relative w-full sm:w-auto">
+                  <input 
+                    type="date"
+                    className="w-full bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-white text-xs font-bold focus:outline-none focus:border-brand-accent"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <label className="flex items-center gap-2 text-white font-bold cursor-pointer hover:text-brand-accent transition-colors">
+                <CalendarIcon className="w-5 h-5 text-brand-accent" />
+                {reportType === 'daily' ? format(currentDate, 'dd MMMM yyyy') : format(currentDate, 'MMMM yyyy')}
+                <input 
+                  type={reportType === 'daily' ? "date" : "month"}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full"
+                  value={reportType === 'daily' ? format(currentDate, 'yyyy-MM-dd') : format(currentDate, 'yyyy-MM')}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const newDate = new Date(e.target.value);
+                      if (!isNaN(newDate.getTime())) {
+                        setCurrentDate(newDate);
+                      }
                     }
-                  }
-                }}
-              />
-            </label>
+                  }}
+                />
+              </label>
+            )}
           </div>
-          <button onClick={nextPeriod} className="p-2 hover:bg-brand-dark rounded-lg text-brand-text-muted hover:text-white">
-            <ChevronRight className="w-5 h-5" />
-          </button>
+
+          {reportType !== 'custom' && (
+            <button onClick={nextPeriod} className="p-2 hover:bg-brand-dark rounded-lg text-brand-text-muted hover:text-white">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          )}
         </div>
         <button 
           onClick={exportToPDF}
