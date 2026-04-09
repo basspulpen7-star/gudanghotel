@@ -18,6 +18,7 @@ export function PWAInstallPrompt() {
 
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
+      console.log('beforeinstallprompt fired');
       (window as any).deferredPrompt = e;
       setDeferredPrompt(e);
       setShowPrompt(true);
