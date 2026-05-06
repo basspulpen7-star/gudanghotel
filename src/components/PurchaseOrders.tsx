@@ -273,46 +273,233 @@ export function PurchaseOrders() {
   };
 
   const exportToPDF = (po: PurchaseOrder) => {
-    const doc = new jsPDF();
+    const doc = new jsPDF('p', 'mm', 'a4');
     const supplier = suppliers.find(s => s.id === po.supplier_id);
     
+    // Numeric only PO number
+    const poNumber = po.id.replace(/[^0-9]/g, '');
+
+    // Font setup
+    doc.setFont('helvetica');
+
+    // 1. Header (Left: Company, Right: PO Title)
+    // Left
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    doc.text('HOTEL ALIA MATRAMAN', 15, 20);
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text('Jl. Matraman Raya No.224', 15, 25);
+    doc.text('Jakarta Timur, 13150', 15, 30);
+    doc.text('Phone: (021) 8590 5555', 15, 35);
+    
+    // Right
+    doc.setFontSize(24);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(33, 41, 54);
+    doc.text('PURCHASE ORDER', 195, 25, { align: 'right' });
+    doc.setTextColor(0, 0, 0);
+
+    // 2. To & Ship To Section
+    doc.setFontSize(10);
+    doc.setLineWidth(0.2);
+    
+    // Rectangles
+    doc.rect(15, 45, 93, 35); // To
+    doc.rect(108, 45, 93, 35); // Ship To
+
+    // Labels
+    doc.setFont(undefined, 'bold');
+    doc.text('To:', 17, 50);
+    doc.text('Ship To:', 110, 50);
+    
+    // Content
+    doc.setFont(undefined, 'normal');
+    // To
+    doc.text(`Name: ${supplier?.contact_person || '-'}`, 17, 55);
+    doc.text(`Company: ${supplier?.name || '-'}`, 17, 60);
+    doc.text(`Address: ${supplier?.address || '-'}`, 17, 65);
+    doc.text(`Phone: ${supplier?.phone || '-'}`, 17, 70);
+    
+    // Ship To
+    doc.text(`Name: ${po.user_profile?.full_name || '-'}`, 110, 55);
+    doc.text(`Company: Hotel Alia Matraman`, 110, 60);
+    doc.text(`Address: Jl. Matraman Raya No.224`, 110, 65);
+    doc.text(`City, State, Zip: Jakarta Timur, 13150`, 110, 70);
+    doc.text(`Phone: (021) 8590 5555`, 110, 75);
+
+    // 3. Order Info Section (4 columns)
+    doc.setFillColor(230, 230, 230);
+    doc.rect(15, 85, 186, 8, 'F');
+    doc.rect(15, 85, 186, 16);
+    
+    doc.setFont(undefined, 'bold');
+    doc.text('Date', 25, 90);
+    doc.text('Requisitioned By', 70, 90);
+    doc.text('F.O.B Point', 125, 90);
+    doc.text('Terms', 170, 90);
+    
+    doc.setFont(undefined, 'normal');
+    doc.text(format(new Date(po.created_at), 'dd/MM/yyyy'), 25, 97);
+    doc.text(po.user_profile?.full_name || '-', 70, 97);
+    doc.text('-', 125, 97);
+    doc.text('-', 170, 97);
+
+    // 4. Items Table
+    doc.setFont(undefined, 'bold');
+    doc.setFillColor(230, 230, 230);
+    doc.rect(15, 105, 186, 8, 'F');
+    doc.rect(15, 105, 186, 100); // Table body outline
+    
+    doc.text('Quantity', 20, 110);
+    doc.text('Description', 70, 110);
+    doc.text('Unit Price', 145, 110, { align: 'right' });
+    doc.text('Total', 195, 110, { align: 'right' });
+    
+    // Line separator
+    doc.line(15, 113, 201, 113);
+    
+    // Items
+    doc.setFont(undefined, 'normal');
+    let yPos = 120;
+    (po.items || []).forEach(item => {
+      doc.text(`${item.quantity} PCS`, 20, yPos);
+      doc.text(item.item?.name || 'Unknown', 40, yPos);
+      doc.text(`Rp ${item.price.toLocaleString()}`, 150, yPos, { align: 'right' });
+      doc.text(`Rp ${(item.quantity * item.price).toLocaleString()}`, 195, yPos, { align: 'right' });
+      yPos += 7;
+    });
+
+    // 5. Footer (Comments + Totals)
+    const footerY = 210;
+    doc.rect(15, footerY, 110, 30); // Comments Box
+    doc.setFont(undefined, 'bold');
+    doc.text('COMMENTS:', 17, footerY + 5);
+    doc.setFont(undefined, 'italic');
+    doc.text('Please deliver during business hours.', 17, footerY + 12);
+    
+    // Totals Box
+    doc.rect(125, footerY, 76, 30);
+    doc.setFont(undefined, 'bold');
+    doc.text('Subtotal:', 130, footerY + 7);
+    doc.text('Tax:', 130, footerY + 14);
+    doc.text('Shipping:', 130, footerY + 21);
+    doc.text('Total:', 130, footerY + 28);
+    
+    doc.setFont(undefined, 'normal');
+    doc.text(`Rp ${po.total_amount.toLocaleString()}`, 198, footerY + 7, { align: 'right' });
+    doc.text('Rp 0', 198, footerY + 14, { align: 'right' });
+    doc.text('Rp 0', 198, footerY + 21, { align: 'right' });
+    doc.setFont(undefined, 'bold');
+    doc.text(`Rp ${po.total_amount.toLocaleString()}`, 198, footerY + 28, { align: 'right' });
+
+    doc.save(`PO_${poNumber}.pdf`);
+  };
+
+  const OLD_exportToPDF = (po: PurchaseOrder) => {
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const supplier = suppliers.find(s => s.id === po.supplier_id);
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setFont(undefined, 'bold');
+    doc.text('Hotel Alia Matraman', 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text('Jl. Matraman Raya No.224, Jakarta Timur, 13150', 105, 26, { align: 'center' });
+    doc.text('Phone: (021) 8590 5555', 105, 31, { align: 'center' });
+
+    doc.setLineWidth(0.5);
+    doc.line(14, 35, 196, 35); // Horizontal line
+    
     doc.setFontSize(20);
-    doc.text('PURCHASE ORDER', 105, 20, { align: 'center' });
-    
-    doc.setFontSize(10);
-    doc.text('Hotel Alia Matraman', 14, 35);
-    doc.text('Jl. Matraman Raya No.224', 14, 40);
-    doc.text('Jakarta Timur', 14, 45);
-    
-    doc.text(`PO Number: ${po.id.slice(0, 8).toUpperCase()}`, 140, 35);
-    doc.text(`Date: ${format(new Date(po.created_at), 'dd/MM/yyyy')}`, 140, 40);
-    doc.text(`Status: ${po.status.toUpperCase()}`, 140, 45);
-    doc.text(`By: ${po.user_profile?.full_name || 'Admin'}`, 140, 50);
+    doc.setFont(undefined, 'bold');
+    doc.text('PURCHASE ORDER', 105, 45, { align: 'center' });
 
-    doc.setFontSize(12);
-    doc.text('Supplier:', 14, 60);
-    doc.setFontSize(10);
-    doc.text(supplier?.name || 'Unknown', 14, 65);
-    doc.text(supplier?.address || '-', 14, 70);
-    doc.text(supplier?.phone || '-', 14, 75);
+    // PO Details Table
+    doc.setDrawColor(150);
+    doc.rect(14, 52, 182, 10);
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    doc.text(`PO Number: #${po.id.slice(0, 8).toUpperCase()}`, 16, 58);
+    // Masih menggunakan tanggal, nanti kita tambahkan field lain jika ada di data
+    doc.text(`Date: ${format(new Date(po.created_at), 'dd/MM/yyyy')}`, 106, 58);
+    
+    // Grid details baru sesuai contoh
+    doc.rect(14, 65, 182, 10);
+    doc.setFontSize(9);
+    doc.text('Date', 30, 71);
+    doc.text('Requisitioned By', 80, 71);
+    doc.text('F.O.B Point', 130, 71);
+    doc.text('Terms', 170, 71);
+    
+    doc.rect(14, 75, 45, 8); // Date val
+    doc.rect(59, 75, 45, 8); // Req By val
+    doc.rect(14, 75, 45, 8); // Date val
+    doc.rect(59, 75, 45, 8); // Req By val
+    doc.rect(104, 75, 45, 8); // FOB val
+    doc.rect(149, 75, 47, 8); // Terms val
+    
+    doc.setFont(undefined, 'normal');
+    doc.text(`${format(new Date(po.created_at), 'dd/MM/yyyy')}`, 30, 80);
+    doc.text(`${po.user_profile?.full_name || 'Staff'}`, 80, 80);
+    doc.text('-', 130, 80);
+    doc.text('-', 170, 80);
 
+    // Supplier & Ship To
+    doc.rect(14, 85, 91, 35);
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    doc.text('To:', 16, 90);
+    doc.setFont(undefined, 'normal');
+    doc.text(`${supplier?.name || '-'}`, 16, 95);
+    doc.text(`${supplier?.address || '-'}`, 16, 100);
+
+    doc.rect(105, 85, 91, 35);
+    doc.setFont(undefined, 'bold');
+    doc.text('Ship To:', 107, 90);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Hotel Alia Matraman`, 107, 95);
+    doc.text(`Jl. Matraman Raya No.224`, 107, 100);
+
+    // Items
     const tableData = (po.items || []).map(item => [
+      item.quantity.toString() + ' ' + (item.item?.unit || ''),
       item.item?.name || 'Unknown',
-      item.quantity.toString(),
-      item.item?.unit || '-',
       `Rp ${item.price.toLocaleString()}`,
       `Rp ${(item.quantity * item.price).toLocaleString()}`
     ]);
 
     autoTable(doc, {
-      startY: 85,
-      head: [['Nama Barang', 'Qty', 'Unit', 'Harga Satuan', 'Total']],
+      startY: 125,
+      head: [['Quantity', 'Description', 'Unit Price', 'Total']],
       body: tableData,
-      foot: [['', '', '', 'GRAND TOTAL', `Rp ${po.total_amount.toLocaleString()}`]],
       theme: 'grid',
-      headStyles: { fillColor: [59, 130, 246] },
-      footStyles: { fillColor: [241, 245, 249], textColor: [0, 0, 0], fontStyle: 'bold' }
+      headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 2, lineColor: [0, 0, 0] },
     });
+
+    const finalY = (doc as any).lastAutoTable.finalY;
+    
+    // Comments & Totals
+    doc.rect(14, finalY, 115, 25);
+    doc.setFontSize(8);
+    doc.setFont(undefined, 'bold');
+    doc.text('COMMENTS:', 16, finalY + 5);
+    doc.setFont(undefined, 'italic');
+    doc.text('Please deliver during business hours.', 16, finalY + 10);
+
+    doc.rect(129, finalY, 67, 25); // Totals box
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    doc.text('Subtotal:', 140, finalY + 6);
+    doc.text(`Rp ${po.total_amount.toLocaleString()}`, 190, finalY + 6, { align: 'right' });
+    doc.text('Tax:', 140, finalY + 11);
+    doc.text('Rp 0', 190, finalY + 11, { align: 'right' });
+    doc.text('Shipping:', 140, finalY + 16);
+    doc.text('Rp 0', 190, finalY + 16, { align: 'right' });
+    doc.text('Total:', 140, finalY + 21);
+    doc.text(`Rp ${po.total_amount.toLocaleString()}`, 190, finalY + 21, { align: 'right' });
 
     doc.save(`PO_${po.id.slice(0, 8)}.pdf`);
   };
@@ -519,7 +706,7 @@ export function PurchaseOrders() {
                     Download PO
                   </button>
                   <button 
-                    onClick={() => exportToPDF(po)}
+                    onClick={() => setViewingPo(po)}
                     className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-white hover:bg-brand-card transition-all"
                   >
                     <Printer className="w-4 h-4" />
@@ -562,6 +749,13 @@ export function PurchaseOrders() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => exportToPDF(viewingPo)}
+                  className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border text-white rounded-lg hover:bg-brand-card transition-all font-bold text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
                 <button 
                   onClick={handlePrint}
                   className="flex items-center gap-2 px-4 py-2 bg-brand-accent text-white rounded-lg hover:bg-blue-600 transition-all font-bold text-sm"
