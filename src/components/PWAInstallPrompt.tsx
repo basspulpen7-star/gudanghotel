@@ -13,6 +13,7 @@ export function PWAInstallPrompt() {
 
     // Check if already installed
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    console.log('Is standalone:', isStandalone);
     
     if (isStandalone) return;
 
@@ -25,6 +26,7 @@ export function PWAInstallPrompt() {
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    console.log('Event listener added for beforeinstallprompt');
 
     // For iOS, we can't detect beforeinstallprompt, so we show a manual tip
     if (isIOSDevice) {

@@ -515,6 +515,13 @@ export function PurchaseOrders() {
                     onClick={() => exportToPDF(po)}
                     className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-white hover:bg-brand-card transition-all"
                   >
+                    <Download className="w-4 h-4" />
+                    Download PO
+                  </button>
+                  <button 
+                    onClick={() => exportToPDF(po)}
+                    className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-white hover:bg-brand-card transition-all"
+                  >
                     <Printer className="w-4 h-4" />
                     Cetak PO
                   </button>
