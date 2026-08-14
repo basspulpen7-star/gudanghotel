@@ -26,6 +26,34 @@ CREATE TABLE IF NOT EXISTS profiles (
   role TEXT DEFAULT 'staff',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'staff';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+
+-- Trigger Otomatis: Buat baris di profiles setiap ada user baru di Supabase Auth
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, full_name, email, username, role, created_at)
+  VALUES (
+    new.id, 
+    COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)),
+    new.email,
+    COALESCE(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
+    COALESCE(new.raw_user_meta_data->>'role', 'staff'),
+    NOW()
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    email = EXCLUDED.email;
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- 2. Table Suppliers
 CREATE TABLE IF NOT EXISTS suppliers (
@@ -78,12 +106,14 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;
 -- 5. Table Purchase Orders
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  po_number TEXT UNIQUE,
   supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
   user_id UUID REFERENCES auth.users(id),
   total_amount DECIMAL(15,2),
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'cancelled')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS po_number TEXT UNIQUE;
 
 -- 6. Table Purchase Order Items
 CREATE TABLE IF NOT EXISTS purchase_order_items (
@@ -129,7 +159,7 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
       { name: 'suppliers', cols: ['name', 'category'] },
       { name: 'items', cols: ['name', 'sku', 'department', 'initial_stock', 'min_stock'] },
       { name: 'transactions', cols: ['type', 'quantity', 'item_id', 'department'] },
-      { name: 'purchase_orders', cols: ['status', 'total_amount'] },
+      { name: 'purchase_orders', cols: ['status', 'total_amount', 'po_number'] },
       { name: 'purchase_order_items', cols: ['purchase_order_id', 'item_id'] }
     ];
 

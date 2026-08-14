@@ -35,6 +35,7 @@ export function PurchaseOrderDocument({ po, supplier }: PurchaseOrderDocumentPro
         </div>
         <div className="text-right">
           <h2 className="text-4xl font-bold text-gray-800 uppercase tracking-tighter">Purchase Order</h2>
+          <p className="text-xl font-bold text-gray-600">#{po.po_number || po.id.slice(0, 8).toUpperCase()}</p>
         </div>
       </div>
 

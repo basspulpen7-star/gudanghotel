@@ -114,6 +114,40 @@ export function PurchaseOrders() {
     setPoItems(newItems);
   };
 
+  const generatePoNumber = async () => {
+    try {
+      const today = new Date();
+      const dateStr = format(today, 'yyyyMMdd');
+      
+      const { data, error } = await supabase
+        .from('purchase_orders')
+        .select('po_number')
+        .ilike('po_number', `${dateStr}%`)
+        .order('po_number', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        // If column doesn't exist yet, we'll return a timestamp-based number
+        if (error.message.includes('column "po_number" does not exist')) {
+          return format(new Date(), 'yyyyMMddHHmmss');
+        }
+        throw error;
+      }
+
+      if (data && data.length > 0 && data[0].po_number) {
+        const lastPart = data[0].po_number.slice(8);
+        const lastNumber = parseInt(lastPart) || 0;
+        const nextNumber = (lastNumber + 1).toString().padStart(4, '0');
+        return `${dateStr}${nextNumber}`;
+      }
+
+      return `${dateStr}0001`;
+    } catch (err) {
+      console.error('Error generating PO number:', err);
+      return format(new Date(), 'yyyyMMddHHmmss');
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSupplierId || poItems.some(i => !i.item_id)) {
@@ -127,36 +161,25 @@ export function PurchaseOrders() {
       if (!user) throw new Error('User not authenticated');
 
       // Double check profile exists to avoid FK error
-      const { data: profile, error: profileCheckError } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('id')
         .eq('id', user.id)
         .maybeSingle();
 
-      if (profileCheckError) {
-        console.error('Error checking profile:', profileCheckError);
-      }
-
       if (!profile) {
-        console.log('Profile missing in PurchaseOrders, creating now...');
-        const { error: insertError } = await supabase.from('profiles').insert([{
+        await supabase.from('profiles').insert([{
           id: user.id,
           full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
           email: user.email,
           role: 'staff'
         }]);
-        
-        if (insertError) {
-          console.error('Failed to create profile in PurchaseOrders:', insertError);
-          throw new Error('Gagal membuat profil pengguna: ' + insertError.message);
-        }
       }
 
       const totalAmount = poItems.reduce((acc, item) => acc + (item.quantity * item.price), 0);
       
       if (editingPoId) {
         // UPDATE EXISTING PO
-        // 1. Update PO header
         const { error: poError } = await supabase.from('purchase_orders').update({
           supplier_id: selectedSupplierId,
           total_amount: totalAmount,
@@ -164,15 +187,8 @@ export function PurchaseOrders() {
 
         if (poError) throw poError;
 
-        // 2. Delete old items
-        const { error: deleteItemsError } = await supabase
-          .from('purchase_order_items')
-          .delete()
-          .eq('purchase_order_id', editingPoId);
-        
-        if (deleteItemsError) throw deleteItemsError;
+        await supabase.from('purchase_order_items').delete().eq('purchase_order_id', editingPoId);
 
-        // 3. Insert new items
         const { error: itemsError } = await supabase.from('purchase_order_items').insert(
           poItems.map(item => ({
             id: crypto.randomUUID(),
@@ -185,17 +201,33 @@ export function PurchaseOrders() {
       } else {
         // CREATE NEW PO
         const poId = crypto.randomUUID();
+        const poNumber = await generatePoNumber();
 
         // 1. Create PO
         const { error: poError } = await supabase.from('purchase_orders').insert([{
           id: poId,
+          po_number: poNumber,
           supplier_id: selectedSupplierId,
           user_id: user.id,
           total_amount: totalAmount,
           status: 'pending'
         }]);
 
-        if (poError) throw poError;
+        if (poError) {
+          // Fallback if po_number column missing
+          if (poError.message.includes('column "po_number" does not exist')) {
+            const { error: fallbackError } = await supabase.from('purchase_orders').insert([{
+              id: poId,
+              supplier_id: selectedSupplierId,
+              user_id: user.id,
+              total_amount: totalAmount,
+              status: 'pending'
+            }]);
+            if (fallbackError) throw fallbackError;
+          } else {
+            throw poError;
+          }
+        }
 
         // 2. Create PO Items
         const { error: itemsError } = await supabase.from('purchase_order_items').insert(
@@ -276,8 +308,8 @@ export function PurchaseOrders() {
     const doc = new jsPDF('p', 'mm', 'a4');
     const supplier = suppliers.find(s => s.id === po.supplier_id);
     
-    // Numeric only PO number
-    const poNumber = po.id.replace(/[^0-9]/g, '');
+    // PO number - use po_number if available, else numeric-only version of ID
+    const poNumber = po.po_number || po.id.replace(/[^0-9]/g, '').slice(0, 12);
 
     // Font setup
     doc.setFont('helvetica');
@@ -635,7 +667,7 @@ export function PurchaseOrders() {
                 <div>
                   <h3 className="text-lg font-bold text-white">{po.supplier?.name || 'Unknown Supplier'}</h3>
                   <div className="flex items-center gap-2 text-xs text-brand-text-muted">
-                    <span className="font-mono">#{po.id.slice(0, 8).toUpperCase()}</span>
+                    <span className="font-mono">#{po.po_number || po.id.slice(0, 8).toUpperCase()}</span>
                     <span>•</span>
                     <span>{format(new Date(po.created_at), 'dd MMM yyyy HH:mm')}</span>
                   </div>
@@ -745,7 +777,7 @@ export function PurchaseOrders() {
               <div className="flex items-center gap-4">
                 <h3 className="text-lg font-bold text-gray-800">Preview Purchase Order</h3>
                 <span className="px-3 py-1 bg-brand-accent/10 text-brand-accent rounded-full text-xs font-bold">
-                  #{viewingPo.id.slice(0, 8).toUpperCase()}
+                  #{viewingPo.po_number || viewingPo.id.slice(0, 8).toUpperCase()}
                 </span>
               </div>
               <div className="flex items-center gap-2">

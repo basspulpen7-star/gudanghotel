@@ -43,6 +43,7 @@ export interface UserProfile {
 
 export interface PurchaseOrder {
   id: string;
+  po_number?: string;
   supplier_id: string;
   status: 'pending' | 'completed' | 'cancelled';
   total_amount: number;
