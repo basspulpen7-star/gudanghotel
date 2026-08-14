@@ -13,36 +13,47 @@ export function Login() {
     setLoading(true);
     setError(null);
 
-    let loginEmail = identifier;
+    const cleanIdentifier = identifier.trim();
+    let loginEmail = cleanIdentifier;
 
-    // If identifier doesn't look like an email, try to resolve it from a profiles table
-    if (!identifier.includes('@')) {
+    // If identifier doesn't look like an email, try to resolve it from profiles table by username
+    if (!cleanIdentifier.includes('@')) {
       try {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('email')
-          .eq('username', identifier)
-          .single();
+          .ilike('username', cleanIdentifier)
+          .maybeSingle();
         
         if (profileError) {
-          // If profile not found, we'll still try to log in with the identifier as email
-          // (it will likely fail, but that's the expected behavior for invalid credentials)
-          console.warn('Profile not found for username:', identifier);
+          console.warn('Error querying username in profiles:', profileError);
         } else if (profile?.email) {
           loginEmail = profile.email;
+        } else {
+          // If no profile found for username
+          setError(`Username "${cleanIdentifier}" tidak ditemukan. Silakan gunakan email akun Anda.`);
+          setLoading(false);
+          return;
         }
       } catch (err) {
         console.error('Error resolving username:', err);
       }
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: loginEmail,
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: loginEmail.toLowerCase(),
       password,
     });
 
-    if (error) {
-      setError(error.message);
+    if (authError) {
+      console.warn('Supabase Auth error:', authError);
+      if (authError.message.includes('Invalid login credentials') || authError.status === 400) {
+        setError('Email / Username atau password salah. Silakan periksa kembali data login Anda.');
+      } else if (authError.message.includes('Email not confirmed')) {
+        setError('Email belum dikonfirmasi. Harap nonaktifkan opsi "Confirm Email" di dashboard Supabase Authentication jika ingin langsung login.');
+      } else {
+        setError(authError.message);
+      }
     }
     setLoading(false);
   };
