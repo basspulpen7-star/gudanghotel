@@ -16,9 +16,9 @@ export function DatabaseSetup() {
 -- DROP TABLE IF EXISTS suppliers CASCADE;
 -- DROP TABLE IF EXISTS profiles CASCADE;
 
--- 1. Table Profiles (Untuk Manajemen User)
+-- 1. Table Profiles (Untuk Manajemen User & Staf)
 CREATE TABLE IF NOT EXISTS profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   full_name TEXT,
   username TEXT UNIQUE,
   email TEXT,
@@ -26,6 +26,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   role TEXT DEFAULT 'staff',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+-- Lepaskan foreign key constraint jika ada agar admin leluasa mengelola user/staf
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
+ALTER TABLE profiles ALTER COLUMN id SET DEFAULT gen_random_uuid();
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'staff';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;

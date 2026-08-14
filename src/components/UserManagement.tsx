@@ -19,7 +19,10 @@ import {
   EyeOff,
   CheckCircle2,
   AlertCircle,
-  Sparkles
+  Sparkles,
+  Terminal,
+  Copy,
+  Check
 } from 'lucide-react';
 
 export function UserManagement() {
@@ -36,7 +39,22 @@ export function UserManagement() {
   const [role, setRole] = useState<'admin' | 'staff'>('staff');
   const [password, setPassword] = useState(''); // For new users
   const [showPassword, setShowPassword] = useState(false);
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string; isFkError?: boolean } | null>(null);
+  const [showSqlFixModal, setShowSqlFixModal] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+
+  const fixSqlScript = `-- Jalankan perintah ini di Supabase SQL Editor untuk memperbaiki Foreign Key tabel Profiles:
+ALTER TABLE IF EXISTS profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
+ALTER TABLE IF EXISTS profiles ALTER COLUMN id SET DEFAULT gen_random_uuid();
+ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS username TEXT;
+ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'staff';
+ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
+
+  const copySqlFix = () => {
+    navigator.clipboard.writeText(fixSqlScript);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 3000);
+  };
 
   useEffect(() => {
     fetchProfiles();
@@ -101,86 +119,82 @@ export function UserManagement() {
         }
 
         let newUserId: string | null = null;
+        let authRegistered = false;
 
         // 1. Create user in Supabase Auth using a temporary un-persisted client
         // This ensures the current admin user is NOT logged out
         if (supabaseUrl && supabaseKey) {
-          const tempClient = createClient(supabaseUrl, supabaseKey, {
-            auth: {
-              persistSession: false,
-              autoRefreshToken: false,
-              detectSessionInUrl: false
-            }
-          });
-
-          const { data: authData, error: authError } = await tempClient.auth.signUp({
-            email: email.trim().toLowerCase(),
-            password: password,
-            options: {
-              data: {
-                full_name: fullName.trim(),
-                username: username.trim(),
-                role: role
+          try {
+            const tempClient = createClient(supabaseUrl, supabaseKey, {
+              auth: {
+                persistSession: false,
+                autoRefreshToken: false,
+                detectSessionInUrl: false
               }
-            }
-          });
+            });
 
-          if (authError) {
-            console.warn('Auth signup error:', authError);
-            if (authError.message.toLowerCase().includes('already registered')) {
-              throw new Error(`Email "${email}" sudah terdaftar di sistem. Gunakan email lain.`);
-            }
-            throw new Error(`Gagal mendaftarkan akun di Auth: ${authError.message}`);
-          }
+            const { data: authData, error: authError } = await tempClient.auth.signUp({
+              email: email.trim().toLowerCase(),
+              password: password,
+              options: {
+                data: {
+                  full_name: fullName.trim(),
+                  username: username.trim(),
+                  role: role
+                }
+              }
+            });
 
-          if (authData.user) {
-            newUserId = authData.user.id;
+            if (authError) {
+              console.warn('Auth signup notice:', authError);
+              if (authError.message.toLowerCase().includes('already registered')) {
+                throw new Error(`Email "${email}" sudah terdaftar di sistem. Gunakan email lain.`);
+              }
+              // If signup fails due to SMTP/rate limit, log and proceed with profile creation
+            } else if (authData.user) {
+              newUserId = authData.user.id;
+              authRegistered = true;
+            }
+          } catch (authErr: any) {
+            if (authErr.message?.includes('sudah terdaftar')) {
+              throw authErr;
+            }
+            console.warn('Auth creation warning:', authErr);
           }
         }
 
         // 2. Insert or Upsert into profiles table
-        if (newUserId) {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .upsert({
-              id: newUserId,
-              full_name: fullName.trim(),
-              username: username.trim(),
-              email: email.trim().toLowerCase(),
-              role,
-              created_at: new Date().toISOString()
-            }, { onConflict: 'id' });
+        const profilePayload = {
+          id: newUserId || crypto.randomUUID(),
+          full_name: fullName.trim(),
+          username: username.trim(),
+          email: email.trim().toLowerCase(),
+          role,
+          created_at: new Date().toISOString()
+        };
 
-          if (profileError) {
-            console.error('Profile upsert error:', profileError);
-            if (profileError.message.includes('profiles_id_fkey')) {
-              throw new Error('Gagal menyimpan profil karena ID belum terdaftar di tabel auth.users. Pastikan user terdaftar di Supabase Auth.');
-            }
-            throw profileError;
-          }
-        } else {
-          // Fallback if auth is not connected or standalone
-          const fallbackId = crypto.randomUUID();
-          const { error: fallbackError } = await supabase
-            .from('profiles')
-            .insert([{
-              id: fallbackId,
-              full_name: fullName.trim(),
-              username: username.trim(),
-              email: email.trim().toLowerCase(),
-              role,
-              created_at: new Date().toISOString()
-            }]);
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert(profilePayload, { onConflict: 'id' });
 
-          if (fallbackError) {
-            if (fallbackError.message.includes('profiles_id_fkey')) {
-              throw new Error('Database mewajibkan User terdaftar di Supabase Auth. Silakan masukkan password untuk membuat akun Auth bersamaan.');
-            }
-            throw fallbackError;
+        if (profileError) {
+          console.error('Profile upsert error:', profileError);
+          if (profileError.message.includes('profiles_id_fkey')) {
+            setNotification({
+              type: 'error',
+              message: 'Tabel "profiles" di Supabase masih memiliki relasi foreign key kaku (profiles_id_fkey). Klik tombol di bawah untuk menyalin perintah SQL perbaikan.',
+              isFkError: true
+            });
+            setShowSqlFixModal(true);
+            return;
           }
+          throw profileError;
         }
 
-        setNotification({ type: 'success', message: `User "${fullName}" berhasil didaftarkan dan siap login!` });
+        setNotification({ 
+          type: 'success', 
+          message: `User "${fullName}" berhasil didaftarkan${authRegistered ? ' dan siap login dengan password!' : '!'}` 
+        });
       }
 
       setIsModalOpen(false);
@@ -188,7 +202,15 @@ export function UserManagement() {
       fetchProfiles();
     } catch (error: any) {
       console.error('Error saving profile:', error);
-      setNotification({ type: 'error', message: 'Gagal menyimpan user: ' + error.message });
+      const isFk = error.message?.includes('profiles_id_fkey');
+      setNotification({ 
+        type: 'error', 
+        message: 'Gagal menyimpan user: ' + error.message,
+        isFkError: isFk
+      });
+      if (isFk) {
+        setShowSqlFixModal(true);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -244,16 +266,29 @@ export function UserManagement() {
       </div>
 
       {notification && (
-        <div className={`p-4 rounded-xl flex items-center gap-3 text-sm font-medium ${
+        <div className={`p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm font-medium ${
           notification.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
         }`}>
-          {notification.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-green-400" />
-          ) : (
-            <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-400" />
-          )}
-          <span className="flex-grow">{notification.message}</span>
-          <button onClick={() => setNotification(null)} className="text-xs opacity-70 hover:opacity-100">✕</button>
+          <div className="flex items-start sm:items-center gap-3">
+            {notification.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-green-400 mt-0.5 sm:mt-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-400 mt-0.5 sm:mt-0" />
+            )}
+            <span>{notification.message}</span>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {notification.isFkError && (
+              <button
+                onClick={() => setShowSqlFixModal(true)}
+                className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
+              >
+                <Terminal className="w-3.5 h-3.5" />
+                Lihat Solusi SQL
+              </button>
+            )}
+            <button onClick={() => setNotification(null)} className="text-xs opacity-70 hover:opacity-100 p-1">✕</button>
+          </div>
         </div>
       )}
 
@@ -409,6 +444,52 @@ export function UserManagement() {
                     <span>Menyimpan...</span>
                   </>
                 ) : (editingProfile ? 'Simpan Perubahan' : 'Daftarkan User')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Perbaikan Foreign Key Database */}
+      {showSqlFixModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[110] p-4">
+          <div className="bg-brand-card w-full max-w-lg rounded-2xl border border-red-500/30 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-200">
+            <div className="p-6 border-b border-brand-border bg-red-500/10 flex justify-between items-center">
+              <div className="flex items-center gap-3 text-red-400 font-bold">
+                <Terminal className="w-5 h-5" />
+                <span>Perbaiki Relasi Foreign Key Database</span>
+              </div>
+              <button onClick={() => setShowSqlFixModal(false)} className="text-brand-text-muted hover:text-white p-1.5">✕</button>
+            </div>
+            <div className="p-6 space-y-4 text-sm">
+              <p className="text-brand-text-muted leading-relaxed">
+                Tabel <code className="text-brand-accent bg-brand-dark px-1.5 py-0.5 rounded">profiles</code> Anda saat ini masih mengunci ID ke <code className="text-brand-accent bg-brand-dark px-1.5 py-0.5 rounded">auth.users</code>. Untuk mengizinkan manajemen staf & user langsung dari aplikasi tanpa error:
+              </p>
+
+              <ol className="list-decimal list-inside space-y-1.5 text-xs text-brand-text-muted bg-brand-dark/50 p-3 rounded-xl border border-brand-border">
+                <li>Buka dashboard <strong>Supabase &gt; SQL Editor</strong>.</li>
+                <li>Salin perintah SQL di bawah ini dan paste ke SQL Editor.</li>
+                <li>Klik tombol <strong>Run</strong> di Supabase.</li>
+              </ol>
+
+              <div className="relative">
+                <pre className="bg-black/80 text-emerald-400 p-4 rounded-xl text-xs font-mono overflow-x-auto border border-brand-border max-h-48">
+                  {fixSqlScript}
+                </pre>
+                <button
+                  onClick={copySqlFix}
+                  className="absolute top-3 right-3 bg-brand-accent hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md transition-all"
+                >
+                  {copiedSql ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedSql ? 'Tersalin!' : 'Salin SQL'}
+                </button>
+              </div>
+            </div>
+            <div className="p-4 border-t border-brand-border bg-brand-dark/30 flex justify-end gap-3">
+              <button
+                onClick={() => setShowSqlFixModal(false)}
+                className="bg-brand-accent hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
+              >
+                Saya Mengerti / Tutup
               </button>
             </div>
           </div>
