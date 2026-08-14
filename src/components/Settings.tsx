@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { User, Mail, Shield, Camera, Save, Loader2, LogOut, Smartphone } from 'lucide-react';
 
 interface SettingsProps {
@@ -9,13 +10,14 @@ interface SettingsProps {
 }
 
 export function Settings({ user, profile, onProfileUpdate }: SettingsProps) {
+  const { signOut, role } = useAuth();
   const [displayName, setDisplayName] = useState(profile?.full_name || user?.user_metadata?.display_name || '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || user?.user_metadata?.avatar_url || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await signOut();
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -88,7 +90,7 @@ export function Settings({ user, profile, onProfileUpdate }: SettingsProps) {
               <div className="flex items-center justify-center gap-2 text-brand-accent">
                 <Shield className="w-4 h-4" />
                 <span className="text-xs font-bold uppercase tracking-wider">
-                  {user?.email === 'admin@hotelalia.com' ? 'Administrator' : 'Staff Gudang'}
+                  {role === 'admin' ? 'Administrator' : 'Staff Gudang'}
                 </span>
               </div>
             </div>

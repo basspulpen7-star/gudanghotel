@@ -1,5 +1,8 @@
 {
   "name": "Gudang Alia",
   "description": "A comprehensive warehouse management system for Hotel Alia Matraman, featuring inventory tracking, incoming/outgoing goods management, and detailed reporting.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

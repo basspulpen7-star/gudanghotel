@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -33,6 +34,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children, currentView, setView, user, profile, searchTerm, setSearchTerm }: LayoutProps) {
+  const { signOut, isAdmin } = useAuth();
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -50,8 +52,6 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
     { id: 'reports', label: 'Laporan', icon: FileText },
     { id: 'database_setup', label: 'DB Setup', icon: Database },
   ];
-
-  const isAdmin = profile?.role === 'admin' || user?.email === 'admin@hotelalia.com' || user?.email === 'satriabertopi7@gmail.com';
 
   if (isAdmin) {
     if (!menuItems.find(m => m.id === 'user_management')) {
@@ -112,8 +112,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    localStorage.clear();
+    await signOut();
   };
 
   const handleSetView = (view: string) => {

@@ -7,48 +7,48 @@ export function DatabaseSetup() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  const sqlSetup = `-- 0. Reset Database (Hapus tanda komentar jika ingin reset total)
--- WARNING: Ini akan menghapus SEMUA data!
--- DROP TABLE IF EXISTS purchase_order_items CASCADE;
--- DROP TABLE IF EXISTS purchase_orders CASCADE;
--- DROP TABLE IF EXISTS transactions CASCADE;
--- DROP TABLE IF EXISTS items CASCADE;
--- DROP TABLE IF EXISTS suppliers CASCADE;
--- DROP TABLE IF EXISTS profiles CASCADE;
+  const sqlSetup = `-- ==========================================================
+-- GUDANG ALIA - SQL SETUP & RLS SECURITY SCHEMA
+-- ==========================================================
 
--- 1. Table Profiles (Untuk Manajemen User & Staf)
+-- 1. Table Profiles (Untuk Identitas User & Role Sistem)
 CREATE TABLE IF NOT EXISTS profiles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT,
   username TEXT UNIQUE,
   email TEXT,
   avatar_url TEXT,
   role TEXT DEFAULT 'staff',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
--- Lepaskan foreign key constraint jika ada agar admin leluasa mengelola user/staf
-ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
-ALTER TABLE profiles ALTER COLUMN id SET DEFAULT gen_random_uuid();
+
+-- Penyesuaian Kolom Tambahan jika tabel sudah ada
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS full_name TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS username TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email TEXT;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'staff';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
 
 -- Trigger Otomatis: Buat baris di profiles setiap ada user baru di Supabase Auth
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, email, username, role, created_at)
+  INSERT INTO public.profiles (id, full_name, email, username, role, created_at, updated_at)
   VALUES (
     new.id, 
     COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)),
     new.email,
     COALESCE(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
     COALESCE(new.raw_user_meta_data->>'role', 'staff'),
+    NOW(),
     NOW()
   )
   ON CONFLICT (id) DO UPDATE SET
     full_name = EXCLUDED.full_name,
-    email = EXCLUDED.email;
+    email = EXCLUDED.email,
+    updated_at = NOW();
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -127,7 +127,9 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
   price DECIMAL(12,2) NOT NULL
 );
 
--- Enable RLS (Optional but recommended)
+-- ==========================================================
+-- 7. ROW LEVEL SECURITY (RLS) POLICIES
+-- ==========================================================
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE suppliers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE items ENABLE ROW LEVEL SECURITY;
@@ -135,21 +137,64 @@ ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE purchase_order_items ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies first to avoid "already exists" errors
+-- Drop previous policies to avoid conflicts
+DROP POLICY IF EXISTS "Users can read own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
+DROP POLICY IF EXISTS "Admins can manage all profiles" ON profiles;
 DROP POLICY IF EXISTS "Allow all for authenticated" ON profiles;
-DROP POLICY IF EXISTS "Allow all for authenticated" ON suppliers;
-DROP POLICY IF EXISTS "Allow all for authenticated" ON items;
-DROP POLICY IF EXISTS "Allow all for authenticated" ON transactions;
-DROP POLICY IF EXISTS "Allow all for authenticated" ON purchase_orders;
-DROP POLICY IF EXISTS "Allow all for authenticated" ON purchase_order_items;
 
--- Simple Policies (Allow all authenticated users for now to ensure app works)
-CREATE POLICY "Allow all for authenticated" ON profiles FOR ALL TO authenticated USING (true);
-CREATE POLICY "Allow all for authenticated" ON suppliers FOR ALL TO authenticated USING (true);
-CREATE POLICY "Allow all for authenticated" ON items FOR ALL TO authenticated USING (true);
-CREATE POLICY "Allow all for authenticated" ON transactions FOR ALL TO authenticated USING (true);
-CREATE POLICY "Allow all for authenticated" ON purchase_orders FOR ALL TO authenticated USING (true);
-CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO authenticated USING (true);`;
+DROP POLICY IF EXISTS "Authenticated users can access suppliers" ON suppliers;
+DROP POLICY IF EXISTS "Authenticated users can access items" ON items;
+DROP POLICY IF EXISTS "Authenticated users can access transactions" ON transactions;
+DROP POLICY IF EXISTS "Authenticated users can access purchase_orders" ON purchase_orders;
+DROP POLICY IF EXISTS "Authenticated users can access purchase_order_items" ON purchase_order_items;
+
+-- Policy Profiles: User hanya membaca profil sendiri
+CREATE POLICY "Users can read own profile"
+ON profiles FOR SELECT
+TO authenticated
+USING (auth.uid() = id);
+
+-- Policy Profiles: User hanya mengubah profil sendiri
+CREATE POLICY "Users can update own profile"
+ON profiles FOR UPDATE
+TO authenticated
+USING (auth.uid() = id)
+WITH CHECK (auth.uid() = id);
+
+-- Policy Profiles: User dapat menambahkan baris profilnya sendiri
+CREATE POLICY "Users can insert own profile"
+ON profiles FOR INSERT
+TO authenticated
+WITH CHECK (auth.uid() = id);
+
+-- Policy Profiles: Admin dapat melihat dan mengelola seluruh profil
+CREATE POLICY "Admins can manage all profiles"
+ON profiles FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM profiles admin_p
+    WHERE admin_p.id = auth.uid() AND admin_p.role = 'admin'
+  )
+);
+
+-- Policy Operasional untuk Staf & Admin yang sudah login (Authenticated)
+CREATE POLICY "Authenticated users can access suppliers" 
+ON suppliers FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access items" 
+ON items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access transactions" 
+ON transactions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access purchase_orders" 
+ON purchase_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can access purchase_order_items" 
+ON purchase_order_items FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
 
   useEffect(() => {
     checkTables();
@@ -158,7 +203,7 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
   const checkTables = async () => {
     setLoading(true);
     const tables = [
-      { name: 'profiles', cols: ['username', 'role'] },
+      { name: 'profiles', cols: ['username', 'role', 'full_name'] },
       { name: 'suppliers', cols: ['name', 'category'] },
       { name: 'items', cols: ['name', 'sku', 'department', 'initial_stock', 'min_stock'] },
       { name: 'transactions', cols: ['type', 'quantity', 'item_id', 'department'] },
@@ -202,7 +247,7 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold text-white">Database Setup</h2>
-          <p className="text-brand-text-muted">Pastikan struktur database Supabase Anda sudah benar</p>
+          <p className="text-brand-text-muted">Pastikan struktur database Supabase & RLS Security Anda sudah terkonfigurasi</p>
         </div>
         <button 
           onClick={checkTables}
@@ -216,7 +261,7 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
         <div className="space-y-4">
           <h3 className="text-lg font-bold text-white flex items-center gap-2">
             <Database className="w-5 h-5 text-brand-accent" />
-            Status Tabel
+            Status Tabel & Kolom
           </h3>
           
           <div className="space-y-3">
@@ -242,11 +287,11 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
                     {!s.exists ? (
                       <p className="text-[10px] text-red-500 font-medium">Tabel belum ada - Jalankan SQL!</p>
                     ) : s.error ? (
-                      <p className="text-[10px] text-red-500 font-medium">Error: {s.error}</p>
+                      <p className="text-[10px] text-red-500 font-medium">Notice: {s.error}</p>
                     ) : s.columns.length > 0 ? (
                       <p className="text-[10px] text-yellow-500 font-medium">Kolom hilang: {s.columns.join(', ')}</p>
                     ) : (
-                      <p className="text-[10px] text-green-500 font-medium">Siap digunakan</p>
+                      <p className="text-[10px] text-green-500 font-medium">Siap digunakan & RLS Aktif</p>
                     )}
                   </div>
                 </div>
@@ -259,7 +304,7 @@ CREATE POLICY "Allow all for authenticated" ON purchase_order_items FOR ALL TO a
           <div className="flex justify-between items-center">
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
               <Terminal className="w-5 h-5 text-brand-accent" />
-              SQL Setup Script
+              SQL Setup & RLS Script
             </h3>
             <button 
               onClick={copyToClipboard}

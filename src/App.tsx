@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from './lib/supabase';
-import { UserProfile } from './types';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { Inventory } from './components/Inventory';
@@ -14,159 +13,61 @@ import { DatabaseSetup } from './components/DatabaseSetup';
 import { Settings } from './components/Settings';
 import { Login } from './components/Login';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { Hotel, ShieldAlert } from 'lucide-react';
 
-type View = 'dashboard' | 'inventory' | 'suppliers' | 'incoming' | 'outgoing' | 'reports' | 'settings' | 'purchase_orders' | 'user_management' | 'database_setup';
+type View = 
+  | 'dashboard' 
+  | 'inventory' 
+  | 'suppliers' 
+  | 'incoming' 
+  | 'outgoing' 
+  | 'reports' 
+  | 'settings' 
+  | 'purchase_orders' 
+  | 'user_management' 
+  | 'database_setup';
 
-export default function App() {
-  const [session, setSession] = useState<any>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+function MainApp() {
+  const { session, user, profile, role, isAdmin, loading, refreshProfile } = useAuth();
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
 
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching profile:', error);
-        return;
-      }
-      
-      if (data) {
-        setProfile(data);
-      }
-    } catch (err) {
-      console.error('Unexpected error in fetchProfile:', err);
-    }
-  };
-
+  // Safeguard: If non-admin user is on an admin-only view, redirect back to dashboard
   useEffect(() => {
-    const ensureProfile = async (user: any) => {
-      if (!user) return;
-      
-      try {
-        const { data: existingProfile, error: checkError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle();
-        
-        if (checkError) {
-          console.error('Error checking profile in App:', checkError);
-          return;
-        }
-        
-        if (!existingProfile) {
-          console.log('Creating missing profile for user in App:', user.id);
-          const newProfile = {
-            id: user.id,
-            full_name: user.user_metadata?.full_name || user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-            email: user.email,
-            role: 'staff'
-          };
-          const { error: insertError } = await supabase.from('profiles').insert([newProfile]);
-          
-          if (insertError) {
-            console.error('Failed to create profile in App:', insertError);
-          } else {
-            setProfile(newProfile as UserProfile);
-          }
-        } else {
-          setProfile(existingProfile);
-        }
-      } catch (err) {
-        console.error('Unexpected error in ensureProfile:', err);
+    if (!loading && session && !isAdmin) {
+      if (currentView === 'user_management' || currentView === 'database_setup') {
+        console.warn(`[ACCESS DENIED] User with role '${role}' attempted to access '${currentView}'. Redirecting to dashboard.`);
+        setCurrentView('dashboard');
       }
-    };
+    }
+  }, [isAdmin, role, currentView, session, loading]);
 
-    const checkSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          if (error.message.includes('Refresh Token Not Found') || error.message.includes('invalid_grant')) {
-            // Force local logout if refresh token is invalid
-            await supabase.auth.signOut();
-            localStorage.clear();
-            setSession(null);
-            setProfile(null);
-          } else {
-            console.error('Session check error:', error);
-          }
-        } else {
-          setSession(session);
-          if (session?.user) {
-            ensureProfile(session.user);
-            setupProfileSubscription(session.user.id);
-          }
-        }
-      } catch (err) {
-        console.error('Unexpected session check error:', err);
-      }
-    };
+  // Loading Screen while verifying session
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-4">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-brand-accent flex items-center justify-center shadow-xl shadow-brand-accent/20 animate-pulse">
+            <Hotel className="w-8 h-8 text-white" />
+          </div>
+          <div className="text-center">
+            <h2 className="text-white font-bold text-lg tracking-tight">Hotel Alia Matraman</h2>
+            <p className="text-brand-text-muted text-xs mt-1">Memeriksa sesi...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-    checkSession();
-
-    let profileSubscription: any = null;
-
-    const setupProfileSubscription = (userId: string) => {
-      if (profileSubscription) profileSubscription.unsubscribe();
-      
-      profileSubscription = supabase
-        .channel(`profile-${userId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'profiles',
-            filter: `id=eq.${userId}`
-          },
-          (payload) => {
-            console.log('Profile changed in real-time:', payload);
-            if (payload.new) {
-              setProfile(payload.new as UserProfile);
-            }
-          }
-        )
-        .subscribe();
-    };
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setSession(null);
-        setProfile(null);
-        if (profileSubscription) profileSubscription.unsubscribe();
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        setSession(session);
-        if (session?.user) {
-          ensureProfile(session.user);
-          setupProfileSubscription(session.user.id);
-        }
-      } else if (event === 'USER_UPDATED') {
-        if (session?.user) fetchProfile(session.user.id);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-      if (profileSubscription) profileSubscription.unsubscribe();
-    };
-  }, []);
-
-  if (!session) {
+  // Unauthenticated -> Show Login
+  if (!session || !user) {
     return <Login />;
   }
 
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard user={session.user} profile={profile} />;
+        return <Dashboard user={user} profile={profile} />;
       case 'inventory':
         return <Inventory globalSearch={globalSearch} />;
       case 'suppliers':
@@ -180,21 +81,57 @@ export default function App() {
       case 'purchase_orders':
         return <PurchaseOrders />;
       case 'user_management':
+        if (!isAdmin) {
+          return (
+            <div className="p-8 text-center bg-brand-card rounded-2xl border border-brand-border space-y-3">
+              <ShieldAlert className="w-12 h-12 text-red-400 mx-auto" />
+              <h3 className="text-lg font-bold text-white">Akses Ditolak</h3>
+              <p className="text-sm text-brand-text-muted">Halaman ini hanya dapat diakses oleh Administrator.</p>
+              <button 
+                onClick={() => setCurrentView('dashboard')}
+                className="mt-2 px-4 py-2 bg-brand-accent text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-all"
+              >
+                Kembali ke Dashboard
+              </button>
+            </div>
+          );
+        }
         return <UserManagement />;
       case 'database_setup':
+        if (!isAdmin) {
+          return (
+            <div className="p-8 text-center bg-brand-card rounded-2xl border border-brand-border space-y-3">
+              <ShieldAlert className="w-12 h-12 text-red-400 mx-auto" />
+              <h3 className="text-lg font-bold text-white">Akses Ditolak</h3>
+              <p className="text-sm text-brand-text-muted">Halaman ini hanya dapat diakses oleh Administrator.</p>
+              <button 
+                onClick={() => setCurrentView('dashboard')}
+                className="mt-2 px-4 py-2 bg-brand-accent text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-all"
+              >
+                Kembali ke Dashboard
+              </button>
+            </div>
+          );
+        }
         return <DatabaseSetup />;
       case 'settings':
-        return <Settings user={session.user} profile={profile} onProfileUpdate={() => session.user && fetchProfile(session.user.id)} />;
+        return (
+          <Settings 
+            user={user} 
+            profile={profile} 
+            onProfileUpdate={refreshProfile} 
+          />
+        );
       default:
-        return <Dashboard user={session.user} profile={profile} />;
+        return <Dashboard user={user} profile={profile} />;
     }
   };
 
   return (
     <Layout 
       currentView={currentView} 
-      setView={setCurrentView} 
-      user={session.user}
+      setView={(v) => setCurrentView(v as View)} 
+      user={user}
       profile={profile}
       searchTerm={globalSearch}
       setSearchTerm={setGlobalSearch}
@@ -202,5 +139,13 @@ export default function App() {
       {renderView()}
       <PWAInstallPrompt />
     </Layout>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainApp />
+    </AuthProvider>
   );
 }
