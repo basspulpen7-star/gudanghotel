@@ -76,73 +76,37 @@ export function Reports() {
     }
 
     try {
-      // Fetch all items
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('items')
-        .select('*')
-        .order('name');
+      const { data, error } = await supabase.rpc('get_stock_report', {
+        p_start: start.toISOString(),
+        p_end: end.toISOString()
+      });
 
-      if (itemsError) throw itemsError;
+      if (error) throw error;
 
-      // Fetch transactions up to end date to calculate historical stock correctly
-      const { data: transData, error: transError } = await supabase
-        .from('transactions')
-        .select('item_id, type, quantity, created_at')
-        .lte('created_at', end.toISOString());
+      const mappedItems: Item[] = [];
+      const stats: Record<string, { initial: number; in: number; out: number; final: number }> = {};
 
-      if (transError) throw transError;
+      data?.forEach((row: any) => {
+        mappedItems.push({
+          id: row.item_id,
+          name: row.item_name,
+          department: row.department,
+          unit: row.unit,
+        } as Item);
 
-      const stats: Record<string, { initial: number, in: number, out: number, final: number }> = {};
-      
-      itemsData?.forEach(item => {
-        let beforeIn = 0;
-        let beforeOut = 0;
-        let currentIn = 0;
-        let currentOut = 0;
-
-        transData?.forEach(tx => {
-          if (tx.item_id === item.id) {
-            const txDate = new Date(tx.created_at);
-            if (txDate < start) {
-              if (tx.type === 'IN') beforeIn += tx.quantity;
-              if (tx.type === 'OUT') beforeOut += tx.quantity;
-            } else if (txDate >= start && txDate <= end) {
-              if (tx.type === 'IN') currentIn += tx.quantity;
-              if (tx.type === 'OUT') currentOut += tx.quantity;
-            }
-          }
-        });
-
-        const itemCreatedAt = new Date(item.created_at);
-        const itemCreatedMonth = startOfMonth(itemCreatedAt);
-        
-        let initialForPeriod = 0;
-        let finalForPeriod = 0;
-
-        // Only show stock if the selected period is the same or after the creation month
-        if (start >= itemCreatedMonth) {
-          initialForPeriod = (item.initial_stock || 0) + beforeIn - beforeOut;
-          finalForPeriod = initialForPeriod + currentIn - currentOut;
-        } else {
-          initialForPeriod = 0;
-          currentIn = 0;
-          currentOut = 0;
-          finalForPeriod = 0;
-        }
-
-        stats[item.id] = {
-          initial: initialForPeriod,
-          in: currentIn,
-          out: currentOut,
-          final: finalForPeriod
+        stats[row.item_id] = {
+          initial: Number(row.initial_stock || 0),
+          in: Number(row.in_qty || 0),
+          out: Number(row.out_qty || 0),
+          final: Number(row.final_stock || 0)
         };
       });
 
-      setItems(itemsData || []);
+      setItems(mappedItems);
       setItemStats(stats as any);
     } catch (error: any) {
       console.error('Error fetching stock data:', error);
-      alert('Gagal mengambil data stok: ' + error.message);
+      alert('Gagal mengambil data stok: ' + (error.message || 'Error tidak diketahui'));
     } finally {
       setLoading(false);
     }
