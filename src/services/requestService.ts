@@ -66,6 +66,7 @@ export const requestService = {
           department: r.department || 'Housekeeping',
           requester_name: r.requester_name || r.requested_by || 'Housekeeping Staff',
           user_id: r.user_id,
+          request_type: r.request_type || (r.notes?.includes('[MANUAL]') ? 'manual' : (r.notes?.includes('[OCCUPANCY]') ? 'occupancy' : undefined)),
           status: (r.status || 'MENUNGGU').toUpperCase(),
           occupancy_count: r.occupancy_count || r.rooms_occupied || 0,
           breakfast_pax: r.breakfast_pax || 0,
@@ -136,6 +137,58 @@ export const requestService = {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
   },
 
+  // Check if HK has already ordered occupancy items today
+  async checkTodayOccupancyOrder(targetDateStr?: string): Promise<{
+    ordered: boolean;
+    request?: HKRequest;
+  }> {
+    const todayStr = targetDateStr || formatDateForDB(new Date());
+
+    const allRequests = await this.getRequests();
+
+    const OCCUPANCY_ITEM_NAMES = [
+      'Linen',
+      'Handuk',
+      'Tissue Roll',
+      'Kopi',
+      'Gula',
+      'Creamer',
+      'Sikat Gigi',
+      'Sabun + Shampoo (2-in-1)',
+      'Air Mineral',
+      'Bath Towel',
+      'Hand Towel',
+      'Shampoo & Sabun'
+    ];
+
+    const todayOccupancy = allRequests.find(req => {
+      const reqDate = formatDateForDB(req.created_at);
+      if (reqDate !== todayStr) return false;
+
+      // If explicitly marked manual, ignore
+      if (req.request_type === 'manual' || req.notes?.includes('[MANUAL]')) {
+        return false;
+      }
+
+      // If explicitly marked occupancy
+      if (req.request_type === 'occupancy' || req.notes?.includes('[OCCUPANCY]')) {
+        return true;
+      }
+
+      // Check if it contains automatic occupancy items
+      const hasOccupancyItems = req.items?.some(it =>
+        OCCUPANCY_ITEM_NAMES.some(name => name.toLowerCase() === it.item_name.toLowerCase())
+      );
+
+      return hasOccupancyItems || false;
+    });
+
+    return {
+      ordered: !!todayOccupancy,
+      request: todayOccupancy
+    };
+  },
+
   // Create new Housekeeping Request
   async createRequest(req: {
     department: string;
@@ -143,6 +196,7 @@ export const requestService = {
     occupancy_count: number;
     breakfast_pax: number;
     notes?: string;
+    request_type?: 'occupancy' | 'manual';
     items: Array<{
       item_name: string;
       quantity: number;
@@ -164,16 +218,22 @@ export const requestService = {
       // ignore
     }
 
+    const reqType = req.request_type || 'occupancy';
+    const tag = reqType === 'occupancy' ? '[OCCUPANCY]' : '[MANUAL]';
+    const userNotes = (req.notes || '').trim();
+    const finalNotes = userNotes ? `${tag} ${userNotes}` : tag;
+
     const newRequest: HKRequest = {
       id: newRequestId,
       request_number: reqNumber,
       department: req.department || 'Housekeeping',
       requester_name: req.requester_name,
       user_id: userId,
+      request_type: reqType,
       status: 'MENUNGGU',
       occupancy_count: req.occupancy_count,
       breakfast_pax: req.breakfast_pax,
-      notes: req.notes || '',
+      notes: finalNotes,
       created_at: new Date().toISOString(),
       items: req.items.map(it => ({
         id: crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`,
@@ -186,24 +246,30 @@ export const requestService = {
     };
 
     try {
+      // Primary insert payload with request_type
+      const insertPayload: any = {
+        id: newRequest.id,
+        request_number: newRequest.request_number,
+        department: newRequest.department,
+        requester_name: newRequest.requester_name,
+        user_id: newRequest.user_id,
+        request_type: reqType,
+        status: newRequest.status,
+        occupancy_count: newRequest.occupancy_count,
+        breakfast_pax: newRequest.breakfast_pax,
+        notes: newRequest.notes,
+        created_at: newRequest.created_at
+      };
+
       // Insert header
       const { error: headerErr } = await warehouseSupabase
         .from('requests')
-        .insert([{
-          id: newRequest.id,
-          request_number: newRequest.request_number,
-          department: newRequest.department,
-          requester_name: newRequest.requester_name,
-          user_id: newRequest.user_id,
-          status: newRequest.status,
-          occupancy_count: newRequest.occupancy_count,
-          breakfast_pax: newRequest.breakfast_pax,
-          notes: newRequest.notes,
-          created_at: newRequest.created_at
-        }]);
+        .insert([insertPayload]);
 
       if (headerErr) {
-        console.warn('[REQUEST SERVICE] Header insert notice:', headerErr.message);
+        console.warn('[REQUEST SERVICE] Header insert notice, retrying without request_type:', headerErr.message);
+        delete insertPayload.request_type;
+        await warehouseSupabase.from('requests').insert([insertPayload]);
       }
 
       // Insert items

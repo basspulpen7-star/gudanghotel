@@ -166,7 +166,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
     <div className="flex h-screen bg-[#F7F8FA] text-gray-900 overflow-hidden font-sans">
       {/* Sidebar - Hidden on mobile, shown on desktop */}
       <aside className={cn(
-        "hidden lg:flex w-64 border-r border-gray-200/90 flex-col bg-white z-50 transition-transform duration-300 relative translate-x-0 shadow-[2px_0_10px_rgba(0,0,0,0.02)]"
+        "hidden lg:flex w-64 border-r border-gray-200/90 flex-col bg-white z-50 transition-transform duration-300 relative translate-x-0 shadow-[2px_0_10px_rgba(0,0,0,0.02)] no-print"
       )}>
         <div className="p-5 flex justify-between items-center border-b border-gray-100">
           <div className="flex items-center gap-2.5">
@@ -239,7 +239,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden bg-[#F7F8FA]">
         {/* Header */}
-        <header className="h-14 md:h-16 border-b border-gray-200/80 flex items-center justify-between px-4 md:px-8 bg-white/90 backdrop-blur-md z-10">
+        <header className="h-14 md:h-16 border-b border-gray-200/80 flex items-center justify-between px-4 md:px-8 bg-white/90 backdrop-blur-md z-10 no-print">
           <div className="flex items-center gap-2 md:gap-4 flex-1">
             {isHKUser ? (
               <div className="flex items-center gap-2">
@@ -394,7 +394,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
         </div>
 
         {/* Mobile Bottom Navigation */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200 flex justify-around items-center px-2 py-2.5 z-30 shadow-[0_-2px_10px_rgba(0,0,0,0.03)]">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-t border-gray-200 flex justify-around items-center px-2 py-2.5 z-30 shadow-[0_-2px_10px_rgba(0,0,0,0.03)] no-print">
           {isHKUser ? (
             <>
               <button

@@ -62,6 +62,7 @@ export interface HKRequest {
   department: string;
   requester_name?: string;
   user_id?: string;
+  request_type?: 'occupancy' | 'manual' | string;
   status: 'MENUNGGU' | 'DIPROSES' | 'SELESAI' | 'DITOLAK' | 'pending' | 'processing' | 'completed' | 'rejected';
   occupancy_count?: number;
   breakfast_pax?: number;

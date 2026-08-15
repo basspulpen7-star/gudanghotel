@@ -28,6 +28,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { HKRequest, HKRequestItem, Item } from '../types';
 import { requestService } from '../services/requestService';
+import { HousekeepingRequestDocument } from './HousekeepingRequestDocument';
 import { cn } from '../lib/utils';
 import { format, parseISO } from 'date-fns';
 import { id as idLocale } from 'date-fns/locale';
@@ -38,7 +39,7 @@ interface HousekeepingRequestProps {
 
 interface PredefinedItem {
   id: string;
-  category: 'LINEN' | 'TOILETRIES' | 'BEVERAGE & AMENITY' | 'OTHER';
+  category: 'LINEN' | 'AMENITIES' | 'BEVERAGE' | 'MINUMAN';
   item_name: string;
   sublabel: string;
   unit: string;
@@ -47,17 +48,22 @@ interface PredefinedItem {
 }
 
 const PREDEFINED_ITEMS: PredefinedItem[] = [
-  // LINEN (2 item)
-  { id: 'bath_towel', category: 'LINEN', item_name: 'Bath Towel', sublabel: '2 / guest', unit: 'pcs', multiplierType: 'guest', multiplier: 2 },
-  { id: 'hand_towel', category: 'LINEN', item_name: 'Hand Towel', sublabel: '1 / guest', unit: 'pcs', multiplierType: 'guest', multiplier: 1 },
-  // TOILETRIES (2 item)
-  { id: 'sikat_gigi', category: 'TOILETRIES', item_name: 'Sikat Gigi', sublabel: '2 / guest', unit: 'pcs', multiplierType: 'guest', multiplier: 2 },
-  { id: 'shampoo_sabun', category: 'TOILETRIES', item_name: 'Shampoo & Sabun', sublabel: '1 / guest', unit: 'pcs', multiplierType: 'guest', multiplier: 1 },
-  // BEVERAGE & AMENITY (4 item)
-  { id: 'kopi', category: 'BEVERAGE & AMENITY', item_name: 'Kopi', sublabel: '2 / room', unit: 'pcs', multiplierType: 'room', multiplier: 2 },
-  { id: 'teh', category: 'BEVERAGE & AMENITY', item_name: 'Teh', sublabel: '2 / room', unit: 'pcs', multiplierType: 'room', multiplier: 2 },
-  { id: 'gula', category: 'BEVERAGE & AMENITY', item_name: 'Gula', sublabel: '4 / room', unit: 'pcs', multiplierType: 'room', multiplier: 4 },
-  { id: 'tissue_roll', category: 'BEVERAGE & AMENITY', item_name: 'Tissue Roll', sublabel: '1 / room', unit: 'pcs', multiplierType: 'room', multiplier: 1 }
+  // LINEN (2 items)
+  { id: 'linen', category: 'LINEN', item_name: 'Linen', sublabel: '1 / room', unit: 'pcs', multiplierType: 'room', multiplier: 1 },
+  { id: 'handuk', category: 'LINEN', item_name: 'Handuk', sublabel: '1 / guest', unit: 'pcs', multiplierType: 'guest', multiplier: 1 },
+
+  // AMENITIES (3 items)
+  { id: 'tissue_roll', category: 'AMENITIES', item_name: 'Tissue Roll', sublabel: '1 / room', unit: 'pcs', multiplierType: 'room', multiplier: 1 },
+  { id: 'sikat_gigi', category: 'AMENITIES', item_name: 'Sikat Gigi', sublabel: '2 / guest', unit: 'pcs', multiplierType: 'guest', multiplier: 2 },
+  { id: 'sabun_shampoo_2in1', category: 'AMENITIES', item_name: 'Sabun + Shampoo (2-in-1)', sublabel: '1 / guest', unit: 'pcs', multiplierType: 'guest', multiplier: 1 },
+
+  // BEVERAGE (3 items)
+  { id: 'kopi', category: 'BEVERAGE', item_name: 'Kopi', sublabel: '2 / room', unit: 'pcs', multiplierType: 'room', multiplier: 2 },
+  { id: 'gula', category: 'BEVERAGE', item_name: 'Gula', sublabel: '4 / room', unit: 'pcs', multiplierType: 'room', multiplier: 4 },
+  { id: 'creamer', category: 'BEVERAGE', item_name: 'Creamer', sublabel: '2 / room', unit: 'pcs', multiplierType: 'room', multiplier: 2 },
+
+  // MINUMAN (1 item)
+  { id: 'air_mineral', category: 'MINUMAN', item_name: 'Air Mineral', sublabel: '2 / room', unit: 'botol', multiplierType: 'room', multiplier: 2 },
 ];
 
 export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestProps) {
@@ -102,6 +108,10 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Daily Occupancy Order Lock
+  const [occupancyAlreadyOrdered, setOccupancyAlreadyOrdered] = useState<boolean>(false);
+  const [sentOccupancyRequest, setSentOccupancyRequest] = useState<HKRequest | null>(null);
+
   // History & Requests
   const [requests, setRequests] = useState<HKRequest[]>([]);
   const [showHistory, setShowHistory] = useState<boolean>(false);
@@ -127,10 +137,21 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
     fetchOccupancy(selectedDate);
   }, []);
 
+  const checkTodayOrder = async (dateStr: string) => {
+    try {
+      const status = await requestService.checkTodayOccupancyOrder(dateStr);
+      setOccupancyAlreadyOrdered(status.ordered);
+      setSentOccupancyRequest(status.request || null);
+    } catch (e) {
+      console.warn('Error checking today order:', e);
+    }
+  };
+
   const loadRequests = async () => {
     try {
       const data = await requestService.getRequests();
       setRequests(data);
+      await checkTodayOrder(selectedDate);
     } catch (e: any) {
       console.warn('Error loading requests:', e?.message || e);
     }
@@ -150,6 +171,8 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
       // Auto-calculate predefined quantities
       const newQtys = calculateQuantities(occ.roomsOccupied, occ.guestCount);
       setQuantities(newQtys);
+
+      await checkTodayOrder(dateStr);
     } catch (e: any) {
       console.warn('Failed to fetch occupancy:', e);
       setOccupancyRooms(0);
@@ -217,67 +240,129 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Prepare items list
-    const itemsToSubmit: Array<{
-      item_name: string;
-      quantity: number;
-      unit: string;
-      notes?: string;
-    }> = [];
-
-    PREDEFINED_ITEMS.forEach(item => {
-      const qty = quantities[item.id] !== undefined ? quantities[item.id] : (item.multiplierType === 'guest' ? guestCount * item.multiplier : occupancyRooms * item.multiplier);
-      if (qty > 0) {
-        itemsToSubmit.push({
-          item_name: item.item_name,
-          quantity: qty,
-          unit: item.unit,
-          notes: item.sublabel
-        });
-      }
-    });
-
-    customItems.forEach(c => {
-      if (c.quantity > 0) {
-        itemsToSubmit.push({
-          item_name: c.item_name,
-          quantity: c.quantity,
-          unit: c.unit,
-          notes: 'Barang Tambahan'
-        });
-      }
-    });
-
-    if (itemsToSubmit.length === 0) {
-      setNotification({ type: 'error', message: 'Harap masukkan minimal 1 barang dengan jumlah lebih dari 0.' });
-      return;
-    }
+    if (submitting) return;
 
     setSubmitting(true);
     setNotification(null);
 
+    const requesterName = profile?.full_name || user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'hk';
+
     try {
-      const requesterName = profile?.full_name || user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'hk';
-      await requestService.createRequest({
-        department: 'Housekeeping',
-        requester_name: requesterName,
-        occupancy_count: occupancyRooms,
-        breakfast_pax: guestCount,
-        notes: requestNotes.trim(),
-        items: itemsToSubmit
-      });
+      if (!occupancyAlreadyOrdered) {
+        // Double check via Supabase live before creating occupancy order
+        const liveCheck = await requestService.checkTodayOccupancyOrder(selectedDate);
+        if (liveCheck.ordered) {
+          setNotification({
+            type: 'error',
+            message: 'Permintaan barang occupancy untuk hari ini sudah dibuat sebelumnya!'
+          });
+          setOccupancyAlreadyOrdered(true);
+          setSentOccupancyRequest(liveCheck.request || null);
+          setSubmitting(false);
+          return;
+        }
 
-      setNotification({
-        type: 'success',
-        message: 'Permintaan berhasil dikirim ke Logistik!'
-      });
+        const itemsToSubmit: Array<{
+          item_name: string;
+          quantity: number;
+          unit: string;
+          notes?: string;
+        }> = [];
 
-      setRequestNotes('');
-      setCustomItems([]);
-      await loadRequests();
-      
-      // Auto-recalculate
-      setQuantities(calculateQuantities(occupancyRooms, guestCount));
+        PREDEFINED_ITEMS.forEach(item => {
+          const qty = quantities[item.id] !== undefined ? quantities[item.id] : (item.multiplierType === 'guest' ? guestCount * item.multiplier : occupancyRooms * item.multiplier);
+          if (qty > 0) {
+            itemsToSubmit.push({
+              item_name: item.item_name,
+              quantity: qty,
+              unit: item.unit,
+              notes: item.sublabel
+            });
+          }
+        });
+
+        customItems.forEach(c => {
+          if (c.quantity > 0) {
+            itemsToSubmit.push({
+              item_name: c.item_name,
+              quantity: c.quantity,
+              unit: c.unit,
+              notes: 'Barang Tambahan'
+            });
+          }
+        });
+
+        if (itemsToSubmit.length === 0) {
+          setNotification({ type: 'error', message: 'Harap masukkan minimal 1 barang dengan jumlah lebih dari 0.' });
+          setSubmitting(false);
+          return;
+        }
+
+        const created = await requestService.createRequest({
+          department: 'Housekeeping',
+          requester_name: requesterName,
+          occupancy_count: occupancyRooms,
+          breakfast_pax: guestCount,
+          notes: requestNotes.trim(),
+          request_type: 'occupancy',
+          items: itemsToSubmit
+        });
+
+        setNotification({
+          type: 'success',
+          message: 'Permintaan barang occupancy berhasil dikirim ke Logistik!'
+        });
+
+        setRequestNotes('');
+        setCustomItems([]);
+        setOccupancyAlreadyOrdered(true);
+        setSentOccupancyRequest(created);
+        await loadRequests();
+      } else {
+        // Submit manual extra items only
+        if (customItems.length === 0) {
+          setNotification({
+            type: 'error',
+            message: 'Harap tambahkan minimal 1 barang tambahan terlebih dahulu (+ Tambah Barang Lain).'
+          });
+          setSubmitting(false);
+          return;
+        }
+
+        const customItemsToSubmit = customItems
+          .filter(c => c.quantity > 0)
+          .map(c => ({
+            item_name: c.item_name,
+            quantity: c.quantity,
+            unit: c.unit,
+            notes: 'Barang Tambahan Manual'
+          }));
+
+        if (customItemsToSubmit.length === 0) {
+          setNotification({ type: 'error', message: 'Harap masukkan jumlah barang yang valid.' });
+          setSubmitting(false);
+          return;
+        }
+
+        await requestService.createRequest({
+          department: 'Housekeeping',
+          requester_name: requesterName,
+          occupancy_count: occupancyRooms,
+          breakfast_pax: guestCount,
+          notes: requestNotes.trim(),
+          request_type: 'manual',
+          items: customItemsToSubmit
+        });
+
+        setNotification({
+          type: 'success',
+          message: 'Permintaan barang tambahan berhasil dikirim ke Logistik!'
+        });
+
+        setRequestNotes('');
+        setCustomItems([]);
+        await loadRequests();
+      }
     } catch (err: any) {
       setNotification({ type: 'error', message: 'Gagal mengirim: ' + (err.message || 'Error server') });
     } finally {
@@ -412,7 +497,7 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
   };
 
   // Group predefined items by category
-  const categories: Array<'LINEN' | 'TOILETRIES' | 'BEVERAGE & AMENITY'> = ['LINEN', 'TOILETRIES', 'BEVERAGE & AMENITY'];
+  const categories: Array<'LINEN' | 'AMENITIES' | 'BEVERAGE' | 'MINUMAN'> = ['LINEN', 'AMENITIES', 'BEVERAGE', 'MINUMAN'];
 
   // Counts for filter chips
   const countAll = requests.length;
@@ -430,7 +515,8 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
   });
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto text-gray-900 pb-16 font-sans">
+    <>
+      <div className="space-y-4 max-w-4xl mx-auto text-gray-900 pb-16 font-sans no-print">
       {/* Alert Notification */}
       {notification && (
         <div className={cn(
@@ -627,6 +713,22 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
         /* VIEW B: FORM PERMINTAAN BARANG HK (DIPAKAI HK UNTUK INPUT KEBUTUHAN)     */
         /* ========================================================================= */
         <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Banner Status jika sudah order occupancy hari ini */}
+          {occupancyAlreadyOrdered && (
+            <div className="bg-emerald-50 border border-emerald-200/90 rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.02)] space-y-1">
+              <div className="flex items-center gap-2 font-extrabold text-xs sm:text-sm text-emerald-800">
+                <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+                <span>✓ PERMINTAAN HARI INI SUDAH DIKIRIM</span>
+              </div>
+              <p className="text-xs font-bold text-emerald-700">
+                Occupancy: {occupancyRooms} Kamar · {guestCount} Guest
+              </p>
+              <p className="text-[11px] sm:text-xs text-emerald-600">
+                Permintaan otomatis sudah dibuat untuk hari ini. Barang occupancy tidak dapat dipesan kembali.
+              </p>
+            </div>
+          )}
+
           {/* 1. OCCUPANCY CARD */}
           <div className="bg-white border border-gray-200/90 rounded-2xl p-3.5 sm:p-5 shadow-[0_2px_8px_rgba(0,0,0,0.03)] space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -716,9 +818,40 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
                       {/* Category Items */}
                       <div className="divide-y divide-gray-100">
                         {catItems.map((item) => {
-                          const qty = quantities[item.id] !== undefined 
+                          const calculatedQty = quantities[item.id] !== undefined 
                             ? quantities[item.id] 
                             : (item.multiplierType === 'guest' ? guestCount * item.multiplier : occupancyRooms * item.multiplier);
+
+                          const sentItem = sentOccupancyRequest?.items?.find(it => it.item_name.toLowerCase() === item.item_name.toLowerCase());
+                          const finalQty = sentItem ? sentItem.quantity : calculatedQty;
+
+                          if (occupancyAlreadyOrdered) {
+                            // Locked Read-Only View
+                            return (
+                              <div 
+                                key={item.id} 
+                                className="px-3.5 sm:px-5 py-3 flex items-center justify-between gap-2.5 bg-gray-50/50"
+                              >
+                                <div className="min-w-0 flex-1 pr-1">
+                                  <p className="font-bold text-gray-700 text-sm sm:text-base leading-snug break-words">
+                                    {item.item_name}
+                                  </p>
+                                  <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5 font-medium">
+                                    {item.sublabel}
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="px-2.5 py-1 bg-amber-50 text-amber-900 border border-amber-200/80 rounded-lg text-xs font-bold font-mono text-center shrink-0">
+                                    {finalQty} {item.unit}
+                                  </span>
+                                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-md text-[10px] font-extrabold tracking-wider uppercase shrink-0">
+                                    TERKIRIM
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
 
                           return (
                             <div 
@@ -739,7 +872,7 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
                               <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 overflow-visible">
                                 {/* Orange/Yellow Badge */}
                                 <span className="px-2 sm:px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200/90 rounded-lg text-xs font-bold font-mono inline-flex items-center gap-0.5 min-w-[50px] sm:min-w-[58px] justify-center shrink-0">
-                                  <span>{qty}</span>
+                                  <span>{calculatedQty}</span>
                                   <span className="text-[10px] font-normal text-amber-700">{item.unit}</span>
                                 </span>
 
@@ -757,7 +890,7 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
                                   <input
                                     type="number"
                                     min="0"
-                                    value={qty}
+                                    value={calculatedQty}
                                     onChange={(e) => setDirectQuantity(item.id, parseInt(e.target.value) || 0)}
                                     className="quantity-input w-[64px] min-w-[64px] h-10 sm:h-8 text-center font-bold text-[15px] sm:text-sm text-[#1f2937] bg-white border border-[#d1d5db] sm:border-gray-200 rounded-[7px] sm:rounded-lg !px-1 !py-0 outline-none focus:border-amber-500 font-mono box-border shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
@@ -935,7 +1068,12 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-4 px-6 bg-[#e65c00] hover:bg-[#cf5300] text-white font-black text-sm sm:text-base rounded-2xl shadow-lg shadow-orange-500/20 transition-all flex items-center justify-center gap-2.5 uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
+              className={cn(
+                "w-full py-4 px-6 text-white font-black text-sm sm:text-base rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2.5 uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]",
+                occupancyAlreadyOrdered 
+                  ? "bg-amber-600 hover:bg-amber-700 shadow-amber-500/20" 
+                  : "bg-[#e65c00] hover:bg-[#cf5300] shadow-orange-500/20"
+              )}
             >
               {submitting ? (
                 <>
@@ -945,7 +1083,7 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
               ) : (
                 <>
                   <Send className="w-4 h-4 shrink-0" />
-                  <span>KIRIM PERMINTAAN</span>
+                  <span>{occupancyAlreadyOrdered ? "KIRIM BARANG TAMBAHAN" : "KIRIM PERMINTAAN"}</span>
                 </>
               )}
             </button>
@@ -1016,12 +1154,13 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
           </div>
         </div>
       )}
+      </div>
 
       {/* ========================================================================= */}
       {/* DETAIL MODAL (LIHAT DETAIL) WITH STATUS PROCESSING & TICKET PRINTING     */}
       {/* ========================================================================= */}
       {selectedRequest && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-3 sm:p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[100] p-3 sm:p-4 no-print">
           <div className="bg-white w-full max-w-xl rounded-2xl border border-gray-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col max-h-[82vh] sm:max-h-[88vh]">
             {/* Modal Header */}
             <div className="p-3.5 sm:p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/90 shrink-0">
@@ -1200,6 +1339,12 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
           </div>
         </div>
       )}
-    </div>
+
+      {selectedRequest && (
+        <div className="print-only">
+          <HousekeepingRequestDocument request={selectedRequest} />
+        </div>
+      )}
+    </>
   );
 }
