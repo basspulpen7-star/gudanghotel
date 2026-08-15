@@ -1,25 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+import { warehouseSupabase, warehouseUrl, warehouseKey } from './supabaseWarehouse';
 
-const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const rawKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || '').trim();
+// Re-export Warehouse Supabase Client for Warehouse database tables
+export { warehouseSupabase, warehouseUrl, warehouseKey };
 
-// Ensure clean base URL without trailing slashes or accidental subpaths (e.g. /auth/v1, /rest/v1)
-export const supabaseUrl = rawUrl
-  .replace(/\/+$/, '')
-  .replace(/\/(auth|rest|storage)\/v\d+.*$/i, '');
-
-export const supabaseKey = rawKey;
-
-if (!supabaseUrl || !supabaseKey) {
-  const msg = 'Missing Supabase credentials. Please check your environment variables (VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY).';
-  console.error(msg);
-}
-
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
-
+// Compatibility export pointing directly to Warehouse Supabase Client
+export const supabase = warehouseSupabase;
+export const supabaseUrl = warehouseUrl;
+export const supabaseKey = warehouseKey;

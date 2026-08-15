@@ -72,10 +72,11 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
   // Occupancy & Date states
   const todayIso = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState<string>(todayIso);
-  const [occupancyRooms, setOccupancyRooms] = useState<number>(34);
-  const [guestCount, setGuestCount] = useState<number>(70);
-  const [familyRoomsCount, setFamilyRoomsCount] = useState<number>(4);
+  const [occupancyRooms, setOccupancyRooms] = useState<number>(0);
+  const [guestCount, setGuestCount] = useState<number>(0);
+  const [familyRoomsCount, setFamilyRoomsCount] = useState<number>(0);
   const [isLiveDb, setIsLiveDb] = useState<boolean>(true);
+  const [occupancyConnected, setOccupancyConnected] = useState<boolean>(true);
   const [loadingOccupancy, setLoadingOccupancy] = useState<boolean>(false);
 
   // Form quantities (map of item id -> quantity)
@@ -138,17 +139,24 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
   const fetchOccupancy = async (dateStr: string) => {
     setLoadingOccupancy(true);
     try {
+      await requestService.testBreakfastConnection();
       const occ = await requestService.getOccupancyData(dateStr);
       setOccupancyRooms(occ.roomsOccupied);
       setGuestCount(occ.guestCount);
       setFamilyRoomsCount(occ.familyRoomsOccupied);
-      setIsLiveDb(occ.isFromLiveDb);
+      setOccupancyConnected(occ.connected);
+      setIsLiveDb(occ.connected);
       
       // Auto-calculate predefined quantities
       const newQtys = calculateQuantities(occ.roomsOccupied, occ.guestCount);
       setQuantities(newQtys);
     } catch (e: any) {
       console.warn('Failed to fetch occupancy:', e);
+      setOccupancyRooms(0);
+      setGuestCount(0);
+      setFamilyRoomsCount(0);
+      setOccupancyConnected(false);
+      setIsLiveDb(false);
     } finally {
       setLoadingOccupancy(false);
     }
@@ -179,6 +187,11 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
       }
       return item;
     }));
+  };
+
+  const updateCustomQuantityDirect = (id: string, val: number) => {
+    const safeVal = isNaN(val) ? 0 : Math.max(0, val);
+    setCustomItems(prev => prev.map(item => item.id === id ? { ...item, quantity: safeVal } : item));
   };
 
   const handleAddCustomItem = () => {
@@ -621,10 +634,17 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
                 <span className="text-xs font-extrabold text-gray-900 tracking-wider uppercase">
                   OCCUPANCY
                 </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-[10px] font-bold shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  LIVE
-                </span>
+                {occupancyConnected ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full text-[10px] font-bold shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    LIVE
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-600 border border-rose-200 rounded-full text-[10px] font-bold shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                    TIDAK TERSEDIA
+                  </span>
+                )}
               </div>
 
               {/* Datepicker input */}
@@ -716,7 +736,7 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
                               </div>
 
                               {/* Controls (Badge + Stepper) */}
-                              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 overflow-visible">
                                 {/* Orange/Yellow Badge */}
                                 <span className="px-2 sm:px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200/90 rounded-lg text-xs font-bold font-mono inline-flex items-center gap-0.5 min-w-[50px] sm:min-w-[58px] justify-center shrink-0">
                                   <span>{qty}</span>
@@ -724,14 +744,14 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
                                 </span>
 
                                 {/* Stepper */}
-                                <div className="flex items-center gap-1 shrink-0">
+                                <div className="quantity-control flex items-center gap-1.5 sm:gap-1 shrink-0 overflow-visible">
                                   <button
                                     type="button"
                                     onClick={() => updateQuantity(item.id, -1)}
-                                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 active:bg-gray-200 text-gray-700 font-bold flex items-center justify-center transition-colors active:scale-95 text-xs sm:text-sm cursor-pointer"
+                                    className="quantity-button w-10 h-10 sm:w-8 sm:h-8 rounded-[7px] sm:rounded-lg border border-gray-300 sm:border-gray-200 bg-white hover:bg-gray-100 active:bg-gray-200 text-gray-800 font-bold flex items-center justify-center transition-colors active:scale-95 text-sm sm:text-xs cursor-pointer shrink-0"
                                     aria-label="Kurangi"
                                   >
-                                    <Minus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+                                    <Minus className="w-4 h-4 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
                                   </button>
 
                                   <input
@@ -739,16 +759,16 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
                                     min="0"
                                     value={qty}
                                     onChange={(e) => setDirectQuantity(item.id, parseInt(e.target.value) || 0)}
-                                    className="w-11 sm:w-16 h-7 sm:h-8 text-center font-bold text-xs sm:text-sm text-gray-900 border border-gray-200 rounded-lg bg-white outline-none focus:border-amber-500 font-mono"
+                                    className="quantity-input w-[64px] min-w-[64px] h-10 sm:h-8 text-center font-bold text-[15px] sm:text-sm text-[#1f2937] bg-white border border-[#d1d5db] sm:border-gray-200 rounded-[7px] sm:rounded-lg !px-1 !py-0 outline-none focus:border-amber-500 font-mono box-border shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                   />
 
                                   <button
                                     type="button"
                                     onClick={() => updateQuantity(item.id, 1)}
-                                    className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 active:bg-gray-200 text-gray-700 font-bold flex items-center justify-center transition-colors active:scale-95 text-xs sm:text-sm cursor-pointer"
+                                    className="quantity-button w-10 h-10 sm:w-8 sm:h-8 rounded-[7px] sm:rounded-lg border border-gray-300 sm:border-gray-200 bg-white hover:bg-gray-100 active:bg-gray-200 text-gray-800 font-bold flex items-center justify-center transition-colors active:scale-95 text-sm sm:text-xs cursor-pointer shrink-0"
                                     aria-label="Tambah"
                                   >
-                                    <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+                                    <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
                                   </button>
                                 </div>
                               </div>
@@ -782,30 +802,34 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
                             </p>
                           </div>
 
-                          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 overflow-visible">
                             <span className="px-2 sm:px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-lg text-xs font-bold font-mono min-w-[50px] sm:min-w-[58px] text-center shrink-0">
                               <span>{c.quantity}</span> <span className="text-[10px] font-normal text-amber-700">{c.unit}</span>
                             </span>
 
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="quantity-control flex items-center gap-1.5 sm:gap-1 shrink-0 overflow-visible">
                               <button
                                 type="button"
                                 onClick={() => updateCustomQuantity(c.id, -1)}
-                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 font-bold flex items-center justify-center text-xs sm:text-sm cursor-pointer"
+                                className="quantity-button w-10 h-10 sm:w-8 sm:h-8 rounded-[7px] sm:rounded-lg border border-gray-300 sm:border-gray-200 bg-white hover:bg-gray-100 text-gray-800 font-bold flex items-center justify-center text-sm sm:text-xs cursor-pointer shrink-0"
                               >
-                                <Minus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+                                <Minus className="w-4 h-4 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
                               </button>
 
-                              <span className="w-11 sm:w-14 h-7 sm:h-8 flex items-center justify-center font-bold text-xs sm:text-sm text-gray-900 border border-gray-200 rounded-lg bg-white font-mono">
-                                {c.quantity}
-                              </span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={c.quantity}
+                                onChange={(e) => updateCustomQuantityDirect(c.id, parseInt(e.target.value) || 0)}
+                                className="quantity-input w-[64px] min-w-[64px] h-10 sm:h-8 text-center font-bold text-[15px] sm:text-sm text-[#1f2937] bg-white border border-[#d1d5db] sm:border-gray-200 rounded-[7px] sm:rounded-lg !px-1 !py-0 outline-none focus:border-amber-500 font-mono box-border shrink-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              />
 
                               <button
                                 type="button"
                                 onClick={() => updateCustomQuantity(c.id, 1)}
-                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 font-bold flex items-center justify-center text-xs sm:text-sm cursor-pointer"
+                                className="quantity-button w-10 h-10 sm:w-8 sm:h-8 rounded-[7px] sm:rounded-lg border border-gray-300 sm:border-gray-200 bg-white hover:bg-gray-100 text-gray-800 font-bold flex items-center justify-center text-sm sm:text-xs cursor-pointer shrink-0"
                               >
-                                <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+                                <Plus className="w-4 h-4 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
                               </button>
 
                               <button

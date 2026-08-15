@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth, getFriendlyAuthErrorMessage } from '../contexts/AuthContext';
-import { supabase, supabaseUrl, supabaseKey } from '../lib/supabase';
+import { warehouseSupabase, warehouseUrl, warehouseKey } from '../lib/supabaseWarehouse';
 import { LogIn, Hotel, UserPlus, Eye, EyeOff, AlertCircle, CheckCircle2, RefreshCw, Send, Mail } from 'lucide-react';
 
 export function Login() {
@@ -18,6 +18,11 @@ export function Login() {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Diagnostic log when Login screen is mounted
+  useEffect(() => {
+    console.log('[LOGIN DATABASE]', 'https://qdsieavuhgvxrqtaytlt.supabase.co');
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -26,7 +31,10 @@ export function Login() {
     setIsRateLimited(false);
     setSuccessMessage(null);
 
-    const cleanEmail = email.trim();
+    // Diagnostic log when login button is pressed
+    console.log('[LOGIN DATABASE]', 'WAREHOUSE SUPABASE');
+
+    const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanEmail) {
       setError('Harap masukkan alamat email Anda.');
@@ -43,15 +51,18 @@ export function Login() {
       return;
     }
 
-    if (!supabaseUrl || !supabaseKey) {
-      setError('Konfigurasi sistem belum lengkap. Hubungi administrator.');
+    if (!warehouseUrl || !warehouseKey) {
+      setError('Supabase Warehouse belum dikonfigurasi.');
       return;
     }
 
     setLoading(true);
 
     try {
-      const { error: authError } = await signIn(cleanEmail, password);
+      const { data, error: authError } = await warehouseSupabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: password
+      });
 
       if (authError) {
         console.error('Login process error:', authError);
@@ -65,6 +76,11 @@ export function Login() {
 
         const friendlyMsg = getFriendlyAuthErrorMessage(authError);
         setError(friendlyMsg);
+      } else if (data.user) {
+        console.log('[LOGIN SUCCESS]', {
+          database: 'WAREHOUSE',
+          project: 'qdsieavuhgvxrqtaytlt'
+        });
       }
     } catch (err: any) {
       console.error('Unexpected login error:', err);
@@ -83,7 +99,7 @@ export function Login() {
 
     setResendingEmail(true);
     try {
-      const { error: resendErr } = await supabase.auth.resend({
+      const { error: resendErr } = await warehouseSupabase.auth.resend({
         type: 'signup',
         email: cleanEmail,
       });
@@ -124,8 +140,8 @@ export function Login() {
       return;
     }
 
-    if (!supabaseUrl || !supabaseKey) {
-      setError('Konfigurasi sistem belum lengkap. Hubungi administrator.');
+    if (!warehouseUrl || !warehouseKey) {
+      setError('Supabase Warehouse belum dikonfigurasi.');
       return;
     }
 

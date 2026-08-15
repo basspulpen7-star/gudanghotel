@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, supabaseUrl, supabaseKey } from '../lib/supabase';
+import { warehouseSupabase, warehouseUrl, warehouseKey } from '../lib/supabaseWarehouse';
 import { UserProfile, UserRole } from '../types';
 
 interface AuthContextType {
@@ -63,7 +63,7 @@ export function getFriendlyAuthErrorMessage(error: any): string {
     return 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.';
   }
 
-  if (!supabaseUrl || !supabaseKey) {
+  if (!warehouseUrl || !warehouseKey) {
     return 'Konfigurasi sistem belum lengkap. Hubungi administrator.';
   }
 
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await warehouseSupabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
@@ -125,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Try to upsert fallback profile asynchronously in background
         (async () => {
           try {
-            const { error: insertErr } = await supabase
+            const { error: insertErr } = await warehouseSupabase
               .from('profiles')
               .upsert(fallbackProfile, { onConflict: 'id' });
             if (insertErr) {
@@ -168,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async function initAuth() {
       try {
         console.log('[AUTH GET SESSION START]');
-        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        const { data: { session: initialSession }, error } = await warehouseSupabase.auth.getSession();
         console.log(`[AUTH GET SESSION END] Took: ${(performance.now() - startTime).toFixed(0)}ms`);
         
         if (!isMounted) return;
@@ -176,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error('[AUTH INIT ERROR]:', error);
           if (error.message.includes('Refresh Token Not Found') || error.message.includes('invalid_grant')) {
-            await supabase.auth.signOut();
+            await warehouseSupabase.auth.signOut();
           }
           setSession(null);
           setUser(null);
@@ -209,7 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
 
     // Listen for Auth changes once
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    const { data: { subscription } } = warehouseSupabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!isMounted) return;
 
       console.log('[AUTH STATE CHANGE]', event);
@@ -245,7 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     console.log('[LOGIN START] Attempting login for email:', email.trim().toLowerCase());
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await warehouseSupabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password: password,
       });
@@ -278,7 +278,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('[SIGNUP START] Registering user:', cleanEmail);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await warehouseSupabase.auth.signUp({
         email: cleanEmail,
         password: password,
         options: {
@@ -307,7 +307,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             created_at: new Date().toISOString()
           };
 
-          await supabase
+          await warehouseSupabase
             .from('profiles')
             .upsert(profileData, { onConflict: 'id' });
         } catch (profErr) {
@@ -332,7 +332,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     console.log('[LOGOUT START] Signing out...');
     try {
-      await supabase.auth.signOut();
+      await warehouseSupabase.auth.signOut();
     } catch (err) {
       console.error('[LOGOUT ERROR]:', err);
     } finally {

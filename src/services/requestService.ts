@@ -1,17 +1,51 @@
-import { supabase } from '../lib/supabase';
+import { warehouseSupabase } from '../lib/supabaseWarehouse';
+import { breakfastSupabase } from '../lib/supabaseBreakfast';
 import { HKRequest, HKRequestItem, BreakfastRecord } from '../types';
 
 const LOCAL_STORAGE_KEY = 'gudang_alia_hk_requests';
-const LOCAL_BREAKFAST_KEY = 'gudang_alia_breakfast_records';
 
-// Initial sample requests is empty so data starts completely clean
-const getInitialSampleRequests = (): HKRequest[] => [];
+// Helper function to ensure YYYY-MM-DD date string without timezone shifting
+export const formatDateForDB = (dateInput: any): string => {
+  if (!dateInput) return '';
+  if (typeof dateInput === 'string') {
+    return dateInput.trim().slice(0, 10);
+  }
+  if (dateInput instanceof Date) {
+    const year = dateInput.getFullYear();
+    const month = String(dateInput.getMonth() + 1).padStart(2, '0');
+    const day = String(dateInput.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return String(dateInput).trim().slice(0, 10);
+};
 
 export const requestService = {
+  // Test connection to Breakfast Supabase
+  async testBreakfastConnection(): Promise<{ connected: boolean; error: string | null }> {
+    try {
+      const { data, error } = await breakfastSupabase
+        .from('breakfast_records')
+        .select('day_date')
+        .limit(1);
+
+      const connected = !error;
+      console.log('[BREAKFAST CONNECTION]', {
+        connected,
+        project: 'idmaamghpaepgywgyubg',
+        error: error?.message || null
+      });
+
+      return { connected, error: error?.message || null };
+    } catch (e: any) {
+      console.error('[BREAKFAST CONNECTION CATCH]', e);
+      return { connected: false, error: e?.message || 'Connection failed' };
+    }
+  },
+
   // Fetch all requests with safe fallback
   async getRequests(): Promise<HKRequest[]> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await warehouseSupabase
         .from('requests')
         .select(`
           *,
@@ -66,7 +100,7 @@ export const requestService = {
       const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        // Filter out dummy/mock requests (e.g. req-hk-001, req-hk-002, req-hk-003)
+        // Filter out dummy/mock requests
         const cleaned = Array.isArray(parsed) 
           ? parsed.filter((r: HKRequest) => !r.id.startsWith('req-hk-00')) 
           : [];
@@ -84,7 +118,7 @@ export const requestService = {
   async clearAllRequests(): Promise<void> {
     try {
       localStorage.removeItem(LOCAL_STORAGE_KEY);
-      await supabase.from('requests').delete().neq('id', '');
+      await warehouseSupabase.from('requests').delete().neq('id', '');
     } catch (e: any) {
       console.warn('[REQUEST SERVICE] Clear requests notice:', e?.message || e);
     }
@@ -92,60 +126,58 @@ export const requestService = {
 
   async deleteRequest(requestId: string): Promise<void> {
     try {
-      await supabase.from('requests').delete().eq('id', requestId);
+      await warehouseSupabase.from('requests').delete().eq('id', requestId);
     } catch (e: any) {
       console.warn('[REQUEST SERVICE] Delete request notice:', e?.message || e);
     }
 
     const list = this.getLocalRequests();
-    const filtered = list.filter(r => r.id !== requestId);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
+    const updated = list.filter(r => r.id !== requestId);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
   },
 
-  // Create new request
-  async createRequest(payload: {
-    department?: string;
-    requester_name?: string;
-    occupancy_count?: number;
-    breakfast_pax?: number;
+  // Create new Housekeeping Request
+  async createRequest(req: {
+    department: string;
+    requester_name: string;
+    occupancy_count: number;
+    breakfast_pax: number;
     notes?: string;
-    items: {
-      item_id?: string;
+    items: Array<{
       item_name: string;
       quantity: number;
       unit: string;
       notes?: string;
-    }[];
+    }>;
   }): Promise<HKRequest> {
-    const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-    const randomSuffix = Math.floor(100 + Math.random() * 900);
-    const generatedReqNumber = `REQ-${dateStr}-${randomSuffix}`;
-    const newId = crypto.randomUUID ? crypto.randomUUID() : `req-${Date.now()}`;
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randSuffix = Math.floor(100 + Math.random() * 900);
+    const reqNumber = `REQ-HK-${todayStr}-${randSuffix}`;
 
-    let authUserId: string | undefined;
+    const newRequestId = crypto.randomUUID ? crypto.randomUUID() : `req-${Date.now()}-${Math.random()}`;
+
+    let userId: string | undefined = undefined;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      authUserId = user?.id;
+      const { data: { user } } = await warehouseSupabase.auth.getUser();
+      userId = user?.id;
     } catch (e) {
       // ignore
     }
 
     const newRequest: HKRequest = {
-      id: newId,
-      request_number: generatedReqNumber,
-      department: payload.department || 'Housekeeping',
-      requester_name: payload.requester_name || 'Staf Housekeeping',
-      user_id: authUserId,
+      id: newRequestId,
+      request_number: reqNumber,
+      department: req.department || 'Housekeeping',
+      requester_name: req.requester_name,
+      user_id: userId,
       status: 'MENUNGGU',
-      occupancy_count: payload.occupancy_count || 0,
-      breakfast_pax: payload.breakfast_pax || 0,
-      notes: payload.notes || '',
+      occupancy_count: req.occupancy_count,
+      breakfast_pax: req.breakfast_pax,
+      notes: req.notes || '',
       created_at: new Date().toISOString(),
-      items: payload.items.map((it, idx) => ({
-        id: `item-${newId}-${idx}`,
-        request_id: newId,
-        item_id: it.item_id,
+      items: req.items.map(it => ({
+        id: crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`,
+        request_id: newRequestId,
         item_name: it.item_name,
         quantity: it.quantity,
         unit: it.unit,
@@ -153,136 +185,175 @@ export const requestService = {
       }))
     };
 
-    // Save to Supabase
     try {
-      const { data: reqData, error: reqError } = await supabase
+      // Insert header
+      const { error: headerErr } = await warehouseSupabase
         .from('requests')
         .insert([{
-          id: newId,
-          request_number: generatedReqNumber,
+          id: newRequest.id,
+          request_number: newRequest.request_number,
           department: newRequest.department,
           requester_name: newRequest.requester_name,
-          user_id: authUserId,
-          status: 'MENUNGGU',
+          user_id: newRequest.user_id,
+          status: newRequest.status,
           occupancy_count: newRequest.occupancy_count,
           breakfast_pax: newRequest.breakfast_pax,
           notes: newRequest.notes,
           created_at: newRequest.created_at
-        }])
-        .select()
-        .single();
+        }]);
 
-      if (!reqError && reqData) {
-        // Insert items
-        const itemsToInsert = payload.items.map(it => ({
-          request_id: newId,
-          item_id: it.item_id || null,
+      if (headerErr) {
+        console.warn('[REQUEST SERVICE] Header insert notice:', headerErr.message);
+      }
+
+      // Insert items
+      if (newRequest.items && newRequest.items.length > 0) {
+        const itemsToInsert = newRequest.items.map(it => ({
+          id: it.id,
+          request_id: newRequest.id,
           item_name: it.item_name,
           quantity: it.quantity,
           unit: it.unit,
-          notes: it.notes || ''
+          notes: it.notes
         }));
 
-        const { error: itemsError } = await supabase
+        const { error: itemsErr } = await warehouseSupabase
           .from('request_items')
           .insert(itemsToInsert);
 
-        if (itemsError) {
-          console.warn('[REQUEST SERVICE] Item insertion notice:', itemsError.message);
+        if (itemsErr) {
+          console.warn('[REQUEST SERVICE] Items insert notice:', itemsErr.message);
         }
       }
     } catch (err: any) {
-      console.warn('[REQUEST SERVICE] Supabase insert notice:', err?.message || err);
+      console.warn('[REQUEST SERVICE] Create request catch notice:', err?.message || err);
     }
 
-    // Always update local cache
+    // Cache locally
     const existing = this.getLocalRequests();
     const updated = [newRequest, ...existing];
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
 
-    // NOTE: Occupancy records is strictly READ-ONLY for HK, no INSERT/UPDATE/DELETE to breakfast_records
     return newRequest;
   },
 
-  // Read-only occupancy query from public.breakfast_records
-  async getOccupancyData(targetDate: string): Promise<{
+  // Read-only occupancy query from public.breakfast_records in Breakfast Supabase
+  async getOccupancyData(rawTargetDate: string): Promise<{
     roomsOccupied: number;
     guestCount: number;
     familyRoomsOccupied: number;
     occupiedRoomsList: string[];
-    isFromLiveDb: boolean;
+    source: string;
+    connected: boolean;
+    date: string;
+    error?: string;
   }> {
+    // Diagnostic logs required
+    console.log('[OCCUPANCY DATABASE]', 'BREAKFAST SUPABASE');
+    console.log('[OCCUPANCY URL]', 'https://idmaamghpaepgywgyubg.supabase.co');
+
+    const occupancyDate = formatDateForDB(rawTargetDate);
+
+    console.log('[BREAKFAST DATE]', {
+      occupancyDate,
+      type: typeof occupancyDate
+    });
+
     const FAMILY_ROOMS = ['105', '109', '205', '209', '305', '309', '405', '409'];
+
     try {
-      // Query breakfast_records filtering by day_date and is_occupied = true (or date column)
-      const { data, error } = await supabase
+      const { data, error } = await breakfastSupabase
         .from('breakfast_records')
-        .select('*')
-        .or(`day_date.eq.${targetDate},date.eq.${targetDate}`);
+        .select(`
+          day_date,
+          room_number,
+          floor,
+          has_breakfast,
+          is_occupied,
+          coupon_count,
+          serial_numbers,
+          is_redeemed,
+          created_at
+        `)
+        .eq('day_date', occupancyDate);
+
+      console.log('[BREAKFAST QUERY]', {
+        date: occupancyDate,
+        rows: data?.length ?? 0,
+        error: error?.message ?? null
+      });
 
       if (error) {
-        console.warn('[OCCUPANCY QUERY NOTICE]:', error.message);
-        throw error;
-      }
-
-      if (data && data.length > 0) {
-        // Case A: Granular room-by-room records with is_occupied
-        const occupiedRows = data.filter((row: any) => 
-          row.is_occupied === true || row.is_occupied === 'true' || row.is_occupied === 1 ||
-          (row.is_occupied === undefined && (row.rooms_occupied === undefined || row.rooms_occupied > 0))
-        );
-
-        if (occupiedRows.length > 0 && occupiedRows[0].room_number !== undefined) {
-          const roomList = occupiedRows.map((r: any) => String(r.room_number || r.room)).filter(Boolean);
-          const familyCount = roomList.filter(r => FAMILY_ROOMS.includes(r)).length;
-          const totalGuests = occupiedRows.reduce((sum: number, r: any) => {
-            const pax = Number(r.guest_count || r.pax || r.breakfast_pax || (FAMILY_ROOMS.includes(String(r.room_number)) ? 4 : 2));
-            return sum + pax;
-          }, 0);
-
-          return {
-            roomsOccupied: occupiedRows.length,
-            guestCount: totalGuests || (occupiedRows.length * 2),
-            familyRoomsOccupied: familyCount,
-            occupiedRoomsList: roomList,
-            isFromLiveDb: true
-          };
-        }
-
-        // Case B: Summary row per date (e.g. rooms_occupied, breakfast_pax)
-        const summaryRow = data[0];
-        const rooms = Number(summaryRow.rooms_occupied || summaryRow.occupied_count || summaryRow.rooms || 45);
-        const pax = Number(summaryRow.breakfast_pax || summaryRow.guest_count || (rooms * 2));
-        
-        // Estimate family rooms proportionally if only aggregated count is available
-        const estimatedFamilyRooms = Math.min(8, Math.round(rooms * 0.1));
+        console.error('[BREAKFAST QUERY ERROR]', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
 
         return {
-          roomsOccupied: rooms,
-          guestCount: pax,
-          familyRoomsOccupied: estimatedFamilyRooms,
+          roomsOccupied: 0,
+          guestCount: 0,
+          familyRoomsOccupied: 0,
           occupiedRoomsList: [],
-          isFromLiveDb: true
+          source: 'breakfast_supabase',
+          connected: false,
+          date: occupancyDate,
+          error: error.message
         };
       }
-    } catch (e: any) {
-      console.warn('[REQUEST SERVICE] getOccupancyData fallback:', e?.message || e);
-    }
 
-    // Default standard fallback if no record found for selected date yet
-    return {
-      roomsOccupied: 45,
-      guestCount: 90,
-      familyRoomsOccupied: 4,
-      occupiedRoomsList: ['105', '109', '205', '209'],
-      isFromLiveDb: false
-    };
+      if (data) {
+        console.log('[BREAKFAST DATA]', data);
+      }
+
+      // Filter is_occupied === true in JavaScript
+      const occupiedRows = (data ?? []).filter((row: any) => row.is_occupied === true);
+
+      console.log('[BREAKFAST OCCUPANCY]', {
+        date: occupancyDate,
+        rows: data?.length ?? 0,
+        occupiedRooms: occupiedRows.length
+      });
+
+      const roomList = occupiedRows.map((r: any) => String(r.room_number)).filter(Boolean);
+      const familyCount = roomList.filter(r => FAMILY_ROOMS.includes(r)).length;
+
+      // Guest count calculation: 2 guests for standard room, 4 guests for family room
+      const totalGuests = occupiedRows.reduce((sum: number, r: any) => {
+        const roomNum = String(r.room_number || '');
+        const isFamily = FAMILY_ROOMS.includes(roomNum);
+        return sum + (isFamily ? 4 : 2);
+      }, 0);
+
+      return {
+        roomsOccupied: occupiedRows.length,
+        guestCount: totalGuests,
+        familyRoomsOccupied: familyCount,
+        occupiedRoomsList: roomList,
+        source: 'breakfast_supabase',
+        connected: true,
+        date: occupancyDate
+      };
+    } catch (err: any) {
+      console.error('[BREAKFAST QUERY CATCH ERROR]', err);
+      return {
+        roomsOccupied: 0,
+        guestCount: 0,
+        familyRoomsOccupied: 0,
+        occupiedRoomsList: [],
+        source: 'breakfast_supabase',
+        connected: false,
+        date: occupancyDate,
+        error: err?.message || 'Unexpected exception'
+      };
+    }
   },
 
   // Update request status (e.g. DIPROSES, SELESAI, DITOLAK)
   async updateStatus(requestId: string, status: 'MENUNGGU' | 'DIPROSES' | 'SELESAI' | 'DITOLAK'): Promise<void> {
     try {
-      await supabase
+      await warehouseSupabase
         .from('requests')
         .update({ status })
         .eq('id', requestId);
@@ -304,11 +375,11 @@ export const requestService = {
 
     if (recordOutgoing && request.items && request.items.length > 0) {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await warehouseSupabase.auth.getUser();
         const userId = user?.id;
 
         // Query existing inventory to match item IDs if missing
-        const { data: masterItems } = await supabase.from('items').select('id, name, current_stock');
+        const { data: masterItems } = await warehouseSupabase.from('items').select('id, name, current_stock');
 
         for (const reqItem of request.items) {
           let matchedItemId = reqItem.item_id;
@@ -324,7 +395,7 @@ export const requestService = {
 
           if (matchedItemId) {
             // Insert outgoing transaction
-            await supabase.from('transactions').insert([{
+            await warehouseSupabase.from('transactions').insert([{
               id: crypto.randomUUID ? crypto.randomUUID() : `tx-${Date.now()}-${Math.random()}`,
               item_id: matchedItemId,
               type: 'OUT',
@@ -337,39 +408,12 @@ export const requestService = {
 
             // Decrement item stock
             const targetStock = Math.max(0, matchedCurrentStock - reqItem.quantity);
-            await supabase.from('items').update({ current_stock: targetStock }).eq('id', matchedItemId);
+            await warehouseSupabase.from('items').update({ current_stock: targetStock }).eq('id', matchedItemId);
           }
         }
       } catch (err: any) {
         console.warn('[REQUEST SERVICE] Auto outgoing transaction notice:', err?.message || err);
       }
-    }
-  },
-
-  // Save breakfast occupancy record
-  async recordBreakfastOccupancy(record: BreakfastRecord): Promise<void> {
-    try {
-      await supabase
-        .from('breakfast_records')
-        .insert([{
-          id: crypto.randomUUID ? crypto.randomUUID() : `br-${Date.now()}`,
-          date: record.date,
-          rooms_occupied: record.rooms_occupied,
-          breakfast_pax: record.breakfast_pax,
-          notes: record.notes,
-          created_at: new Date().toISOString()
-        }]);
-    } catch (e: any) {
-      console.warn('[REQUEST SERVICE] Breakfast record notice:', e?.message || e);
-    }
-
-    try {
-      const cached = localStorage.getItem(LOCAL_BREAKFAST_KEY);
-      const list = cached ? JSON.parse(cached) : [];
-      list.unshift(record);
-      localStorage.setItem(LOCAL_BREAKFAST_KEY, JSON.stringify(list.slice(0, 30)));
-    } catch (e) {
-      // ignore
     }
   }
 };
