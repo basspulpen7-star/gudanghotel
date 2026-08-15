@@ -1,7 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect, useCallback } from 'react';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Edit2, 
+  Trash2, 
+  AlertCircle, 
+  Activity, 
+  ChevronLeft, 
+  ChevronRight, 
+  Package, 
+  X,
+  Layers
+} from 'lucide-react';
+import { inventoryService } from '../services/inventoryService';
 import { Item } from '../types';
-import { Plus, Search, Filter, Edit2, Trash2, AlertCircle, Activity } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 interface InventoryProps {
@@ -10,514 +23,503 @@ interface InventoryProps {
 
 export function Inventory({ globalSearch = '' }: InventoryProps) {
   const [items, setItems] = useState<Item[]>([]);
-  const [itemStats, setItemStats] = useState<Record<string, { initial: number, in: number, out: number, final: number }>>({});
+  const [selectedDept, setSelectedDept] = useState<string>('Semua');
+  const [searchQuery, setSearchQuery] = useState(globalSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(globalSearch);
+
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItemsCount, setTotalItemsCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+
+  // Form & Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-
-  // Month & Year Filter
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-
-  const months = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-  ];
-
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i);
-
-  // Sync local search with global search
-  useEffect(() => {
-    if (globalSearch) {
-      setSearchTerm(globalSearch);
-    }
-  }, [globalSearch]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Form state
   const [name, setName] = useState('');
   const [department, setDepartment] = useState('Housekeeping');
-  const [unit, setUnit] = useState('');
-  const [initialStock, setInitialStock] = useState(0);
-  const [minStock, setMinStock] = useState(0);
+  const [unit, setUnit] = useState('pcs');
+  const [initialStock, setInitialStock] = useState<number | ''>(0);
+  const [minStock, setMinStock] = useState<number | ''>(5);
 
-  const departments = ['Housekeeping', 'Resto', 'Tekhnisi', 'Front Office', 'General'];
+  const departments = ['Housekeeping', 'Resto', 'Teknik', 'Front Office', 'General'];
 
-  const [dbStatus, setDbStatus] = useState<{ ok: boolean; message: string } | null>(null);
-
+  // Sync initial search query
   useEffect(() => {
-    fetchItems();
-    checkDatabase();
-  }, [selectedMonth, selectedYear]);
-
-  const checkDatabase = async () => {
-    try {
-      // Check for required columns in items table
-      const { error: itemsError } = await supabase.from('items').select('department, initial_stock').limit(1);
-      
-      if (itemsError) {
-        if (itemsError.message.includes('column "initial_stock" does not exist')) {
-          setDbStatus({ ok: false, message: 'Kolom "initial_stock" belum ada di tabel items. Silakan jalankan SQL update.' });
-          return;
-        } else if (itemsError.message.includes('column "department" does not exist')) {
-          setDbStatus({ ok: false, message: 'Kolom "department" belum ada di tabel items. Silakan jalankan SQL update.' });
-          return;
-        } else if (itemsError.message.includes('does not exist') || itemsError.message.includes('relation') || itemsError.code === '42P01') {
-          setDbStatus({ ok: false, message: 'Tabel "items" belum dibuat di Supabase.' });
-          return;
-        } else {
-          setDbStatus({ ok: false, message: 'Error database items: ' + itemsError.message });
-          return;
-        }
-      }
-
-      // Check for required columns in transactions table
-      const { error: transError } = await supabase.from('transactions').select('department, notes').limit(1);
-      if (transError) {
-        if (transError.message.includes('column "department" does not exist') || transError.message.includes('column "notes" does not exist')) {
-          setDbStatus({ ok: false, message: 'Kolom "department" atau "notes" belum ada di tabel transactions.' });
-          return;
-        }
-      }
-
-      setDbStatus({ ok: true, message: 'Database terhubung dengan benar.' });
-    } catch (err) {
-      setDbStatus({ ok: false, message: 'Gagal mengecek status database.' });
+    if (globalSearch) {
+      setSearchQuery(globalSearch);
     }
-  };
+  }, [globalSearch]);
 
-  const fetchItems = async () => {
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setPage(1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Fetch Items
+  const fetchItemsData = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: itemsData, error: itemsError } = await supabase.from('items').select('*').order('name');
-      if (itemsError) throw itemsError;
-
-      const { data: transData, error: transError } = await supabase.from('transactions').select('item_id, type, quantity, created_at');
-      if (transError) throw transError;
-
-      const startDate = new Date(selectedYear, selectedMonth, 1);
-      const endDate = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59);
-
-      const stats: Record<string, { initial: number, in: number, out: number, final: number }> = {};
-      
-      itemsData?.forEach(item => {
-        // Calculate initial stock for the selected month
-        // Initial = item.initial_stock + sum(IN before) - sum(OUT before)
-        let beforeIn = 0;
-        let beforeOut = 0;
-        let currentIn = 0;
-        let currentOut = 0;
-
-        transData?.forEach(tx => {
-          if (tx.item_id === item.id) {
-            const txDate = new Date(tx.created_at);
-            if (txDate < startDate) {
-              if (tx.type === 'IN') beforeIn += tx.quantity;
-              if (tx.type === 'OUT') beforeOut += tx.quantity;
-            } else if (txDate >= startDate && txDate <= endDate) {
-              if (tx.type === 'IN') currentIn += tx.quantity;
-              if (tx.type === 'OUT') currentOut += tx.quantity;
-            }
-          }
-        });
-
-        const itemCreatedAt = new Date(item.created_at);
-        const itemCreatedMonth = new Date(itemCreatedAt.getFullYear(), itemCreatedAt.getMonth(), 1);
-        
-        let initialForMonth = 0;
-        let finalForMonth = 0;
-
-        // Only show stock if the selected month is the same or after the creation month
-        if (startDate >= itemCreatedMonth) {
-          initialForMonth = (item.initial_stock || 0) + beforeIn - beforeOut;
-          finalForMonth = initialForMonth + currentIn - currentOut;
-        } else {
-          // If month is before creation, everything is 0
-          initialForMonth = 0;
-          currentIn = 0;
-          currentOut = 0;
-          finalForMonth = 0;
-        }
-
-        stats[item.id] = {
-          initial: initialForMonth,
-          in: currentIn,
-          out: currentOut,
-          final: finalForMonth
-        };
+      const res = await inventoryService.getItems({
+        department: selectedDept,
+        search: debouncedSearch,
+        page,
+        limit: 15
       });
 
-      setItemStats(stats);
-      if (itemsData) setItems(itemsData);
-    } catch (error: any) {
-      console.error('Error fetching items:', error);
-      alert('Gagal mengambil data barang: ' + (error.message || 'Error tidak diketahui'));
+      setItems(res.data);
+      setTotalPages(res.totalPages);
+      setTotalItemsCount(res.total);
+    } catch (err: any) {
+      console.error('Error fetching inventory items:', err);
     } finally {
       setLoading(false);
     }
+  }, [selectedDept, debouncedSearch, page]);
+
+  useEffect(() => {
+    fetchItemsData();
+  }, [fetchItemsData]);
+
+  const resetForm = () => {
+    setName('');
+    setDepartment('Housekeeping');
+    setUnit('pcs');
+    setInitialStock(0);
+    setMinStock(5);
+    setFormError(null);
+  };
+
+  const openAddItemModal = () => {
+    setEditingItem(null);
+    resetForm();
+    setIsModalOpen(true);
+  };
+
+  const openEditItemModal = (item: Item) => {
+    setEditingItem(item);
+    setName(item.name);
+    setDepartment(item.department || 'Housekeeping');
+    setUnit(item.unit || 'pcs');
+    setInitialStock(item.initial_stock || 0);
+    setMinStock(item.min_stock || 0);
+    setFormError(null);
+    setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    const itemData = { name, department, unit, initial_stock: initialStock, min_stock: minStock };
+    setFormError(null);
 
+    if (!name.trim()) {
+      setFormError('Nama barang tidak boleh kosong.');
+      return;
+    }
+
+    const numInitial = typeof initialStock === 'number' ? initialStock : parseInt(initialStock || '0', 10);
+    const numMin = typeof minStock === 'number' ? minStock : parseInt(minStock || '0', 10);
+
+    setIsSubmitting(true);
     try {
-      if (editingItem) {
-        const { error } = await supabase.from('items').update(itemData).eq('id', editingItem.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('items').insert([{ 
-          id: crypto.randomUUID(),
-          ...itemData, 
-          current_stock: initialStock 
-        }]);
-        if (error) {
-          throw error;
-        }
-      }
+      await inventoryService.saveItem(
+        {
+          name: name.trim(),
+          department,
+          unit: unit.trim() || 'pcs',
+          initial_stock: numInitial,
+          min_stock: numMin
+        },
+        editingItem?.id
+      );
 
       setIsModalOpen(false);
-      setEditingItem(null);
       resetForm();
-      fetchItems();
-    } catch (error: any) {
-      console.error('Error saving item:', error);
-      alert('Gagal menyimpan data barang: ' + (error.message || 'Error tidak diketahui') + 
-            '\n\nPastikan tabel "items" sudah ada di database Supabase Anda.');
+      fetchItemsData();
+    } catch (err: any) {
+      console.error('Save item error:', err);
+      setFormError(err.message || 'Gagal menyimpan barang');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const resetForm = () => {
-    setName('');
-    setDepartment('Housekeeping');
-    setUnit('');
-    setInitialStock(0);
-    setMinStock(0);
-  };
-
-  const handleEdit = (item: Item) => {
-    setEditingItem(item);
-    setName(item.name);
-    setDepartment(item.department);
-    setUnit(item.unit);
-    setInitialStock(item.initial_stock || 0);
-    setMinStock(item.min_stock);
-    setIsModalOpen(true);
-  };
-
   const handleDelete = async () => {
     if (!itemToDelete) return;
     try {
-      await supabase.from('items').delete().eq('id', itemToDelete);
+      await inventoryService.deleteItem(itemToDelete);
       setItemToDelete(null);
-      fetchItems();
-    } catch (error) {
-      console.error('Error deleting item:', error);
+      fetchItemsData();
+    } catch (err: any) {
+      alert('Gagal menghapus barang: ' + err.message);
     }
   };
 
-  const filteredItems = items.filter(item => 
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.department.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const getStockBadge = (current: number, min: number) => {
+    if (current <= 0) {
+      return (
+        <span className="px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 text-[9px] font-black rounded-md uppercase">
+          HABIS
+        </span>
+      );
+    }
+    if (current <= min) {
+      return (
+        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[9px] font-black rounded-md uppercase">
+          MENIPIS
+        </span>
+      );
+    }
+    return (
+      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black rounded-md uppercase">
+        AMAN
+      </span>
+    );
+  };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 p-4 md:p-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-4 animate-in fade-in duration-300 pb-20 md:pb-6">
+      {/* Header & Main Button */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-brand-card p-4 md:p-6 rounded-2xl border border-brand-border">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-white">Stok Barang</h2>
-          <p className="text-brand-text-muted">Kelola daftar inventaris hotel</p>
-          {dbStatus && !dbStatus.ok && (
-            <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" />
-              {dbStatus.message}
-            </p>
+          <h1 className="text-xl md:text-2xl font-bold text-white">Stok Barang (Inventory)</h1>
+          <p className="text-xs md:text-sm text-brand-text-muted mt-0.5">Daftar lengkap ketersediaan item inventaris hotel</p>
+        </div>
+
+        <div className="flex gap-2 w-full md:w-auto">
+          <button
+            onClick={fetchItemsData}
+            className="bg-brand-dark hover:bg-brand-border text-brand-text-muted hover:text-white p-2.5 rounded-xl border border-brand-border transition-all flex items-center justify-center min-h-[44px]"
+            title="Refresh Data"
+          >
+            <Activity className={cn("w-5 h-5", loading && "animate-spin text-brand-accent")} />
+          </button>
+
+          <button
+            onClick={openAddItemModal}
+            className="flex-1 md:flex-none bg-brand-accent hover:bg-blue-600 text-white font-bold py-2.5 px-5 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-brand-accent/20 min-h-[44px]"
+          >
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>Tambah Barang</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Search & Department Filters */}
+      <div className="bg-brand-card p-3 md:p-4 rounded-2xl border border-brand-border space-y-3">
+        {/* Search Bar */}
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-text-muted" />
+          <input
+            type="text"
+            placeholder="Cari barang / departemen..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-brand-dark border border-brand-border rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-brand-accent min-h-[40px]"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-muted hover:text-white"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
-          <button 
-            onClick={fetchItems}
-            className="flex-1 md:flex-none bg-brand-card text-white px-4 py-3 rounded-xl border border-brand-border hover:bg-brand-dark transition-all flex items-center justify-center gap-2"
-          >
-            <Activity className="w-5 h-5" />
-            <span>Refresh</span>
-          </button>
-          <button 
-            onClick={() => { resetForm(); setEditingItem(null); setIsModalOpen(true); }}
-            className="flex-1 md:flex-none bg-brand-accent hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-brand-accent/20"
-          >
-            <Plus className="w-5 h-5" />
-            Tambah Barang
-          </button>
+
+        {/* Department Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+          <span className="text-brand-text-muted text-[10px] font-bold uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+            <Filter className="w-3 h-3" /> Dept:
+          </span>
+          {['Semua', ...departments].map((dept) => (
+            <button
+              key={dept}
+              onClick={() => { setSelectedDept(dept); setPage(1); }}
+              className={cn(
+                "px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all border shrink-0",
+                selectedDept === dept
+                  ? "bg-brand-accent/20 border-brand-accent text-brand-accent"
+                  : "bg-brand-dark border-brand-border text-brand-text-muted hover:text-white"
+              )}
+            >
+              {dept}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 md:gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-brand-text-muted" />
-          <input 
-            type="text" 
-            placeholder="Cari barang atau departemen..." 
-            className="w-full pl-9 py-1.5 md:py-2 text-xs md:text-sm bg-brand-dark border border-brand-border rounded-lg text-white focus:ring-1 focus:ring-brand-accent outline-none"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <select 
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-            className="flex-1 bg-brand-dark border border-brand-border text-white text-xs md:text-sm rounded-lg px-2 md:px-3 py-1.5 md:py-2 outline-none focus:ring-1 focus:ring-brand-accent"
-          >
-            {months.map((month, index) => (
-              <option key={index} value={index}>{month}</option>
-            ))}
-          </select>
-          <select 
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="bg-brand-dark border border-brand-border text-white text-xs md:text-sm rounded-lg px-2 md:px-3 py-1.5 md:py-2 outline-none focus:ring-1 focus:ring-brand-accent"
-          >
-            {years.map((year) => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
-          <button className="bg-brand-card border border-brand-border px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-brand-text-muted hover:text-white flex items-center justify-center gap-2 text-xs md:text-sm">
-            <Filter className="w-3.5 h-3.5" />
-            Filter
-          </button>
-        </div>
-      </div>
-
+      {/* Main Stock Display */}
       <div className="bg-brand-card rounded-2xl border border-brand-border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[600px]">
-            <thead>
-              <tr className="bg-brand-dark/50 text-brand-text-muted text-[10px] md:text-xs font-bold uppercase tracking-wider">
-                <th className="px-3 md:px-6 py-3 md:py-4">Nama Barang</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">Dept</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">Awal</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">Masuk</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">Keluar</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">Akhir</th>
-                <th className="px-3 md:px-6 py-3 md:py-4">Satuan</th>
-                <th className="px-3 md:px-6 py-3 md:py-4 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-border">
-              {loading ? (
-                <tr><td colSpan={8} className="px-6 py-8 text-center text-brand-text-muted">Loading...</td></tr>
-              ) : filteredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <p className="text-brand-text-muted">Tidak ada data ditemukan.</p>
-                      <div className="p-4 bg-brand-dark/50 rounded-xl border border-brand-border max-w-md text-xs text-brand-text-muted text-left">
-                        <p className="font-bold text-white mb-2 flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 text-orange-500" />
-                          Tips: Data tidak muncul?
-                        </p>
-                        <ul className="list-disc pl-4 space-y-1 mb-4">
-                          <li>Pastikan Anda sudah menjalankan SQL di Supabase SQL Editor.</li>
-                          <li>Pastikan tabel "items", "suppliers", dan "transactions" sudah ada.</li>
-                          <li>Cek apakah RLS (Row Level Security) sudah dikonfigurasi.</li>
-                        </ul>
-                        {dbStatus && !dbStatus.ok && (
-                          <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                            <p className="text-red-400 font-bold mb-1">Status Error:</p>
-                            <p className="text-red-300 mb-2">{dbStatus.message}</p>
-                            <p className="text-white font-semibold mb-1">Gunakan SQL ini untuk update:</p>
-                            <pre className="bg-black/50 p-2 rounded text-[10px] overflow-x-auto text-blue-300">
-{`-- Perbaiki ID tabel items agar bisa tambah banyak barang
-ALTER TABLE items ALTER COLUMN id SET DEFAULT gen_random_uuid();
-
--- Tambahkan kolom jika belum ada
-ALTER TABLE items ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'General';
-ALTER TABLE items ADD COLUMN IF NOT EXISTS initial_stock NUMERIC DEFAULT 0;
-ALTER TABLE transactions ADD COLUMN IF NOT EXISTS department TEXT DEFAULT 'General';
-ALTER TABLE transactions ADD COLUMN IF NOT EXISTS notes TEXT;`}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredItems.map((item) => {
-                const stats = itemStats[item.id] || { initial: 0, in: 0, out: 0, final: 0 };
-                return (
-                  <tr key={item.id} className={cn(
-                    "hover:bg-brand-dark/30 transition-colors group",
-                    stats.final <= item.min_stock && "bg-orange-500/5 border-l-2 border-l-orange-500"
-                  )}>
-                    <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-white text-xs md:text-sm">{item.name}</td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted">
-                      <span className="px-1.5 py-0.5 bg-brand-dark rounded-md text-[9px] md:text-[10px] font-bold uppercase border border-brand-border">
-                        {item.department}
-                      </span>
-                    </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm">{stats.initial}</td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-blue-400 text-xs md:text-sm">+{stats.in}</td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-purple-400 text-xs md:text-sm">-{stats.out}</td>
-                    <td className="px-3 md:px-6 py-3 md:py-4">
-                      <div className="flex items-center gap-1 md:gap-2">
-                        <span className={cn(
-                          "font-bold text-xs md:text-sm",
-                          stats.final <= item.min_stock ? "text-orange-500" : "text-white"
-                        )}>
-                          {stats.final}
-                        </span>
-                        {stats.final <= item.min_stock && (
-                          <AlertCircle className="w-3 h-3 md:w-4 md:h-4 text-orange-500" title={`Stok rendah! Min: ${item.min_stock}`} />
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm">{item.unit}</td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-right">
-                    <div className="flex justify-end gap-1 md:gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={() => handleEdit(item)}
-                        className="p-1.5 md:p-2 hover:bg-brand-accent/20 text-brand-accent rounded-lg transition-colors"
-                      >
-                        <Edit2 className="w-3 h-3 md:w-4 md:h-4" />
-                      </button>
-                      <button 
-                        onClick={() => setItemToDelete(item.id)}
-                        className="p-1.5 md:p-2 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
-                      </button>
-                    </div>
-                    </td>
+        {loading ? (
+          <div className="py-12 text-center text-xs text-brand-text-muted animate-pulse">Memuat daftar barang...</div>
+        ) : items.length === 0 ? (
+          <div className="py-12 text-center text-xs text-brand-text-muted">Tidak ada barang ditemukan.</div>
+        ) : (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-brand-dark/60 text-brand-text-muted uppercase text-[10px] font-bold border-b border-brand-border">
+                    <th className="p-4">Nama Barang</th>
+                    <th className="p-4">Departemen</th>
+                    <th className="p-4 text-center">Status</th>
+                    <th className="p-4 text-right">Stok Awal</th>
+                    <th className="p-4 text-right">Stok Saat Ini</th>
+                    <th className="p-4 text-right">Min. Stok</th>
+                    <th className="p-4 text-center">Satuan</th>
+                    <th className="p-4 text-center">Aksi</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-brand-border">
+                  {items.map((item) => (
+                    <tr key={item.id} className="hover:bg-brand-dark/40 transition-colors">
+                      <td className="p-4 font-bold text-white text-sm">{item.name}</td>
+                      <td className="p-4 text-brand-text-muted">{item.department || 'General'}</td>
+                      <td className="p-4 text-center">
+                        {getStockBadge(item.current_stock, item.min_stock)}
+                      </td>
+                      <td className="p-4 text-right text-brand-text-muted font-semibold">{item.initial_stock || 0}</td>
+                      <td className="p-4 text-right font-black text-sm text-white">{item.current_stock}</td>
+                      <td className="p-4 text-right text-brand-text-muted">{item.min_stock}</td>
+                      <td className="p-4 text-center text-brand-text-muted">{item.unit || 'pcs'}</td>
+                      <td className="p-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => openEditItemModal(item)}
+                            className="p-1.5 hover:bg-brand-accent/20 text-brand-accent rounded-lg transition-colors"
+                            title="Edit Barang"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setItemToDelete(item.id)}
+                            className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                            title="Hapus Barang"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards View (One-hand optimized, no horizontal scroll) */}
+            <div className="block md:hidden divide-y divide-brand-border">
+              {items.map((item) => (
+                <div key={item.id} className="p-3.5 space-y-2 hover:bg-brand-dark/30 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-bold text-white leading-tight">{item.name}</h3>
+                      <p className="text-[10px] text-brand-text-muted mt-0.5">{item.department || 'General'}</p>
+                    </div>
+                    <div>{getStockBadge(item.current_stock, item.min_stock)}</div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-brand-border/40 text-xs">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <span className="text-[9px] text-brand-text-muted uppercase block">Stok Saat Ini</span>
+                        <span className="font-extrabold text-white text-sm">
+                          {item.current_stock} <span className="text-xs font-normal text-brand-text-muted">{item.unit}</span>
+                        </span>
+                      </div>
+                      <div className="border-l border-brand-border/60 pl-3">
+                        <span className="text-[9px] text-brand-text-muted uppercase block">Batas Min.</span>
+                        <span className="font-semibold text-brand-text-muted text-xs">{item.min_stock} {item.unit}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openEditItemModal(item)}
+                        className="p-2 bg-brand-dark rounded-xl text-brand-accent border border-brand-border active:scale-95"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setItemToDelete(item.id)}
+                        className="p-2 bg-brand-dark rounded-xl text-red-400 border border-brand-border active:scale-95"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            <div className="p-3 md:p-4 border-t border-brand-border bg-brand-dark/30 flex items-center justify-between text-xs text-brand-text-muted">
+              <span>Total {totalItemsCount} SKU</span>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  className="p-1.5 rounded-lg border border-brand-border bg-brand-dark hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="font-bold text-white">Hal {page} / {totalPages || 1}</span>
+                <button
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  className="p-1.5 rounded-lg border border-brand-border bg-brand-dark hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Modal */}
+      {/* Add / Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
-          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
-            <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30 flex-shrink-0">
-              <h3 className="text-xl font-bold text-white">{editingItem ? 'Edit Barang' : 'Tambah Barang Baru'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-brand-text-muted hover:text-white p-2">✕</button>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-brand-card w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl border border-brand-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-brand-border flex items-center justify-between bg-brand-dark/40">
+              <h3 className="text-base font-bold text-white">
+                {editingItem ? 'Edit Data Barang' : 'Tambah Barang Baru'}
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-brand-text-muted hover:text-white p-2">
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <form id="inventory-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow">
+
+            {/* Modal Form */}
+            <form id="item-form" onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
+              {formError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-brand-text-muted mb-1">Nama Barang</label>
-                <input 
-                  type="text" 
-                  value={name} 
-                  onChange={(e) => setName(e.target.value)} 
-                  className="w-full" 
-                  required 
+                <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Nama Barang *</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Handuk Mandi Standard"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm text-white focus:outline-none focus:border-brand-accent min-h-[44px]"
+                  required
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-brand-text-muted mb-1">Departemen</label>
-                  <select 
-                    value={department} 
-                    onChange={(e) => setDepartment(e.target.value)} 
-                    className="w-full" 
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Departemen *</label>
+                  <select
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    className="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm text-white focus:outline-none focus:border-brand-accent min-h-[44px]"
                     required
                   >
-                    {departments.map(dept => (
-                      <option key={dept} value={dept}>{dept}</option>
+                    {departments.map((d) => (
+                      <option key={d} value={d}>{d}</option>
                     ))}
                   </select>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-brand-text-muted mb-1">Satuan</label>
-                  <input 
-                    type="text" 
-                    value={unit} 
-                    onChange={(e) => setUnit(e.target.value)} 
-                    className="w-full" 
-                    placeholder="Pcs, Ltr, Unit"
-                    required 
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Satuan *</label>
+                  <input
+                    type="text"
+                    placeholder="pcs, unit, kg"
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    className="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm text-white focus:outline-none focus:border-brand-accent min-h-[44px]"
+                    required
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-brand-text-muted mb-1">Stok Awal</label>
-                  <input 
-                    type="number" 
-                    value={initialStock} 
-                    onChange={(e) => setInitialStock(Number(e.target.value))} 
-                    className="w-full" 
-                    required 
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Stok Awal *</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    placeholder="0"
+                    value={initialStock}
+                    onChange={(e) => setInitialStock(e.target.value ? parseInt(e.target.value, 10) : '')}
+                    className="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm text-white focus:outline-none focus:border-brand-accent min-h-[44px]"
+                    required
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-brand-text-muted mb-1">Min. Stok (Peringatan)</label>
-                  <input 
-                    type="number" 
-                    value={minStock} 
-                    onChange={(e) => setMinStock(Number(e.target.value))} 
-                    className="w-full" 
-                    required 
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Min. Stok Alert *</label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    placeholder="5"
+                    value={minStock}
+                    onChange={(e) => setMinStock(e.target.value ? parseInt(e.target.value, 10) : '')}
+                    className="w-full bg-brand-dark border border-brand-border rounded-xl p-3 text-sm text-white focus:outline-none focus:border-brand-accent min-h-[44px]"
+                    required
                   />
                 </div>
               </div>
             </form>
-            <div className="p-6 border-t border-brand-border bg-brand-dark/30 flex flex-col sm:flex-row gap-3 flex-shrink-0">
-              <button 
-                type="button" 
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-brand-border bg-brand-dark/40 flex items-center gap-3">
+              <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all"
+                className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-xs text-brand-text-muted hover:text-white transition-all min-h-[44px]"
               >
                 Batal
               </button>
-              <button 
+              <button
                 type="submit"
-                form="inventory-form"
+                form="item-form"
                 disabled={isSubmitting}
-                className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 bg-brand-accent hover:bg-blue-600 font-bold text-xs text-white py-3 rounded-xl transition-all shadow-lg shadow-brand-accent/20 min-h-[44px]"
               >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Menyimpan...</span>
-                  </>
-                ) : (
-                  editingItem ? 'Simpan Perubahan' : 'Tambah Barang'
-                )}
+                {isSubmitting ? 'Menyimpan...' : editingItem ? 'Simpan Perubahan' : 'Tambah Barang'}
               </button>
             </div>
           </div>
         </div>
       )}
+
       {/* Delete Confirmation Modal */}
       {itemToDelete && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-brand-card w-full max-w-sm rounded-2xl border border-brand-border shadow-2xl p-6 space-y-6 animate-in zoom-in duration-200">
-            <div className="text-center space-y-2">
-              <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Trash2 className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold text-white">Hapus Barang?</h3>
-              <p className="text-brand-text-muted text-sm">Tindakan ini tidak dapat dibatalkan. Semua data terkait barang ini akan dihapus.</p>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+          <div className="bg-brand-card w-full max-w-sm rounded-2xl border border-brand-border p-6 text-center space-y-4">
+            <div className="w-12 h-12 bg-red-500/20 text-red-500 rounded-2xl flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
             </div>
-            <div className="flex gap-3">
-              <button 
+            <h3 className="text-base font-bold text-white">Hapus Barang dari Inventaris?</h3>
+            <p className="text-xs text-brand-text-muted">Tindakan ini tidak dapat dibatalkan.</p>
+            <div className="flex gap-2 pt-2">
+              <button
                 onClick={() => setItemToDelete(null)}
-                className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all"
+                className="flex-1 bg-brand-dark border border-brand-border py-2.5 rounded-xl text-xs font-bold text-brand-text-muted hover:text-white"
               >
                 Batal
               </button>
-              <button 
+              <button
                 onClick={handleDelete}
-                className="flex-1 bg-red-500 hover:bg-red-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-red-500/20"
+                className="flex-1 bg-red-600 hover:bg-red-500 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg shadow-red-900/30"
               >
                 Hapus
               </button>

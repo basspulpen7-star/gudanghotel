@@ -67,7 +67,7 @@ function MainApp() {
   const renderView = () => {
     switch (currentView) {
       case 'dashboard':
-        return <Dashboard user={user} profile={profile} />;
+        return <Dashboard user={user} profile={profile} onNavigate={(v) => setCurrentView(v as View)} />;
       case 'inventory':
         return <Inventory globalSearch={globalSearch} />;
       case 'suppliers':
@@ -123,7 +123,7 @@ function MainApp() {
           />
         );
       default:
-        return <Dashboard user={user} profile={profile} />;
+        return <Dashboard user={user} profile={profile} onNavigate={(v) => setCurrentView(v as View)} />;
     }
   };
 

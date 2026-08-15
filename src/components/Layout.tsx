@@ -85,25 +85,16 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
 
   const fetchNotifications = async () => {
     try {
-      // Fetch items and transactions to calculate current stock
-      const { data: items, error: itemsError } = await supabase.from('items').select('*');
+      const { data: items, error: itemsError } = await supabase.from('items').select('id, name, unit, min_stock, current_stock');
       if (itemsError) throw itemsError;
 
-      const { data: transactions, error: transError } = await supabase.from('transactions').select('item_id, type, quantity');
-      if (transError) throw transError;
-
-      const lowStockItems = items?.filter(item => {
-        const itemTransactions = transactions?.filter(t => t.item_id === item.id) || [];
-        const currentStock = (item.initial_stock || 0) + 
-          itemTransactions.reduce((acc, t) => t.type === 'IN' ? acc + t.quantity : acc - t.quantity, 0);
-        
-        return currentStock <= (item.min_stock || 0);
-      }).map(item => ({
-        id: item.id,
-        title: 'Stok Rendah',
-        message: `${item.name} sisa sedikit (${item.unit})`,
-        type: 'warning'
-      })) || [];
+      const lowStockItems = items?.filter(item => (item.current_stock ?? 0) <= (item.min_stock ?? 0))
+        .map(item => ({
+          id: item.id,
+          title: 'Stok Rendah',
+          message: `${item.name} sisa sedikit (${item.unit})`,
+          type: 'warning'
+        })) || [];
 
       setNotifications(lowStockItems);
     } catch (error) {

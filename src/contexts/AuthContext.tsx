@@ -151,9 +151,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, fetchProfile]);
 
-  // Initialize Session on mount
+  // Initialize Session and Auth Listener once on mount
   useEffect(() => {
-    console.log('[AUTH INIT] Checking initial session...');
     let isMounted = true;
 
     async function initAuth() {
@@ -171,14 +170,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
         } else if (initialSession?.user) {
-          console.log('[SESSION FOUND] User authenticated:', initialSession.user.id);
           if (isMounted) {
             setSession(initialSession);
             setUser(initialSession.user);
-            await fetchProfile(initialSession.user.id, initialSession.user);
+            fetchProfile(initialSession.user.id, initialSession.user);
           }
         } else {
-          console.log('[AUTH INIT] No active session found.');
           if (isMounted) {
             setSession(null);
             setUser(null);
@@ -196,28 +193,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
 
-    // Listen for Auth changes
+    // Listen for Auth changes once
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log('[AUTH STATE CHANGE] Event:', event);
+      if (!isMounted) return;
 
       if (event === 'SIGNED_OUT') {
-        console.log('[LOGOUT] Session cleared.');
         setSession(null);
         setUser(null);
         setProfile(null);
         setLoading(false);
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        console.log('[SESSION FOUND] Event:', event, 'User:', newSession?.user?.id);
         setSession(newSession);
         setUser(newSession?.user || null);
         if (newSession?.user) {
-          await fetchProfile(newSession.user.id, newSession.user);
+          fetchProfile(newSession.user.id, newSession.user);
         }
         setLoading(false);
       } else if (event === 'USER_UPDATED') {
         setUser(newSession?.user || null);
         if (newSession?.user) {
-          await fetchProfile(newSession.user.id, newSession.user);
+          fetchProfile(newSession.user.id, newSession.user);
         }
       }
     });
@@ -226,7 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, []); // Run ONCE on mount
 
   // Sign In using Email + Password only
   const signIn = async (email: string, password: string) => {

@@ -52,7 +52,10 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
   const fetchSuppliers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('suppliers').select('*').order('name');
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('id, name, contact_person, phone, address, category')
+        .order('name');
       if (error) throw error;
       if (data) setSuppliers(data);
     } catch (error: any) {
@@ -201,11 +204,11 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
                 <h3 className="text-lg font-bold text-white">{supplier.name}</h3>
                 <p className="text-xs text-brand-accent font-medium mt-1">{supplier.category || 'Kategori belum diatur'}</p>
               </div>
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => handleEdit(supplier)} className="p-1.5 hover:bg-brand-accent/20 text-brand-accent rounded-lg">
+              <div className="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => handleEdit(supplier)} className="p-2 md:p-1.5 hover:bg-brand-accent/20 text-brand-accent rounded-lg border border-brand-border md:border-none">
                   <Edit2 className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(supplier.id)} className="p-1.5 hover:bg-red-500/20 text-red-500 rounded-lg">
+                <button onClick={() => handleDelete(supplier.id)} className="p-2 md:p-1.5 hover:bg-red-500/20 text-red-500 rounded-lg border border-brand-border md:border-none">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

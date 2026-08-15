@@ -84,10 +84,11 @@ export function Reports() {
 
       if (itemsError) throw itemsError;
 
-      // Fetch all transactions to calculate historical stock correctly
+      // Fetch transactions up to end date to calculate historical stock correctly
       const { data: transData, error: transError } = await supabase
         .from('transactions')
-        .select('item_id, type, quantity, created_at');
+        .select('item_id, type, quantity, created_at')
+        .lte('created_at', end.toISOString());
 
       if (transError) throw transError;
 
@@ -165,7 +166,7 @@ export function Reports() {
     try {
       let query = supabase
         .from('transactions')
-        .select('*, items(*)')
+        .select('id, item_id, type, quantity, notes, created_at, items(id, name, unit)')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString())
         .order('created_at', { ascending: false });

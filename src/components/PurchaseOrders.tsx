@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
+import { purchaseOrderService } from '../services/purchaseOrderService';
 import { Supplier, Item, PurchaseOrder, PurchaseOrderItem } from '../types';
 import { 
   Plus, 
@@ -53,48 +54,18 @@ export function PurchaseOrders() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [posRes, suppliersRes, itemsRes] = await Promise.all([
-        supabase.from('purchase_orders').select('*, supplier:suppliers(*)').order('created_at', { ascending: false }),
-        supabase.from('suppliers').select('*').order('name'),
-        supabase.from('items').select('*').order('name')
+      const [posData, suppliersRes, itemsRes] = await Promise.all([
+        purchaseOrderService.getPurchaseOrders(),
+        supabase.from('suppliers').select('id, name, contact_person, phone, address, category').order('name'),
+        supabase.from('items').select('id, name, unit, current_stock').order('name')
       ]);
 
-      if (posRes.error) {
-        if (posRes.error.message.includes('does not exist')) {
-          throw new Error('Tabel "purchase_orders" belum ada. Silakan buka menu "Database Setup" untuk membuat tabel.');
-        }
-        throw posRes.error;
-      }
-      if (suppliersRes.error) throw suppliersRes.error;
-      if (itemsRes.error) throw itemsRes.error;
-
-      // Fetch all profiles to map them to POs
-      const { data: profilesData } = await supabase.from('profiles').select('*');
-      const profileMap = (profilesData || []).reduce((acc: any, profile) => {
-        acc[profile.id] = profile;
-        return acc;
-      }, {});
-
-      // Fetch items for each PO and attach profiles
-      const posWithItems = await Promise.all((posRes.data || []).map(async (po) => {
-        const { data: poItemsData } = await supabase
-          .from('purchase_order_items')
-          .select('*, item:items(*)')
-          .eq('purchase_order_id', po.id);
-        
-        return { 
-          ...po, 
-          items: poItemsData || [],
-          user_profile: profileMap[po.user_id] || null
-        };
-      }));
-
-      setPos(posWithItems);
+      setPos(posData);
       setSuppliers(suppliersRes.data || []);
       setItems(itemsRes.data || []);
     } catch (error: any) {
       console.error('Error fetching PO data:', error);
-      alert(error.message);
+      alert(error.message || 'Gagal memuat data Purchase Orders');
     } finally {
       setLoading(false);
     }
@@ -294,10 +265,14 @@ export function PurchaseOrders() {
     }
   };
 
-  const updateStatus = async (id: string, status: 'completed' | 'cancelled') => {
+  const updateStatus = async (po: PurchaseOrder, status: 'completed' | 'cancelled') => {
     try {
-      const { error } = await supabase.from('purchase_orders').update({ status }).eq('id', id);
-      if (error) throw error;
+      if (status === 'completed') {
+        await purchaseOrderService.completePurchaseOrder(po);
+      } else {
+        const { error } = await supabase.from('purchase_orders').update({ status }).eq('id', po.id);
+        if (error) throw error;
+      }
       fetchData();
     } catch (error: any) {
       alert('Gagal update status: ' + error.message);
@@ -747,14 +722,14 @@ export function PurchaseOrders() {
                   {po.status === 'pending' && (
                     <>
                       <button 
-                        onClick={() => updateStatus(po.id, 'cancelled')}
+                        onClick={() => updateStatus(po, 'cancelled')}
                         className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"
                       >
                         <XCircle className="w-4 h-4" />
                         Batalkan
                       </button>
                       <button 
-                        onClick={() => updateStatus(po.id, 'completed')}
+                        onClick={() => updateStatus(po, 'completed')}
                         className="flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white rounded-lg transition-all"
                       >
                         <CheckCircle2 className="w-4 h-4" />
