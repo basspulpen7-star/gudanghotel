@@ -89,6 +89,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfileLoading(true);
     console.log('[PROFILE FETCH] Fetching profile for user ID:', userId);
 
+    const targetUser = currentUser || user;
+    const fallbackName = targetUser?.user_metadata?.full_name || 
+                         targetUser?.user_metadata?.display_name || 
+                         targetUser?.email?.split('@')[0] || 
+                         'User';
+    
+    const fallbackProfile: UserProfile = {
+      id: userId,
+      full_name: fallbackName,
+      email: targetUser?.email || '',
+      role: 'staff',
+      created_at: new Date().toISOString()
+    };
+
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -97,48 +111,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (error) {
-        console.error('[PROFILE FETCH ERROR]:', error);
-      }
-
-      if (data) {
+        console.warn('[PROFILE FETCH NOTICE]:', error.message);
+        setProfile(fallbackProfile);
+      } else if (data) {
         console.log('[PROFILE FOUND] Role:', data.role || 'staff');
         setProfile(data as UserProfile);
       } else {
         console.warn('[PROFILE NOT FOUND] Profile row missing for ID:', userId);
-        // Fallback: create default profile row if missing to prevent broken state
-        const targetUser = currentUser || user;
-        const fallbackName = targetUser?.user_metadata?.full_name || 
-                             targetUser?.user_metadata?.display_name || 
-                             targetUser?.email?.split('@')[0] || 
-                             'User';
-        
-        const fallbackProfile: UserProfile = {
-          id: userId,
-          full_name: fallbackName,
-          email: targetUser?.email || '',
-          role: 'staff',
-          created_at: new Date().toISOString()
-        };
+        setProfile(fallbackProfile);
 
-        try {
-          const { error: insertErr } = await supabase
-            .from('profiles')
-            .upsert(fallbackProfile, { onConflict: 'id' });
-          
-          if (!insertErr) {
-            setProfile(fallbackProfile);
-            console.log('[PROFILE CREATED FALLBACK] Role:', fallbackProfile.role);
-          } else {
-            console.warn('[PROFILE FALLBACK INSERT NOTICE]:', insertErr.message);
-            setProfile(fallbackProfile);
+        // Try to upsert fallback profile asynchronously in background
+        (async () => {
+          try {
+            const { error: insertErr } = await supabase
+              .from('profiles')
+              .upsert(fallbackProfile, { onConflict: 'id' });
+            if (insertErr) {
+              console.warn('[PROFILE FALLBACK UPSERT NOTICE]:', insertErr.message);
+            }
+          } catch (err: any) {
+            console.warn('[PROFILE FALLBACK CATCH]:', err?.message || err);
           }
-        } catch (insertCatchErr) {
-          console.error('[PROFILE FALLBACK CATCH]:', insertCatchErr);
-          setProfile(fallbackProfile);
-        }
+        })();
       }
-    } catch (err) {
-      console.error('[PROFILE UNEXPECTED ERROR]:', err);
+    } catch (err: any) {
+      console.warn('[PROFILE UNEXPECTED NOTICE]:', err?.message || err);
+      setProfile(fallbackProfile);
     } finally {
       setProfileLoading(false);
     }
@@ -154,39 +152,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Initialize Session and Auth Listener once on mount
   useEffect(() => {
     let isMounted = true;
+    const startTime = performance.now();
+    console.log('[AUTH BOOT START]');
+
+    // Safety timeout to prevent infinite loading if network hangs (5 seconds)
+    const timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn('[AUTH TIMEOUT] Session check taking longer than expected. Forcing loading false.');
+        setLoading(false);
+      }
+    }, 5000);
 
     async function initAuth() {
       try {
+        console.log('[AUTH GET SESSION START]');
         const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+        console.log(`[AUTH GET SESSION END] Took: ${(performance.now() - startTime).toFixed(0)}ms`);
         
+        if (!isMounted) return;
+
         if (error) {
           console.error('[AUTH INIT ERROR]:', error);
           if (error.message.includes('Refresh Token Not Found') || error.message.includes('invalid_grant')) {
             await supabase.auth.signOut();
-            if (isMounted) {
-              setSession(null);
-              setUser(null);
-              setProfile(null);
-            }
           }
+          setSession(null);
+          setUser(null);
+          setProfile(null);
         } else if (initialSession?.user) {
-          if (isMounted) {
-            setSession(initialSession);
-            setUser(initialSession.user);
-            fetchProfile(initialSession.user.id, initialSession.user);
-          }
+          setSession(initialSession);
+          setUser(initialSession.user);
+          // Fetch profile asynchronously in background without blocking auth state readiness
+          fetchProfile(initialSession.user.id, initialSession.user);
         } else {
-          if (isMounted) {
-            setSession(null);
-            setUser(null);
-            setProfile(null);
-          }
+          setSession(null);
+          setUser(null);
+          setProfile(null);
         }
       } catch (err) {
         console.error('[AUTH INIT CATCH]:', err);
+        if (isMounted) {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+        }
       } finally {
         if (isMounted) {
           setLoading(false);
+          console.log(`[AUTH STATE READY] Total boot time: ${(performance.now() - startTime).toFixed(0)}ms`);
         }
       }
     }
@@ -196,6 +209,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for Auth changes once
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!isMounted) return;
+
+      console.log('[AUTH STATE CHANGE]', event);
 
       if (event === 'SIGNED_OUT') {
         setSession(null);
@@ -219,6 +234,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       isMounted = false;
+      clearTimeout(timeoutId);
       subscription.unsubscribe();
     };
   }, []); // Run ONCE on mount

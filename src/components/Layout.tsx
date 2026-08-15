@@ -97,8 +97,8 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
         })) || [];
 
       setNotifications(lowStockItems);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
+    } catch (error: any) {
+      console.warn('Notice fetching notifications:', error?.message || error);
     }
   };
 
@@ -125,20 +125,20 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
           </div>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 px-3 space-y-1.5 overflow-y-auto">
           {menuItems.map((item) => (
             <button
               key={item.id}
               onClick={() => handleSetView(item.id)}
               className={cn(
-                "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
+                "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium",
                 currentView === item.id 
-                  ? "bg-brand-accent text-white shadow-lg shadow-brand-accent/20" 
+                  ? "bg-[#D4A72C]/10 text-brand-accent border-l-4 border-brand-accent rounded-l-none" 
                   : "text-brand-text-muted hover:bg-brand-card hover:text-white"
               )}
             >
-              <item.icon className="w-5 h-5" />
-              <span className="font-medium">{item.label}</span>
+              <item.icon className={cn("w-5 h-5", currentView === item.id ? "text-brand-accent" : "text-brand-text-muted")} />
+              <span>{item.label}</span>
             </button>
           ))}
         </nav>
@@ -146,7 +146,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
         <div className="p-3 space-y-1 border-t border-brand-border">
           <button 
             onClick={() => handleSetView('purchase_orders')}
-            className="w-full bg-brand-accent hover:bg-blue-600 text-white font-bold py-2.5 rounded-xl transition-all mb-3 shadow-lg shadow-brand-accent/20 flex items-center justify-center gap-2 text-sm"
+            className="w-full bg-brand-accent hover:bg-brand-accent-hover text-brand-dark font-bold py-2.5 rounded-xl transition-all mb-3 flex items-center justify-center gap-2 text-sm shadow-sm"
           >
             <ShoppingCart className="w-4 h-4" />
             Buat Purchase Order
@@ -155,8 +155,8 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
           <button 
             onClick={() => handleSetView('settings')}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all text-sm",
-              currentView === 'settings' ? "text-white bg-brand-card" : "text-brand-text-muted hover:text-white"
+              "w-full flex items-center gap-3 px-4 py-2 rounded-xl transition-all text-sm font-medium",
+              currentView === 'settings' ? "bg-[#D4A72C]/10 text-brand-accent border-l-4 border-brand-accent rounded-l-none" : "text-brand-text-muted hover:text-white"
             )}
           >
             <Settings className="w-4 h-4" />
@@ -164,7 +164,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
           </button>
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-2 text-brand-text-muted hover:text-red-400 transition-all text-sm"
+            className="w-full flex items-center gap-3 px-4 py-2 text-brand-text-muted hover:text-red-400 transition-all text-sm font-medium"
           >
             <LogOut className="w-4 h-4" />
             <span>Keluar</span>

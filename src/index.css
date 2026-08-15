@@ -1,25 +1,35 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-dark: #0f172a;
-  --color-brand-card: #1e293b;
-  --color-brand-accent: #3b82f6;
-  --color-brand-text-muted: #94a3b8;
-  --color-brand-border: #334155;
+  --color-brand-dark: #0B0F14;
+  --color-brand-surface: #11161D;
+  --color-brand-card: #161C23;
+  --color-brand-elevated: #1B222B;
+  --color-brand-accent: #D4A72C;
+  --color-brand-accent-hover: #E2B84B;
+  --color-brand-accent-dark: #9A761C;
+  --color-brand-text-muted: #8B949E;
+  --color-brand-border: #29313B;
+  --color-brand-divider: #252C35;
+  --color-success: #35B878;
+  --color-danger: #E05A5A;
+  --color-warning: #D9A441;
+  --color-info: #5B8DEF;
 }
 
 body {
   background-color: var(--color-brand-dark);
-  color: white;
+  color: #F0F6FC;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 @layer base {
   input, select, textarea {
-    @apply bg-brand-card border border-brand-border rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-brand-accent;
+    @apply bg-[#161C23] border border-[#29313B] rounded-xl px-3.5 py-2.5 text-white placeholder:text-[#8B949E] focus:outline-none focus:border-[#D4A72C] transition-colors text-sm;
   }
   
   option {
-    @apply bg-brand-card text-white;
+    @apply bg-[#161C23] text-white;
   }
 }
+

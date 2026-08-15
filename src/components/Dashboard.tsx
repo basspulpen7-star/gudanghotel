@@ -58,8 +58,8 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
       setKpis(kpiData);
       setLowStockItems(lowStockData);
       setRecentTransactions(txData.data);
-    } catch (error) {
-      console.error('[DASHBOARD FETCH ERROR]:', error);
+    } catch (error: any) {
+      console.warn('[DASHBOARD FETCH NOTICE]:', error?.message || error);
     } finally {
       setLoading(false);
     }
@@ -105,37 +105,37 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
       </div>
 
       {/* Quick Action Buttons (Primary CTAs for mobile & desktop) */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           onClick={() => onNavigate('transactions', 'IN')}
-          className="bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-400 p-4 rounded-2xl flex items-center justify-between transition-all group active:scale-[0.98]"
+          className="bg-[#161C23] hover:bg-[#1B222B] border border-[#29313B] hover:border-[#35B878]/50 p-4 rounded-2xl flex items-center justify-between transition-all group active:scale-[0.98]"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-              <Plus className="w-6 h-6 stroke-[3]" />
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-[#35B878]/10 border border-[#35B878]/20 flex items-center justify-center text-[#35B878] group-hover:scale-105 transition-transform">
+              <Plus className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div className="text-left">
               <p className="text-sm font-bold text-white">+ Barang Masuk</p>
-              <p className="text-[10px] text-emerald-400/80">Input stok dari vendor</p>
+              <p className="text-xs text-[#8B949E]">Input stok dari vendor</p>
             </div>
           </div>
-          <ArrowRight className="w-5 h-5 text-emerald-400 opacity-60 group-hover:translate-x-1 transition-transform hidden sm:block" />
+          <ArrowRight className="w-4 h-4 text-[#8B949E] group-hover:text-white group-hover:translate-x-1 transition-all hidden sm:block" />
         </button>
 
         <button
           onClick={() => onNavigate('transactions', 'OUT')}
-          className="bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-400 p-4 rounded-2xl flex items-center justify-between transition-all group active:scale-[0.98]"
+          className="bg-[#161C23] hover:bg-[#1B222B] border border-[#29313B] hover:border-[#E05A5A]/50 p-4 rounded-2xl flex items-center justify-between transition-all group active:scale-[0.98]"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
-              <Minus className="w-6 h-6 stroke-[3]" />
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-[#E05A5A]/10 border border-[#E05A5A]/20 flex items-center justify-center text-[#E05A5A] group-hover:scale-105 transition-transform">
+              <Minus className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div className="text-left">
               <p className="text-sm font-bold text-white">- Barang Keluar</p>
-              <p className="text-[10px] text-purple-400/80">Distribusi ke departemen</p>
+              <p className="text-xs text-[#8B949E]">Distribusi ke departemen</p>
             </div>
           </div>
-          <ArrowRight className="w-5 h-5 text-purple-400 opacity-60 group-hover:translate-x-1 transition-transform hidden sm:block" />
+          <ArrowRight className="w-4 h-4 text-[#8B949E] group-hover:text-white group-hover:translate-x-1 transition-all hidden sm:block" />
         </button>
       </div>
 

@@ -47,12 +47,18 @@ function MainApp() {
     return (
       <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-brand-accent flex items-center justify-center shadow-xl shadow-brand-accent/20 animate-pulse">
-            <Hotel className="w-8 h-8 text-white" />
+          <div className="w-12 h-12 rounded-xl bg-brand-accent flex items-center justify-center shadow-lg shadow-brand-accent/20 animate-pulse">
+            <Hotel className="w-6 h-6 text-white" />
           </div>
-          <div className="text-center">
-            <h2 className="text-white font-bold text-lg tracking-tight">Hotel Alia Matraman</h2>
-            <p className="text-brand-text-muted text-xs mt-1">Memeriksa sesi...</p>
+          <div className="text-center space-y-2">
+            <h2 className="text-white font-bold text-base tracking-tight">Hotel Alia Matraman</h2>
+            <p className="text-brand-text-muted text-xs">Memuat...</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-[11px] text-brand-accent hover:underline pt-2 block mx-auto"
+            >
+              Muat ulang jika terlalu lama?
+            </button>
           </div>
         </div>
       </div>
