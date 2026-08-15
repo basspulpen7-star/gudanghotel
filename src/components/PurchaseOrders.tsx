@@ -564,37 +564,37 @@ export function PurchaseOrders() {
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 p-4 md:p-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl border border-gray-200/90 shadow-sm">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-white">Purchase Orders</h2>
-          <p className="text-brand-text-muted">Kelola pesanan barang ke supplier</p>
+          <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Purchase Orders</h2>
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5 font-medium">Kelola pesanan barang ke supplier & vendor</p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="w-full md:w-auto bg-brand-accent hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-brand-accent/20"
+          className="w-full md:w-auto bg-[#E65C00] hover:bg-[#CF5300] text-white px-5 py-2.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm shadow-orange-500/20 text-xs sm:text-sm min-h-[44px]"
         >
-          <Plus className="w-5 h-5" />
-          Buat PO Baru
+          <Plus className="w-4 h-4 stroke-[3]" />
+          <span>Buat PO Baru</span>
         </button>
       </div>
 
-      <div className="bg-brand-card p-4 rounded-2xl border border-brand-border flex flex-col md:flex-row gap-4 items-center">
+      <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-sm flex flex-col md:flex-row gap-3 items-center">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-brand-text-muted" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input 
             type="text"
             placeholder="Cari PO atau Supplier..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-brand-dark border border-brand-border rounded-xl py-2 pl-10 pr-4 text-white focus:outline-none focus:border-brand-accent transition-all"
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2 pl-9 pr-3 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-500 focus:bg-white transition-all"
           />
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <select 
             value={filterMonth}
             onChange={(e) => setFilterMonth(parseInt(e.target.value))}
-            className="flex-1 md:w-40 bg-brand-dark border border-brand-border rounded-xl py-2 px-4 text-white focus:outline-none focus:border-brand-accent transition-all"
+            className="flex-1 md:w-36 bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 text-xs font-semibold text-gray-800 focus:outline-none focus:border-amber-500 focus:bg-white transition-all"
           >
             <option value={-1}>Semua Bulan</option>
             {months.map((month, index) => (
@@ -604,7 +604,7 @@ export function PurchaseOrders() {
           <select 
             value={filterYear}
             onChange={(e) => setFilterYear(parseInt(e.target.value))}
-            className="flex-1 md:w-32 bg-brand-dark border border-brand-border rounded-xl py-2 px-4 text-white focus:outline-none focus:border-brand-accent transition-all"
+            className="flex-1 md:w-32 bg-gray-50 border border-gray-200 rounded-xl py-2 px-3 text-xs font-semibold text-gray-800 focus:outline-none focus:border-amber-500 focus:bg-white transition-all"
           >
             <option value={-1}>Semua Tahun</option>
             {years.map((year) => (
@@ -614,125 +614,125 @@ export function PurchaseOrders() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-3">
         {loading ? (
-          <div className="text-center py-12 text-brand-text-muted">Loading...</div>
+          <div className="text-center py-12 text-gray-500 font-medium text-xs">Memuat data...</div>
         ) : filteredPos.length === 0 ? (
-          <div className="bg-brand-card p-12 rounded-2xl border border-brand-border text-center">
-            <ShoppingCart className="w-12 h-12 text-brand-text-muted mx-auto mb-4 opacity-20" />
-            <p className="text-brand-text-muted">Tidak ada data Purchase Order yang sesuai filter.</p>
+          <div className="bg-white p-12 rounded-2xl border border-gray-200/90 text-center shadow-sm">
+            <ShoppingCart className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-xs text-gray-500 font-medium">Tidak ada data Purchase Order yang sesuai filter.</p>
           </div>
         ) : filteredPos.map((po) => (
-          <div key={po.id} className="bg-brand-card rounded-2xl border border-brand-border overflow-hidden transition-all hover:border-brand-accent/50">
+          <div key={po.id} className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden transition-all hover:border-amber-500/50">
             <div 
-              className="p-4 md:p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer"
+              className="p-4 md:p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 cursor-pointer hover:bg-amber-50/20"
               onClick={() => setExpandedPo(expandedPo === po.id ? null : po.id)}
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3.5">
                 <div className={cn(
-                  "w-12 h-12 rounded-xl flex items-center justify-center",
-                  po.status === 'completed' ? "bg-green-500/10 text-green-500" :
-                  po.status === 'cancelled' ? "bg-red-500/10 text-red-500" :
-                  "bg-blue-500/10 text-blue-500"
+                  "w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs border",
+                  po.status === 'completed' ? "bg-emerald-50 text-emerald-700 border-emerald-200" :
+                  po.status === 'cancelled' ? "bg-red-50 text-red-700 border-red-200" :
+                  "bg-amber-50 text-amber-700 border-amber-200"
                 )}>
-                  {po.status === 'completed' ? <CheckCircle2 className="w-6 h-6" /> :
-                   po.status === 'cancelled' ? <XCircle className="w-6 h-6" /> :
-                   <Clock className="w-6 h-6" />}
+                  {po.status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> :
+                   po.status === 'cancelled' ? <XCircle className="w-5 h-5" /> :
+                   <Clock className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white">{po.supplier?.name || 'Unknown Supplier'}</h3>
-                  <div className="flex items-center gap-2 text-xs text-brand-text-muted">
-                    <span className="font-mono">#{po.po_number || po.id.slice(0, 8).toUpperCase()}</span>
+                  <h3 className="text-sm md:text-base font-black text-gray-900">{po.supplier?.name || 'Unknown Supplier'}</h3>
+                  <div className="flex items-center gap-2 text-[10px] text-gray-500 font-medium mt-0.5">
+                    <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-700 font-bold">#{po.po_number || po.id.slice(0, 8).toUpperCase()}</span>
                     <span>•</span>
                     <span>{format(new Date(po.created_at), 'dd MMM yyyy HH:mm')}</span>
                   </div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
+              <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
                 <div className="text-right">
-                  <p className="text-xs text-brand-text-muted uppercase font-bold tracking-wider">Total Amount</p>
-                  <p className="text-xl font-bold text-white">Rp {po.total_amount.toLocaleString()}</p>
+                  <p className="text-[10px] text-gray-400 uppercase font-extrabold tracking-wider">Total Nilai</p>
+                  <p className="text-base font-black text-gray-900">Rp {po.total_amount.toLocaleString()}</p>
                 </div>
-                {expandedPo === po.id ? <ChevronUp className="w-5 h-5 text-brand-text-muted" /> : <ChevronDown className="w-5 h-5 text-brand-text-muted" />}
+                {expandedPo === po.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
               </div>
             </div>
 
             {expandedPo === po.id && (
-              <div className="px-4 md:px-6 pb-6 border-t border-brand-border pt-6 animate-in slide-in-from-top-2 duration-200">
-                <div className="overflow-x-auto mb-6">
-                  <table className="w-full text-left border-collapse">
+              <div className="px-4 md:px-5 pb-5 border-t border-gray-100 pt-4 bg-gray-50/50">
+                <div className="overflow-x-auto mb-4 bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="text-brand-text-muted text-xs font-bold uppercase tracking-wider">
-                        <th className="pb-4">Item</th>
-                        <th className="pb-4">Qty</th>
-                        <th className="pb-4">Price</th>
-                        <th className="pb-4 text-right">Subtotal</th>
+                      <tr className="bg-gray-50 text-gray-500 text-[10px] font-extrabold uppercase tracking-wider border-b border-gray-200">
+                        <th className="px-4 py-2.5">Item</th>
+                        <th className="px-4 py-2.5">Qty</th>
+                        <th className="px-4 py-2.5">Harga</th>
+                        <th className="px-4 py-2.5 text-right">Subtotal</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-brand-border/50">
+                    <tbody className="divide-y divide-gray-100">
                       {po.items?.map((item) => (
                         <tr key={item.id}>
-                          <td className="py-3 text-white font-medium">{item.item?.name}</td>
-                          <td className="py-3 text-brand-text-muted">{item.quantity} {item.item?.unit}</td>
-                          <td className="py-3 text-brand-text-muted">Rp {item.price.toLocaleString()}</td>
-                          <td className="py-3 text-white font-bold text-right">Rp {(item.quantity * item.price).toLocaleString()}</td>
+                          <td className="px-4 py-2.5 text-gray-900 font-bold">{item.item?.name}</td>
+                          <td className="px-4 py-2.5 text-gray-600 font-medium">{item.quantity} {item.item?.unit}</td>
+                          <td className="px-4 py-2.5 text-gray-600">Rp {item.price.toLocaleString()}</td>
+                          <td className="px-4 py-2.5 text-gray-900 font-black text-right">Rp {(item.quantity * item.price).toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="flex flex-wrap gap-3 justify-end">
+                <div className="flex flex-wrap gap-2 justify-end">
                   <button 
                     onClick={() => setViewingPo(po)}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-white hover:bg-brand-card transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-100 transition-all shadow-xs"
                   >
-                    <Eye className="w-4 h-4" />
+                    <Eye className="w-3.5 h-3.5" />
                     Lihat Detail
                   </button>
                   <button 
                     onClick={() => handleEdit(po)}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-blue-400 hover:bg-brand-card transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-700 hover:bg-amber-100 transition-all shadow-xs"
                   >
-                    <Edit2 className="w-4 h-4" />
+                    <Edit2 className="w-3.5 h-3.5" />
                     Edit PO
                   </button>
                   <button 
                     onClick={() => handleDelete(po.id)}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-red-400 hover:bg-brand-card transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-600 hover:bg-red-100 transition-all shadow-xs"
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Hapus PO
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Hapus
                   </button>
                   <button 
                     onClick={() => exportToPDF(po)}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-white hover:bg-brand-card transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 hover:bg-gray-200 transition-all shadow-xs"
                   >
-                    <Download className="w-4 h-4" />
-                    Download PO
+                    <Download className="w-3.5 h-3.5" />
+                    Download PDF
                   </button>
                   <button 
                     onClick={() => setViewingPo(po)}
-                    className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border rounded-lg text-white hover:bg-brand-card transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 hover:bg-gray-200 transition-all shadow-xs"
                   >
-                    <Printer className="w-4 h-4" />
-                    Cetak PO
+                    <Printer className="w-3.5 h-3.5" />
+                    Cetak
                   </button>
                   {po.status === 'pending' && (
                     <>
                       <button 
                         onClick={() => updateStatus(po, 'cancelled')}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-all shadow-xs"
                       >
-                        <XCircle className="w-4 h-4" />
+                        <XCircle className="w-3.5 h-3.5" />
                         Batalkan
                       </button>
                       <button 
                         onClick={() => updateStatus(po, 'completed')}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white rounded-lg transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 transition-all shadow-xs"
                       >
-                        <CheckCircle2 className="w-4 h-4" />
+                        <CheckCircle2 className="w-3.5 h-3.5" />
                         Selesaikan
                       </button>
                     </>
@@ -746,40 +746,40 @@ export function PurchaseOrders() {
 
       {/* Modal Preview PO */}
       {viewingPo && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[110] p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col max-h-[95vh]">
-            <div className="p-4 bg-gray-100 border-b border-gray-200 flex justify-between items-center no-print">
-              <div className="flex items-center gap-4">
-                <h3 className="text-lg font-bold text-gray-800">Preview Purchase Order</h3>
-                <span className="px-3 py-1 bg-brand-accent/10 text-brand-accent rounded-full text-xs font-bold">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[110] p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col max-h-[95vh] border border-gray-200">
+            <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center no-print">
+              <div className="flex items-center gap-3">
+                <h3 className="text-base font-black text-gray-900">Preview Purchase Order</h3>
+                <span className="px-2.5 py-0.5 bg-amber-500/10 text-amber-700 rounded-lg text-xs font-bold border border-amber-500/20">
                   #{viewingPo.po_number || viewingPo.id.slice(0, 8).toUpperCase()}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <button 
                   onClick={() => exportToPDF(viewingPo)}
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-dark border border-brand-border text-white rounded-lg hover:bg-brand-card transition-all font-bold text-sm"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 border border-gray-200 text-gray-800 rounded-xl hover:bg-gray-200 transition-all font-bold text-xs"
                 >
                   <Download className="w-4 h-4" />
                   Download
                 </button>
                 <button 
                   onClick={handlePrint}
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-accent text-white rounded-lg hover:bg-blue-600 transition-all font-bold text-sm"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-[#E65C00] text-white rounded-xl hover:bg-[#CF5300] transition-all font-extrabold text-xs shadow-xs"
                 >
                   <Printer className="w-4 h-4" />
                   Cetak / Print
                 </button>
                 <button 
                   onClick={() => setViewingPo(null)} 
-                  className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-200 rounded-lg transition-all"
+                  className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg transition-all"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
             
-            <div className="flex-grow overflow-y-auto p-4 md:p-8 bg-gray-200">
+            <div className="flex-grow overflow-y-auto p-4 md:p-8 bg-gray-100">
               <PurchaseOrderDocument 
                 po={viewingPo} 
                 supplier={suppliers.find(s => s.id === viewingPo.supplier_id)} 
@@ -791,22 +791,22 @@ export function PurchaseOrders() {
 
       {/* Modal Buat PO */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
-          <div className="bg-brand-card w-full max-w-2xl rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
-            <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30">
-              <h3 className="text-xl font-bold text-white">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-2xl border border-gray-200 shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
+            <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <h3 className="text-base font-black text-gray-900">
                 {editingPoId ? 'Edit Purchase Order' : 'Buat Purchase Order Baru'}
               </h3>
-              <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-brand-text-muted hover:text-white p-2">✕</button>
+              <button onClick={() => { setIsModalOpen(false); resetForm(); }} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
             </div>
             
-            <form id="po-form" onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-grow">
+            <form id="po-form" onSubmit={handleSubmit} className="p-5 space-y-5 overflow-y-auto flex-grow">
               <div>
-                <label className="block text-sm font-medium text-brand-text-muted mb-2">Pilih Supplier</label>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Pilih Supplier</label>
                 <select 
                   value={selectedSupplierId} 
                   onChange={(e) => setSelectedSupplierId(e.target.value)}
-                  className="w-full"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
                   required
                 >
                   <option value="">-- Pilih Supplier --</option>
@@ -816,26 +816,26 @@ export function PurchaseOrders() {
                 </select>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <label className="block text-sm font-medium text-brand-text-muted">Daftar Barang</label>
+                  <label className="block text-xs font-bold text-gray-700 uppercase">Daftar Barang</label>
                   <button 
                     type="button" 
                     onClick={addPoItem}
-                    className="text-xs text-brand-accent font-bold hover:underline flex items-center gap-1"
+                    className="text-xs text-[#E65C00] font-extrabold hover:underline flex items-center gap-1"
                   >
-                    <Plus className="w-3 h-3" /> Tambah Baris
+                    <Plus className="w-3.5 h-3.5" /> Tambah Baris
                   </button>
                 </div>
                 
                 {poItems.map((poItem, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-3 items-end bg-brand-dark/30 p-3 rounded-xl border border-brand-border/50">
+                  <div key={index} className="grid grid-cols-12 gap-2.5 items-end bg-gray-50 p-3 rounded-xl border border-gray-200">
                     <div className="col-span-12 sm:col-span-5">
-                      <label className="block text-[10px] text-brand-text-muted uppercase font-bold mb-1">Nama Barang</label>
+                      <label className="block text-[10px] text-gray-500 uppercase font-extrabold mb-1">Nama Barang</label>
                       <select 
                         value={poItem.item_id} 
                         onChange={(e) => updatePoItem(index, 'item_id', e.target.value)}
-                        className="w-full text-sm bg-brand-card text-white border-brand-border focus:ring-brand-accent"
+                        className="w-full text-xs bg-white text-gray-900 border border-gray-200 rounded-lg p-2 focus:border-amber-500 focus:outline-none"
                         required
                       >
                         <option value="">-- Pilih Barang --</option>
@@ -845,23 +845,23 @@ export function PurchaseOrders() {
                       </select>
                     </div>
                     <div className="col-span-4 sm:col-span-2">
-                      <label className="block text-[10px] text-brand-text-muted uppercase font-bold mb-1">Jumlah</label>
+                      <label className="block text-[10px] text-gray-500 uppercase font-extrabold mb-1">Jumlah</label>
                       <input 
                         type="number" 
                         value={poItem.quantity} 
                         onChange={(e) => updatePoItem(index, 'quantity', parseInt(e.target.value))}
-                        className="w-full text-sm"
+                        className="w-full text-xs bg-white text-gray-900 border border-gray-200 rounded-lg p-2 focus:border-amber-500 focus:outline-none"
                         min="1"
                         required
                       />
                     </div>
                     <div className="col-span-6 sm:col-span-4">
-                      <label className="block text-[10px] text-brand-text-muted uppercase font-bold mb-1">Harga Satuan (Rp)</label>
+                      <label className="block text-[10px] text-gray-500 uppercase font-extrabold mb-1">Harga Satuan (Rp)</label>
                       <input 
                         type="number" 
                         value={poItem.price} 
                         onChange={(e) => updatePoItem(index, 'price', parseInt(e.target.value))}
-                        className="w-full text-sm"
+                        className="w-full text-xs bg-white text-gray-900 border border-gray-200 rounded-lg p-2 focus:border-amber-500 focus:outline-none"
                         min="0"
                         required
                       />
@@ -871,7 +871,7 @@ export function PurchaseOrders() {
                         type="button" 
                         onClick={() => removePoItem(index)}
                         disabled={poItems.length === 1}
-                        className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg disabled:opacity-20"
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-20"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -880,21 +880,21 @@ export function PurchaseOrders() {
                 ))}
               </div>
 
-              <div className="bg-brand-dark p-4 rounded-xl border border-brand-border flex justify-between items-center">
-                <span className="text-brand-text-muted font-bold">Total Estimasi:</span>
-                <span className="text-xl font-bold text-white">
+              <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200 flex justify-between items-center">
+                <span className="text-xs text-amber-900 font-extrabold uppercase">Total Estimasi:</span>
+                <span className="text-lg font-black text-gray-900">
                   Rp {poItems.reduce((acc, item) => acc + (item.quantity * item.price), 0).toLocaleString()}
                 </span>
               </div>
             </form>
 
-            <div className="p-6 border-t border-brand-border bg-brand-dark/30 flex flex-col sm:flex-row gap-3">
-              <button type="button" onClick={() => { setIsModalOpen(false); resetForm(); }} className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all">Batal</button>
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row gap-2.5">
+              <button type="button" onClick={() => { setIsModalOpen(false); resetForm(); }} className="flex-1 bg-white border border-gray-200 py-2.5 rounded-xl font-bold text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all min-h-[44px]">Batal</button>
               <button 
                 type="submit" 
                 form="po-form"
                 disabled={isSubmitting}
-                className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-[#E65C00] hover:bg-[#CF5300] py-2.5 rounded-xl font-extrabold text-xs text-white transition-all shadow-sm shadow-orange-500/20 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[44px]"
               >
                 {isSubmitting ? 'Menyimpan...' : 'Simpan & Cetak PO'}
               </button>
@@ -905,27 +905,25 @@ export function PurchaseOrders() {
 
       {/* Modal Konfirmasi Hapus */}
       {deleteConfirmationPoId && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[120] p-4">
-          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 p-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">Hapus Purchase Order?</h3>
-                <p className="text-sm text-brand-text-muted">Tindakan ini tidak dapat dibatalkan.</p>
-              </div>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[120] p-4">
+          <div className="bg-white w-full max-w-sm rounded-2xl border border-gray-200 shadow-2xl p-6 space-y-4 animate-in zoom-in duration-200 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 mx-auto">
+              <AlertTriangle className="w-6 h-6" />
             </div>
-            <div className="flex gap-3">
+            <div>
+              <h3 className="text-base font-black text-gray-900">Hapus Purchase Order?</h3>
+              <p className="text-xs text-gray-500 font-medium mt-1">Tindakan ini tidak dapat dibatalkan.</p>
+            </div>
+            <div className="flex gap-2 pt-2">
               <button 
                 onClick={() => setDeleteConfirmationPoId(null)}
-                className="flex-1 bg-brand-dark border border-brand-border py-2 rounded-lg text-white font-bold hover:bg-brand-card transition-all"
+                className="flex-1 bg-gray-100 border border-gray-200 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900"
               >
                 Batal
               </button>
               <button 
                 onClick={confirmDelete}
-                className="flex-1 bg-red-500 hover:bg-red-600 py-2 rounded-lg text-white font-bold transition-all"
+                className="flex-1 bg-red-600 hover:bg-red-700 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm"
               >
                 Ya, Hapus
               </button>

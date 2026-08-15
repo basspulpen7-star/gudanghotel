@@ -84,58 +84,58 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
   const userName = profile?.full_name || user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Staff';
 
   return (
-    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6">
+    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
       {/* Header & Greeting */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-brand-card p-4 md:p-6 rounded-2xl border border-brand-border">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 md:p-6 rounded-2xl border border-gray-200/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
         <div>
-          <h1 className="text-xl md:text-2xl font-extrabold text-white flex items-center gap-2">
+          <h1 className="text-xl md:text-2xl font-extrabold text-gray-900 flex items-center gap-2">
             <span>{getGreeting()}, {userName}!</span>
           </h1>
-          <p className="text-xs md:text-sm text-brand-text-muted mt-1">
+          <p className="text-xs md:text-sm text-gray-500 mt-1 font-medium">
             Berikut kondisi gudang Hotel Alia Matraman hari ini.
           </p>
         </div>
         <button 
           onClick={fetchDashboardData}
-          className="flex items-center gap-2 bg-brand-dark/80 hover:bg-brand-dark text-brand-text-muted hover:text-white px-3 py-2 rounded-xl border border-brand-border text-xs font-semibold transition-all self-end sm:self-auto"
+          className="flex items-center gap-2 bg-gray-50 hover:bg-gray-100 text-gray-700 px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold transition-all self-end sm:self-auto shadow-sm"
         >
-          <Activity className={cn("w-4 h-4", loading && "animate-spin text-brand-accent")} />
+          <Activity className={cn("w-4 h-4", loading && "animate-spin text-amber-600")} />
           <span>Refresh</span>
         </button>
       </div>
 
-      {/* Quick Action Buttons (Primary CTAs for mobile & desktop) */}
+      {/* Quick Action Buttons */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
           onClick={() => onNavigate('transactions', 'IN')}
-          className="bg-[#161C23] hover:bg-[#1B222B] border border-[#29313B] hover:border-[#35B878]/50 p-4 rounded-2xl flex items-center justify-between transition-all group active:scale-[0.98]"
+          className="bg-white hover:bg-emerald-50/40 border border-gray-200 hover:border-emerald-300 p-4 rounded-2xl flex items-center justify-between transition-all group active:scale-[0.99] shadow-[0_2px_8px_rgba(0,0,0,0.03)]"
         >
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-[#35B878]/10 border border-[#35B878]/20 flex items-center justify-center text-[#35B878] group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform shadow-xs">
               <Plus className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-bold text-white">+ Barang Masuk</p>
-              <p className="text-xs text-[#8B949E]">Input stok dari vendor</p>
+              <p className="text-sm font-bold text-gray-900">+ Barang Masuk</p>
+              <p className="text-xs text-gray-500 font-medium">Input stok dari vendor / supplier</p>
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-[#8B949E] group-hover:text-white group-hover:translate-x-1 transition-all hidden sm:block" />
+          <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-1 transition-all hidden sm:block" />
         </button>
 
         <button
           onClick={() => onNavigate('transactions', 'OUT')}
-          className="bg-[#161C23] hover:bg-[#1B222B] border border-[#29313B] hover:border-[#E05A5A]/50 p-4 rounded-2xl flex items-center justify-between transition-all group active:scale-[0.98]"
+          className="bg-white hover:bg-amber-50/40 border border-gray-200 hover:border-amber-300 p-4 rounded-2xl flex items-center justify-between transition-all group active:scale-[0.99] shadow-[0_2px_8px_rgba(0,0,0,0.03)]"
         >
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-[#E05A5A]/10 border border-[#E05A5A]/20 flex items-center justify-center text-[#E05A5A] group-hover:scale-105 transition-transform">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 group-hover:scale-105 transition-transform shadow-xs">
               <Minus className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div className="text-left">
-              <p className="text-sm font-bold text-white">- Barang Keluar</p>
-              <p className="text-xs text-[#8B949E]">Distribusi ke departemen</p>
+              <p className="text-sm font-bold text-gray-900">- Barang Keluar</p>
+              <p className="text-xs text-gray-500 font-medium">Distribusi ke Housekeeping & Departemen</p>
             </div>
           </div>
-          <ArrowRight className="w-4 h-4 text-[#8B949E] group-hover:text-white group-hover:translate-x-1 transition-all hidden sm:block" />
+          <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-gray-900 group-hover:translate-x-1 transition-all hidden sm:block" />
         </button>
       </div>
 
@@ -144,62 +144,70 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
         {/* KPI 1: Low Stock */}
         <div 
           onClick={() => onNavigate('inventory')}
-          className="bg-brand-card p-4 rounded-2xl border border-brand-border hover:border-amber-500/50 cursor-pointer transition-all"
+          className="bg-white p-4 rounded-2xl border border-gray-200/90 hover:border-amber-400 cursor-pointer transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)] group"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-brand-text-muted uppercase tracking-wider">Stok Menipis</span>
-            <AlertTriangle className={cn("w-4 h-4", kpis.lowStockCount > 0 ? "text-amber-500" : "text-brand-text-muted")} />
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Stok Menipis</span>
+            <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+              <AlertTriangle className="w-3.5 h-3.5" />
+            </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className={cn("text-2xl font-black", kpis.lowStockCount > 0 ? "text-amber-400" : "text-white")}>
+            <span className={cn("text-2xl font-black", kpis.lowStockCount > 0 ? "text-amber-700" : "text-gray-900")}>
               {kpis.lowStockCount}
             </span>
-            <span className="text-xs text-brand-text-muted">Item</span>
+            <span className="text-xs font-semibold text-gray-500">Item</span>
           </div>
         </div>
 
         {/* KPI 2: Today Incoming */}
         <div 
           onClick={() => onNavigate('transactions', 'IN')}
-          className="bg-brand-card p-4 rounded-2xl border border-brand-border hover:border-emerald-500/50 cursor-pointer transition-all"
+          className="bg-white p-4 rounded-2xl border border-gray-200/90 hover:border-emerald-400 cursor-pointer transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)] group"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-brand-text-muted uppercase tracking-wider">Barang Masuk</span>
-            <ArrowDownCircle className="w-4 h-4 text-emerald-500" />
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Barang Masuk</span>
+            <div className="w-6 h-6 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <ArrowDownCircle className="w-3.5 h-3.5" />
+            </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-emerald-400">{kpis.todayInQty}</span>
-            <span className="text-xs text-brand-text-muted">Pcs hari ini</span>
+            <span className="text-2xl font-black text-emerald-600">{kpis.todayInQty}</span>
+            <span className="text-xs font-semibold text-gray-500">Pcs hari ini</span>
           </div>
         </div>
 
         {/* KPI 3: Today Outgoing */}
         <div 
           onClick={() => onNavigate('transactions', 'OUT')}
-          className="bg-brand-card p-4 rounded-2xl border border-brand-border hover:border-purple-500/50 cursor-pointer transition-all"
+          className="bg-white p-4 rounded-2xl border border-gray-200/90 hover:border-purple-400 cursor-pointer transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)] group"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-brand-text-muted uppercase tracking-wider">Barang Keluar</span>
-            <ArrowUpCircle className="w-4 h-4 text-purple-500" />
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Barang Keluar</span>
+            <div className="w-6 h-6 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+              <ArrowUpCircle className="w-3.5 h-3.5" />
+            </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-purple-400">{kpis.todayOutQty}</span>
-            <span className="text-xs text-brand-text-muted">Pcs hari ini</span>
+            <span className="text-2xl font-black text-purple-600">{kpis.todayOutQty}</span>
+            <span className="text-xs font-semibold text-gray-500">Pcs hari ini</span>
           </div>
         </div>
 
         {/* KPI 4: Total SKU */}
         <div 
           onClick={() => onNavigate('inventory')}
-          className="bg-brand-card p-4 rounded-2xl border border-brand-border hover:border-blue-500/50 cursor-pointer transition-all"
+          className="bg-white p-4 rounded-2xl border border-gray-200/90 hover:border-blue-400 cursor-pointer transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)] group"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-bold text-brand-text-muted uppercase tracking-wider">Total Barang</span>
-            <Layers className="w-4 h-4 text-blue-500" />
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Barang</span>
+            <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+              <Layers className="w-3.5 h-3.5" />
+            </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-white">{kpis.totalItems}</span>
-            <span className="text-xs text-brand-text-muted">SKU aktif</span>
+            <span className="text-2xl font-black text-gray-900">{kpis.totalItems}</span>
+            <span className="text-xs font-semibold text-gray-500">SKU aktif</span>
           </div>
         </div>
       </div>
@@ -207,16 +215,18 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
       {/* Main Content Grid: Low Stock Alert & Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Stok Perlu Perhatian */}
-        <div className="bg-brand-card p-4 md:p-5 rounded-2xl border border-brand-border flex flex-col justify-between">
+        <div className="bg-white p-4 md:p-5 rounded-2xl border border-gray-200/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-amber-500" />
-                <h2 className="text-sm md:text-base font-bold text-white">Stok Perlu Perhatian</h2>
+                <div className="w-6 h-6 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                </div>
+                <h2 className="text-sm md:text-base font-bold text-gray-900">Stok Perlu Perhatian</h2>
               </div>
               <button 
                 onClick={() => onNavigate('inventory')}
-                className="text-xs font-bold text-brand-accent hover:underline flex items-center gap-1"
+                className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1"
               >
                 <span>Lihat Stok</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -224,12 +234,12 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
             </div>
 
             {loading ? (
-              <div className="py-8 text-center text-xs text-brand-text-muted animate-pulse">Memuat data stok...</div>
+              <div className="py-8 text-center text-xs text-gray-500 animate-pulse font-medium">Memuat data stok...</div>
             ) : lowStockItems.length === 0 ? (
-              <div className="py-8 text-center flex flex-col items-center justify-center text-emerald-400 gap-2 bg-emerald-500/5 rounded-xl border border-emerald-500/20">
-                <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+              <div className="py-8 text-center flex flex-col items-center justify-center text-emerald-700 gap-2 bg-emerald-50/50 rounded-xl border border-emerald-200">
+                <CheckCircle2 className="w-7 h-7 text-emerald-600" />
                 <p className="text-xs font-bold">Semua stok aman!</p>
-                <p className="text-[10px] text-brand-text-muted">Tidak ada barang yang menyentuh batas minimum.</p>
+                <p className="text-[11px] text-gray-500">Tidak ada barang yang menyentuh batas minimum.</p>
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -237,18 +247,18 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
                   <div 
                     key={item.id}
                     onClick={() => onNavigate('inventory')}
-                    className="p-3 bg-brand-dark/60 hover:bg-brand-dark rounded-xl border border-brand-border flex items-center justify-between cursor-pointer transition-all"
+                    className="p-3 bg-gray-50/70 hover:bg-gray-100/80 rounded-xl border border-gray-200 flex items-center justify-between cursor-pointer transition-all"
                   >
                     <div>
-                      <p className="text-xs md:text-sm font-bold text-white">{item.name}</p>
-                      <p className="text-[10px] text-brand-text-muted">{item.department || 'General'}</p>
+                      <p className="text-xs md:text-sm font-bold text-gray-900">{item.name}</p>
+                      <p className="text-[10px] text-gray-500 font-medium">{item.department || 'General'}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <span className="text-xs font-black text-amber-400">{item.current_stock} {item.unit}</span>
-                        <p className="text-[9px] text-brand-text-muted">Min: {item.min_stock}</p>
+                        <span className="text-xs font-black text-amber-700">{item.current_stock} {item.unit}</span>
+                        <p className="text-[9px] text-gray-400 font-medium">Min: {item.min_stock}</p>
                       </div>
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[9px] font-black rounded-md uppercase">
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-800 border border-amber-200 text-[9px] font-black rounded-md uppercase">
                         MENIPIS
                       </span>
                     </div>
@@ -260,16 +270,18 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
         </div>
 
         {/* Aktivitas Terbaru */}
-        <div className="bg-brand-card p-4 md:p-5 rounded-2xl border border-brand-border flex flex-col justify-between">
+        <div className="bg-white p-4 md:p-5 rounded-2xl border border-gray-200/90 shadow-[0_2px_8px_rgba(0,0,0,0.03)] flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-brand-accent" />
-                <h2 className="text-sm md:text-base font-bold text-white">Aktivitas Terbaru</h2>
+                <div className="w-6 h-6 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                  <Activity className="w-3.5 h-3.5" />
+                </div>
+                <h2 className="text-sm md:text-base font-bold text-gray-900">Aktivitas Terbaru</h2>
               </div>
               <button 
                 onClick={() => onNavigate('transactions')}
-                className="text-xs font-bold text-brand-accent hover:underline flex items-center gap-1"
+                className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1"
               >
                 <span>Lihat Semua</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -277,35 +289,35 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
             </div>
 
             {loading ? (
-              <div className="py-8 text-center text-xs text-brand-text-muted animate-pulse">Memuat aktivitas...</div>
+              <div className="py-8 text-center text-xs text-gray-500 animate-pulse font-medium">Memuat aktivitas...</div>
             ) : recentTransactions.length === 0 ? (
-              <div className="py-8 text-center text-xs text-brand-text-muted italic">Belum ada transaksi recorded.</div>
+              <div className="py-8 text-center text-xs text-gray-500 italic">Belum ada transaksi recorded.</div>
             ) : (
               <div className="space-y-2.5">
                 {recentTransactions.map((tx) => (
                   <div 
                     key={tx.id}
-                    className="p-3 bg-brand-dark/60 rounded-xl border border-brand-border flex items-center justify-between"
+                    className="p-3 bg-gray-50/70 rounded-xl border border-gray-200 flex items-center justify-between"
                   >
                     <div className="flex items-center gap-3">
                       <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                        tx.type === 'IN' ? "bg-emerald-500/20 text-emerald-400" : "bg-purple-500/20 text-purple-400"
+                        "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border",
+                        tx.type === 'IN' ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-purple-50 border-purple-200 text-purple-600"
                       )}>
                         {tx.type === 'IN' ? <ArrowDownCircle className="w-4 h-4" /> : <ArrowUpCircle className="w-4 h-4" />}
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-white line-clamp-1">
+                        <p className="text-xs font-bold text-gray-900 line-clamp-1">
                           {tx.items?.name || 'Barang'}
                         </p>
-                        <p className="text-[10px] text-brand-text-muted">
+                        <p className="text-[10px] text-gray-500 font-medium">
                           {tx.department || 'General'} • {formatDistanceToNow(new Date(tx.created_at), { addSuffix: true })}
                         </p>
                       </div>
                     </div>
                     <span className={cn(
                       "text-xs font-extrabold shrink-0 ml-2",
-                      tx.type === 'IN' ? "text-emerald-400" : "text-purple-400"
+                      tx.type === 'IN' ? "text-emerald-700" : "text-purple-700"
                     )}>
                       {tx.type === 'IN' ? '+' : '-'}{tx.quantity} {tx.items?.unit || 'pcs'}
                     </span>

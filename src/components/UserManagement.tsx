@@ -36,7 +36,7 @@ export function UserManagement() {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'staff'>('staff');
+  const [role, setRole] = useState<'admin' | 'staff' | 'hk' | 'logistik'>('staff');
   const [password, setPassword] = useState(''); // For new users
   const [showPassword, setShowPassword] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string; isFkError?: boolean } | null>(null);
@@ -250,30 +250,30 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 p-4 md:p-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl border border-gray-200/90 shadow-sm">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-white">Manajemen User</h2>
-          <p className="text-brand-text-muted">Kelola administrator dan staff gudang</p>
+          <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Manajemen Pengguna</h2>
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5 font-medium">Kelola hak akses administrator, staf gudang, dan staf HK</p>
         </div>
         <button 
           onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="w-full md:w-auto bg-brand-accent hover:bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-brand-accent/20"
+          className="w-full md:w-auto bg-[#E65C00] hover:bg-[#CF5300] text-white px-5 py-2.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm shadow-orange-500/20 text-xs min-h-[44px]"
         >
-          <UserPlus className="w-5 h-5" />
-          Daftarkan User Baru
+          <UserPlus className="w-4 h-4 stroke-[3]" />
+          <span>Tambah Pengguna Baru</span>
         </button>
       </div>
 
       {notification && (
-        <div className={`p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm font-medium ${
-          notification.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+        <div className={`p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-bold border shadow-xs ${
+          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-red-50 text-red-800 border-red-200'
         }`}>
           <div className="flex items-start sm:items-center gap-3">
             {notification.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-green-400 mt-0.5 sm:mt-0" />
+              <CheckCircle2 className="w-5 h-5 flex-shrink-0 text-emerald-600 mt-0.5 sm:mt-0" />
             ) : (
-              <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-400 mt-0.5 sm:mt-0" />
+              <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600 mt-0.5 sm:mt-0" />
             )}
             <span>{notification.message}</span>
           </div>
@@ -281,7 +281,7 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
             {notification.isFkError && (
               <button
                 onClick={() => setShowSqlFixModal(true)}
-                className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-red-100 hover:bg-red-200 text-red-800 rounded-xl text-xs font-extrabold transition-all flex items-center gap-1.5"
               >
                 <Terminal className="w-3.5 h-3.5" />
                 Lihat Solusi SQL
@@ -292,51 +292,57 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
         </div>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {loading ? (
-          <div className="col-span-full text-center py-12 text-brand-text-muted flex items-center justify-center gap-2">
-            <Activity className="w-5 h-5 animate-spin text-brand-accent" />
-            <span>Memuat data user...</span>
+          <div className="col-span-full text-center py-12 text-gray-500 flex items-center justify-center gap-2 font-medium">
+            <Activity className="w-5 h-5 animate-spin text-amber-600" />
+            <span>Memuat data pengguna...</span>
           </div>
         ) : profiles.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-brand-text-muted">Belum ada data user.</div>
+          <div className="col-span-full text-center py-12 bg-white rounded-2xl border border-gray-200/90 text-gray-500 font-medium">Belum ada data user.</div>
         ) : profiles.map((profile) => (
-          <div key={profile.id} className="bg-brand-card p-6 rounded-2xl border border-brand-border hover:border-brand-accent transition-all group relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={() => handleEdit(profile)} title="Edit User" className="p-2 hover:bg-brand-accent/20 text-brand-accent rounded-lg">
-                <Edit2 className="w-4 h-4" />
+          <div key={profile.id} className="bg-white p-5 rounded-2xl border border-gray-200/90 hover:border-amber-400/80 transition-all group relative shadow-sm">
+            <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => handleEdit(profile)} title="Edit User" className="p-1.5 hover:bg-amber-50 text-amber-600 rounded-lg">
+                <Edit2 className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => handleDelete(profile.id)} title="Hapus User" className="p-2 hover:bg-red-500/20 text-red-500 rounded-lg">
-                <Trash2 className="w-4 h-4" />
+              <button onClick={() => handleDelete(profile.id)} title="Hapus User" className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg">
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 rounded-2xl bg-brand-accent flex items-center justify-center text-white shadow-lg shadow-brand-accent/20 flex-shrink-0">
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-12 h-12 rounded-xl bg-amber-500 flex items-center justify-center text-white shadow-sm flex-shrink-0">
                 {profile.avatar_url ? (
-                  <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover rounded-2xl" />
+                  <img src={profile.avatar_url} alt={profile.full_name} className="w-full h-full object-cover rounded-xl" />
                 ) : (
-                  <UserIcon className="w-8 h-8" />
+                  <UserIcon className="w-6 h-6" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-bold text-white truncate">{profile.full_name || 'Tanpa Nama'}</h3>
+                <h3 className="text-sm font-black text-gray-900 truncate">{profile.full_name || 'Tanpa Nama'}</h3>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${profile.role === 'admin' ? 'bg-purple-500/20 text-purple-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                    {profile.role || 'staff'}
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${
+                    profile.role === 'admin' 
+                      ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                      : profile.role === 'hk'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-blue-50 text-blue-700 border-blue-200'
+                  }`}>
+                    {profile.role === 'hk' ? 'Housekeeping' : profile.role || 'staff'}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 text-sm text-brand-text-muted">
-                <Mail className="w-4 h-4 flex-shrink-0 text-brand-accent/70" />
+            <div className="space-y-2 pt-2 border-t border-gray-100 text-xs">
+              <div className="flex items-center gap-2.5 text-gray-500 font-medium">
+                <Mail className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
                 <span className="truncate">{profile.email || '-'}</span>
               </div>
-              <div className="flex items-center gap-3 text-sm text-brand-text-muted">
-                <Shield className="w-4 h-4 flex-shrink-0 text-brand-accent/70" />
-                <span className="truncate">Username: {profile.username || '-'}</span>
+              <div className="flex items-center gap-2.5 text-gray-500 font-medium">
+                <Shield className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
+                <span className="truncate">Username: <strong className="text-gray-900">{profile.username || '-'}</strong></span>
               </div>
             </div>
           </div>
@@ -345,44 +351,44 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
 
       {/* Modal User */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
-          <div className="bg-brand-card w-full max-w-md rounded-2xl border border-brand-border shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
-            <div className="p-6 border-b border-brand-border flex justify-between items-center bg-brand-dark/30">
-              <h3 className="text-xl font-bold text-white">{editingProfile ? 'Edit User' : 'Daftarkan User Baru'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-brand-text-muted hover:text-white p-2">✕</button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-[100] p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-md rounded-2xl border border-gray-200 shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col my-auto max-h-[90vh]">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h3 className="text-base font-black text-gray-900">{editingProfile ? 'Edit Pengguna' : 'Tambah Pengguna Baru'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-700 p-1.5 rounded-lg">✕</button>
             </div>
             
-            <form id="user-form" onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-grow">
+            <form id="user-form" onSubmit={handleSubmit} className="p-5 space-y-3.5 overflow-y-auto flex-grow text-xs">
               <div>
-                <label className="block text-sm font-medium text-brand-text-muted mb-1">Nama Lengkap</label>
+                <label className="block font-bold text-gray-700 uppercase mb-1">Nama Lengkap</label>
                 <input 
                   type="text" 
                   value={fullName} 
                   onChange={(e) => setFullName(e.target.value)} 
                   placeholder="Contoh: Budi Santoso"
-                  className="w-full" 
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 text-xs font-semibold focus:outline-none focus:border-amber-500 focus:bg-white" 
                   required 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-brand-text-muted mb-1">Username</label>
+                <label className="block font-bold text-gray-700 uppercase mb-1">Username</label>
                 <input 
                   type="text" 
                   value={username} 
                   onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s+/g, ''))} 
                   placeholder="Contoh: budi_gudang"
-                  className="w-full" 
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 text-xs font-semibold focus:outline-none focus:border-amber-500 focus:bg-white" 
                   required 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-brand-text-muted mb-1">Email</label>
+                <label className="block font-bold text-gray-700 uppercase mb-1">Email</label>
                 <input 
                   type="email" 
                   value={email} 
                   onChange={(e) => setEmail(e.target.value)} 
                   placeholder="Contoh: budi@hotelalia.com"
-                  className="w-full" 
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 text-xs font-semibold focus:outline-none focus:border-amber-500 focus:bg-white" 
                   required 
                 />
               </div>
@@ -390,11 +396,11 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
               {!editingProfile && (
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-sm font-medium text-brand-text-muted">Password Akun Baru</label>
+                    <label className="block font-bold text-gray-700 uppercase">Password Akun Baru</label>
                     <button 
                       type="button" 
                       onClick={generateRandomPassword}
-                      className="text-xs text-brand-accent hover:underline flex items-center gap-1"
+                      className="text-[11px] text-amber-600 hover:text-amber-700 font-bold flex items-center gap-1"
                     >
                       <Sparkles className="w-3 h-3" /> Acak Password
                     </button>
@@ -405,38 +411,50 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
                       value={password} 
                       onChange={(e) => setPassword(e.target.value)} 
                       placeholder="Minimal 6 karakter"
-                      className="w-full pr-10" 
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 pr-10 text-gray-900 text-xs font-semibold focus:outline-none focus:border-amber-500 focus:bg-white" 
                       required 
                       minLength={6}
                     />
                     <button 
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-muted hover:text-white"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
-                  <p className="text-[11px] text-brand-text-muted mt-1">Password ini digunakan staf untuk login langsung ke aplikasi.</p>
+                  <p className="text-[11px] text-gray-400 mt-1">Password ini digunakan staf untuk login langsung ke aplikasi.</p>
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-medium text-brand-text-muted mb-1">Role / Peran</label>
-                <select value={role} onChange={(e) => setRole(e.target.value as any)} className="w-full">
+                <label className="block font-bold text-gray-700 uppercase mb-1">Role / Peran</label>
+                <select 
+                  value={role} 
+                  onChange={(e) => setRole(e.target.value as any)} 
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 text-xs font-semibold focus:outline-none focus:border-amber-500 focus:bg-white"
+                >
                   <option value="staff">Staff Gudang</option>
+                  <option value="logistik">Logistik</option>
+                  <option value="hk">Housekeeping (HK)</option>
                   <option value="admin">Administrator</option>
                 </select>
               </div>
             </form>
 
-            <div className="p-6 border-t border-brand-border bg-brand-dark/30 flex flex-col sm:flex-row gap-3">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 bg-brand-dark border border-brand-border py-3 rounded-xl font-bold text-brand-text-muted hover:text-white transition-all">Batal</button>
+            <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row gap-2.5">
+              <button 
+                type="button" 
+                onClick={() => setIsModalOpen(false)} 
+                className="flex-1 bg-white border border-gray-200 hover:bg-gray-100 py-2.5 rounded-xl font-bold text-gray-700 text-xs transition-all min-h-[40px]"
+              >
+                Batal
+              </button>
               <button 
                 type="submit" 
                 form="user-form"
                 disabled={isSubmitting}
-                className="flex-1 bg-brand-accent hover:bg-blue-600 py-3 rounded-xl font-bold text-white transition-all shadow-lg shadow-brand-accent/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-[#E65C00] hover:bg-[#CF5300] py-2.5 rounded-xl font-extrabold text-white text-xs transition-all shadow-sm shadow-orange-500/20 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[40px]"
               >
                 {isSubmitting ? (
                   <>
@@ -449,45 +467,46 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
           </div>
         </div>
       )}
+
       {/* Modal Perbaikan Foreign Key Database */}
       {showSqlFixModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[110] p-4">
-          <div className="bg-brand-card w-full max-w-lg rounded-2xl border border-red-500/30 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-200">
-            <div className="p-6 border-b border-brand-border bg-red-500/10 flex justify-between items-center">
-              <div className="flex items-center gap-3 text-red-400 font-bold">
-                <Terminal className="w-5 h-5" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[110] p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col animate-in zoom-in duration-200">
+            <div className="p-5 border-b border-gray-100 bg-red-50 flex justify-between items-center">
+              <div className="flex items-center gap-2.5 text-red-700 font-black text-sm">
+                <Terminal className="w-4 h-4" />
                 <span>Perbaiki Relasi Foreign Key Database</span>
               </div>
-              <button onClick={() => setShowSqlFixModal(false)} className="text-brand-text-muted hover:text-white p-1.5">✕</button>
+              <button onClick={() => setShowSqlFixModal(false)} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
             </div>
-            <div className="p-6 space-y-4 text-sm">
-              <p className="text-brand-text-muted leading-relaxed">
-                Tabel <code className="text-brand-accent bg-brand-dark px-1.5 py-0.5 rounded">profiles</code> Anda saat ini masih mengunci ID ke <code className="text-brand-accent bg-brand-dark px-1.5 py-0.5 rounded">auth.users</code>. Untuk mengizinkan manajemen staf & user langsung dari aplikasi tanpa error:
+            <div className="p-5 space-y-3 text-xs">
+              <p className="text-gray-600 leading-relaxed">
+                Tabel <code className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">profiles</code> Anda saat ini masih mengunci ID ke <code className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">auth.users</code>. Untuk mengizinkan manajemen staf & user langsung dari aplikasi tanpa error:
               </p>
 
-              <ol className="list-decimal list-inside space-y-1.5 text-xs text-brand-text-muted bg-brand-dark/50 p-3 rounded-xl border border-brand-border">
+              <ol className="list-decimal list-inside space-y-1 text-xs text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-200">
                 <li>Buka dashboard <strong>Supabase &gt; SQL Editor</strong>.</li>
                 <li>Salin perintah SQL di bawah ini dan paste ke SQL Editor.</li>
                 <li>Klik tombol <strong>Run</strong> di Supabase.</li>
               </ol>
 
               <div className="relative">
-                <pre className="bg-black/80 text-emerald-400 p-4 rounded-xl text-xs font-mono overflow-x-auto border border-brand-border max-h-48">
+                <pre className="bg-gray-900 text-emerald-400 p-4 rounded-xl text-xs font-mono overflow-x-auto border border-gray-800 max-h-48">
                   {fixSqlScript}
                 </pre>
                 <button
                   onClick={copySqlFix}
-                  className="absolute top-3 right-3 bg-brand-accent hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md transition-all"
+                  className="absolute top-2.5 right-2.5 bg-[#E65C00] hover:bg-[#CF5300] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all"
                 >
                   {copiedSql ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   {copiedSql ? 'Tersalin!' : 'Salin SQL'}
                 </button>
               </div>
             </div>
-            <div className="p-4 border-t border-brand-border bg-brand-dark/30 flex justify-end gap-3">
+            <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-end gap-3">
               <button
                 onClick={() => setShowSqlFixModal(false)}
-                className="bg-brand-accent hover:bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
+                className="bg-[#E65C00] hover:bg-[#CF5300] text-white px-5 py-2 rounded-xl font-bold text-xs transition-all"
               >
                 Saya Mengerti / Tutup
               </button>

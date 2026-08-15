@@ -1,35 +1,37 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-dark: #0B0F14;
-  --color-brand-surface: #11161D;
-  --color-brand-card: #161C23;
-  --color-brand-elevated: #1B222B;
-  --color-brand-accent: #D4A72C;
-  --color-brand-accent-hover: #E2B84B;
-  --color-brand-accent-dark: #9A761C;
-  --color-brand-text-muted: #8B949E;
-  --color-brand-border: #29313B;
-  --color-brand-divider: #252C35;
-  --color-success: #35B878;
-  --color-danger: #E05A5A;
-  --color-warning: #D9A441;
-  --color-info: #5B8DEF;
+  --color-brand-dark: #F7F8FA;
+  --color-brand-surface: #FFFFFF;
+  --color-brand-card: #FFFFFF;
+  --color-brand-elevated: #F9FAFB;
+  --color-brand-accent: #E65C00;
+  --color-brand-accent-hover: #CF5300;
+  --color-brand-accent-dark: #9A3412;
+  --color-brand-text-muted: #6B7280;
+  --color-brand-border: #E5E7EB;
+  --color-brand-divider: #F3F4F6;
+  --color-success: #10B981;
+  --color-danger: #EF4444;
+  --color-warning: #F59E0B;
+  --color-info: #3B82F6;
 }
 
 body {
-  background-color: var(--color-brand-dark);
-  color: #F0F6FC;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #F7F8FA;
+  color: #111827;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 @layer base {
   input, select, textarea {
-    @apply bg-[#161C23] border border-[#29313B] rounded-xl px-3.5 py-2.5 text-white placeholder:text-[#8B949E] focus:outline-none focus:border-[#D4A72C] transition-colors text-sm;
+    @apply bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#E65C00] focus:ring-1 focus:ring-[#E65C00] transition-colors text-sm;
   }
   
   option {
-    @apply bg-[#161C23] text-white;
+    @apply bg-white text-gray-900;
   }
 }
+
 

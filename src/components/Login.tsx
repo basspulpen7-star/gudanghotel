@@ -169,18 +169,19 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-brand-dark p-4">
-      <div className="max-w-md w-full bg-brand-card p-8 rounded-2xl border border-brand-border shadow-2xl">
+    <div className="min-h-screen flex items-center justify-center bg-[#F7F8FA] p-4 font-sans">
+      <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-gray-200/90 shadow-xl shadow-gray-200/40">
         <div className="flex flex-col items-center mb-6">
-          <div className="w-16 h-16 bg-brand-accent rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-brand-accent/20">
-            <Hotel className="w-10 h-10 text-white" />
+          <div className="w-14 h-14 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center mb-3 text-amber-600 shadow-xs">
+            <Hotel className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Hotel Alia Matraman</h1>
-          <p className="text-sm text-brand-text-muted mt-1">Warehouse Management System</p>
+          <span className="text-[11px] font-extrabold text-amber-600 uppercase tracking-widest">HOTEL ALIA</span>
+          <h1 className="text-xl font-black text-gray-900 tracking-tight mt-0.5">Warehouse System</h1>
+          <p className="text-xs text-gray-500 mt-1 font-medium">Hotel Alia Matraman</p>
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex bg-brand-dark p-1 rounded-xl mb-6 border border-brand-border">
+        <div className="flex bg-gray-100 p-1 rounded-xl mb-6 border border-gray-200/80">
           <button
             type="button"
             onClick={() => {
@@ -188,13 +189,13 @@ export function Login() {
               setError(null);
               setSuccessMessage(null);
             }}
-            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
               !isSignUp
-                ? 'bg-brand-accent text-white shadow-md'
-                : 'text-brand-text-muted hover:text-white'
+                ? 'bg-white text-gray-900 shadow-sm border border-gray-200/60'
+                : 'text-gray-500 hover:text-gray-900'
             }`}
           >
-            <LogIn className="w-4 h-4" />
+            <LogIn className="w-3.5 h-3.5" />
             Masuk
           </button>
           <button
@@ -204,51 +205,51 @@ export function Login() {
               setError(null);
               setSuccessMessage(null);
             }}
-            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
               isSignUp
-                ? 'bg-brand-accent text-white shadow-md'
-                : 'text-brand-text-muted hover:text-white'
+                ? 'bg-white text-gray-900 shadow-sm border border-gray-200/60'
+                : 'text-gray-500 hover:text-gray-900'
             }`}
           >
-            <UserPlus className="w-4 h-4" />
+            <UserPlus className="w-3.5 h-3.5" />
             Daftar Baru
           </button>
         </div>
 
         {error && (
-          <div className="p-3.5 mb-5 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs space-y-2.5 leading-relaxed animate-in fade-in duration-200">
+          <div className="p-3.5 mb-5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs space-y-2.5 leading-relaxed animate-in fade-in duration-200">
             <div className="flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>{error}</span>
+              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+              <span className="font-semibold">{error}</span>
             </div>
 
             {isEmailUnconfirmed && (
-              <div className="pt-2 border-t border-red-500/20 space-y-2 text-[11px] text-red-300">
+              <div className="pt-2 border-t border-red-200 space-y-2 text-[11px] text-red-600">
                 <p>
                   <strong>Cara menonaktifkan konfirmasi email:</strong> Buka Supabase Dashboard &rarr; <strong>Authentication</strong> &rarr; <strong>Providers</strong> &rarr; <strong>Email</strong> &rarr; matikan toggle <strong>"Confirm email"</strong> &rarr; <strong>Save</strong>.
                 </p>
-                <p className="text-[10px] text-red-400">
+                <p className="text-[10px] text-red-500">
                   Untuk akun yang sudah terdaftar tapi belum dikonfirmasi: buka menu <strong>Authentication &rarr; Users</strong> di Supabase, klik ikon <strong>...</strong> pada user lalu pilih <strong>"Confirm user"</strong>.
                 </p>
               </div>
             )}
 
             {isRateLimited && (
-              <div className="pt-2 border-t border-red-500/20 space-y-2 text-[11px] text-red-300">
-                <p className="font-semibold text-red-200">
+              <div className="pt-2 border-t border-red-200 space-y-2 text-[11px] text-red-600">
+                <p className="font-semibold text-red-800">
                   Solusi Cepat Mengatasi Batas Rate Limit Supabase:
                 </p>
-                <ol className="list-decimal list-inside space-y-1 text-[10px] text-red-300">
+                <ol className="list-decimal list-inside space-y-1 text-[10px] text-red-700">
                   <li>Buka <strong>Supabase Dashboard</strong> &rarr; <strong>Authentication</strong> &rarr; <strong>Providers</strong> &rarr; <strong>Email</strong>.</li>
-                  <li>Matikan toggle <strong>"Confirm email"</strong> &rarr; klik <strong>Save</strong> (setelah dimatikan, pendaftaran tidak akan memicu pengiriman email sehingga tidak akan terkena batas rate limit).</li>
-                  <li>Atau tambahkan pengguna secara instan melalui menu <strong>Authentication</strong> &rarr; <strong>Users</strong> &rarr; <strong>Add User</strong> &rarr; <strong>Create User</strong> (isi Email & Password, centang Auto Confirm).</li>
+                  <li>Matikan toggle <strong>"Confirm email"</strong> &rarr; klik <strong>Save</strong>.</li>
+                  <li>Atau tambahkan pengguna secara instan melalui menu <strong>Authentication</strong> &rarr; <strong>Users</strong> &rarr; <strong>Add User</strong>.</li>
                 </ol>
               </div>
             )}
 
             {isInvalidCredentials && !isSignUp && (
-              <div className="pt-2 border-t border-red-500/20 flex items-center justify-between text-[11px]">
-                <span className="text-red-300">Belum memiliki akun?</span>
+              <div className="pt-2 border-t border-red-200 flex items-center justify-between text-[11px]">
+                <span className="text-red-700">Belum memiliki akun?</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -256,7 +257,7 @@ export function Login() {
                     setError(null);
                     setIsInvalidCredentials(false);
                   }}
-                  className="font-bold underline text-white hover:text-brand-accent transition-colors ml-2"
+                  className="font-bold underline text-amber-700 hover:text-amber-800 transition-colors ml-2"
                 >
                   Daftar Sekarang
                 </button>
@@ -266,16 +267,16 @@ export function Login() {
         )}
 
         {successMessage && (
-          <div className="p-3.5 mb-5 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-xs flex items-start gap-2.5 leading-relaxed animate-in fade-in duration-200">
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>{successMessage}</span>
+          <div className="p-3.5 mb-5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-start gap-2.5 leading-relaxed animate-in fade-in duration-200">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+            <span className="font-semibold">{successMessage}</span>
           </div>
         )}
 
         <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
           {isSignUp && (
             <div>
-              <label className="block text-xs font-semibold text-brand-text-muted mb-1.5 uppercase tracking-wider">
+              <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
                 Nama Lengkap
               </label>
               <input
@@ -290,7 +291,7 @@ export function Login() {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-brand-text-muted mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
               Alamat Email
             </label>
             <input
@@ -305,7 +306,7 @@ export function Login() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-brand-text-muted mb-1.5 uppercase tracking-wider">
+            <label className="block text-xs font-bold text-gray-700 mb-1.5 uppercase tracking-wider">
               Password
             </label>
             <div className="relative">
@@ -322,21 +323,21 @@ export function Login() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-text-muted hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 aria-label={showPassword ? 'Sembunyikan password' : 'Lihat password'}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
             {isSignUp && (
-              <p className="text-[11px] text-brand-text-muted mt-1">Minimal 6 karakter.</p>
+              <p className="text-[11px] text-gray-500 mt-1">Minimal 6 karakter.</p>
             )}
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 bg-brand-accent hover:bg-blue-600 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-brand-accent/20 flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+            className="w-full mt-2 bg-[#E65C00] hover:bg-[#CF5300] text-white font-extrabold py-3 rounded-xl transition-all shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
           >
             {loading ? (
               <>

@@ -1,14 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase, supabaseUrl, supabaseKey } from '../lib/supabase';
-import { UserProfile } from '../types';
+import { UserProfile, UserRole } from '../types';
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   profile: UserProfile | null;
-  role: 'admin' | 'staff';
+  role: UserRole;
   isAdmin: boolean;
+  isHK: boolean;
+  isLogistik: boolean;
   loading: boolean;
   profileLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; user?: User }>;
@@ -342,13 +344,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Role resolution
-  const userRole: 'admin' | 'staff' = 
-    profile?.role === 'admin' || user?.email === 'admin@hotelalia.com' 
-      ? 'admin' 
-      : 'staff';
+  // Role resolution strictly from user.user_metadata.role or profile.role
+  const rawRole = String(user?.user_metadata?.role || profile?.role || '').toLowerCase().trim();
+  
+  let userRole: UserRole = 'staff';
+  if (rawRole === 'admin') {
+    userRole = 'admin';
+  } else if (rawRole === 'hk' || rawRole === 'housekeeping') {
+    userRole = 'hk';
+  } else if (rawRole === 'logistik') {
+    userRole = 'logistik';
+  } else if (rawRole === 'staff') {
+    userRole = 'staff';
+  } else {
+    // Fallback if role is not set in metadata or profile
+    userRole = 'staff';
+  }
 
   const isAdmin = userRole === 'admin';
+  const isHK = userRole === 'hk';
+  const isLogistik = userRole === 'logistik';
 
   return (
     <AuthContext.Provider
@@ -358,6 +373,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         role: userRole,
         isAdmin,
+        isHK,
+        isLogistik,
         loading,
         profileLoading,
         signIn,

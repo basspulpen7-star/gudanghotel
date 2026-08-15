@@ -65,22 +65,22 @@ export function PWAInstallPrompt() {
   if (!showPrompt) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 md:left-auto md:right-8 md:bottom-8 md:w-80 z-[200] animate-in slide-in-from-bottom duration-300">
-      <div className="bg-brand-card border border-brand-border rounded-2xl shadow-2xl p-4 overflow-hidden relative">
+    <div className="fixed bottom-20 left-4 right-4 md:left-auto md:right-8 md:bottom-8 md:w-80 z-[200] animate-in slide-in-from-bottom duration-300 font-sans">
+      <div className="bg-white border border-gray-200/90 rounded-2xl shadow-xl p-4 overflow-hidden relative">
         <button 
           onClick={closePrompt}
-          className="absolute top-2 right-2 p-1 text-brand-text-muted hover:text-white transition-colors"
+          className="absolute top-2.5 right-2.5 p-1 text-gray-400 hover:text-gray-600 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
 
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-brand-accent/20 flex items-center justify-center flex-shrink-0">
-            <Smartphone className="w-6 h-6 text-brand-accent" />
+        <div className="flex items-start gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0">
+            <Smartphone className="w-5 h-5 text-amber-700" />
           </div>
-          <div className="flex-grow pr-4">
-            <h4 className="text-sm font-bold text-white">Pasang Aplikasi</h4>
-            <p className="text-xs text-brand-text-muted mt-1">
+          <div className="flex-grow pr-3">
+            <h4 className="text-sm font-black text-gray-900">Pasang Aplikasi</h4>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed font-medium">
               {isIOS 
                 ? 'Ketuk ikon "Share" lalu pilih "Add to Home Screen" untuk memasang di iPhone Anda.' 
                 : 'Pasang Gudang Alia di layar utama Anda untuk akses lebih cepat dan mudah.'}
@@ -89,9 +89,9 @@ export function PWAInstallPrompt() {
             {!isIOS && deferredPrompt && (
               <button 
                 onClick={handleInstallClick}
-                className="mt-3 w-full bg-brand-accent text-white text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-brand-accent/90 transition-all"
+                className="mt-3 w-full bg-[#E65C00] hover:bg-[#CF5300] text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all"
               >
-                <Download className="w-3 h-3" />
+                <Download className="w-3.5 h-3.5" />
                 Pasang Sekarang
               </button>
             )}

@@ -11,6 +11,7 @@ import { PurchaseOrders } from './components/PurchaseOrders';
 import { UserManagement } from './components/UserManagement';
 import { DatabaseSetup } from './components/DatabaseSetup';
 import { Settings } from './components/Settings';
+import { HousekeepingRequest } from './components/HousekeepingRequest';
 import { Login } from './components/Login';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { Hotel, ShieldAlert } from 'lucide-react';
@@ -21,6 +22,7 @@ type View =
   | 'suppliers' 
   | 'incoming' 
   | 'outgoing' 
+  | 'housekeeping_request'
   | 'reports' 
   | 'settings' 
   | 'purchase_orders' 
@@ -28,34 +30,43 @@ type View =
   | 'database_setup';
 
 function MainApp() {
-  const { session, user, profile, role, isAdmin, loading, refreshProfile } = useAuth();
-  const [currentView, setCurrentView] = useState<View>('dashboard');
+  const { session, user, profile, role, isAdmin, isHK, loading, refreshProfile } = useAuth();
+  const isHKUser = isHK || role === 'hk' || profile?.role === 'hk' || user?.user_metadata?.role === 'hk';
+  const [currentView, setCurrentView] = useState<View>(isHKUser ? 'housekeeping_request' : 'dashboard');
   const [globalSearch, setGlobalSearch] = useState('');
 
-  // Safeguard: If non-admin user is on an admin-only view, redirect back to dashboard
+  // Safeguard: Role-based view authorization and initial routing
   useEffect(() => {
-    if (!loading && session && !isAdmin) {
-      if (currentView === 'user_management' || currentView === 'database_setup') {
-        console.warn(`[ACCESS DENIED] User with role '${role}' attempted to access '${currentView}'. Redirecting to dashboard.`);
-        setCurrentView('dashboard');
+    if (!loading && session) {
+      if (isHKUser) {
+        // HK role is strictly restricted to housekeeping_request
+        if (currentView !== 'housekeeping_request') {
+          setCurrentView('housekeeping_request');
+        }
+      } else if (!isAdmin) {
+        // Staff/Logistik cannot access admin-only views
+        if (currentView === 'user_management' || currentView === 'database_setup') {
+          console.warn(`[ACCESS DENIED] User with role '${role}' attempted to access '${currentView}'. Redirecting to dashboard.`);
+          setCurrentView('dashboard');
+        }
       }
     }
-  }, [isAdmin, role, currentView, session, loading]);
+  }, [isAdmin, isHKUser, role, currentView, session, loading]);
 
   // Loading Screen while verifying session
   if (loading) {
     return (
-      <div className="min-h-screen bg-brand-dark flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-[#F7F8FA] flex flex-col items-center justify-center p-4 font-sans">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-12 h-12 rounded-xl bg-brand-accent flex items-center justify-center shadow-lg shadow-brand-accent/20 animate-pulse">
+          <div className="w-12 h-12 rounded-2xl bg-[#E65C00] flex items-center justify-center shadow-lg shadow-orange-500/20 animate-pulse">
             <Hotel className="w-6 h-6 text-white" />
           </div>
-          <div className="text-center space-y-2">
-            <h2 className="text-white font-bold text-base tracking-tight">Hotel Alia Matraman</h2>
-            <p className="text-brand-text-muted text-xs">Memuat...</p>
+          <div className="text-center space-y-1.5">
+            <h2 className="text-gray-900 font-black text-base tracking-tight">Hotel Alia Matraman</h2>
+            <p className="text-gray-500 text-xs font-medium">Memuat data...</p>
             <button
               onClick={() => window.location.reload()}
-              className="text-[11px] text-brand-accent hover:underline pt-2 block mx-auto"
+              className="text-xs text-amber-700 font-bold hover:underline pt-2 block mx-auto"
             >
               Muat ulang jika terlalu lama?
             </button>
@@ -82,6 +93,8 @@ function MainApp() {
         return <IncomingGoods globalSearch={globalSearch} />;
       case 'outgoing':
         return <OutgoingGoods globalSearch={globalSearch} />;
+      case 'housekeeping_request':
+        return <HousekeepingRequest globalSearch={globalSearch} />;
       case 'reports':
         return <Reports />;
       case 'purchase_orders':
@@ -89,13 +102,13 @@ function MainApp() {
       case 'user_management':
         if (!isAdmin) {
           return (
-            <div className="p-8 text-center bg-brand-card rounded-2xl border border-brand-border space-y-3">
-              <ShieldAlert className="w-12 h-12 text-red-400 mx-auto" />
-              <h3 className="text-lg font-bold text-white">Akses Ditolak</h3>
-              <p className="text-sm text-brand-text-muted">Halaman ini hanya dapat diakses oleh Administrator.</p>
+            <div className="p-8 text-center bg-white rounded-2xl border border-gray-200/90 shadow-sm space-y-3 font-sans">
+              <ShieldAlert className="w-12 h-12 text-red-500 mx-auto" />
+              <h3 className="text-lg font-black text-gray-900">Akses Ditolak</h3>
+              <p className="text-xs text-gray-500 font-medium">Halaman ini hanya dapat diakses oleh Administrator.</p>
               <button 
                 onClick={() => setCurrentView('dashboard')}
-                className="mt-2 px-4 py-2 bg-brand-accent text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-all"
+                className="mt-2 px-5 py-2.5 bg-[#E65C00] hover:bg-[#CF5300] text-white rounded-xl text-xs font-extrabold shadow-sm transition-all"
               >
                 Kembali ke Dashboard
               </button>
@@ -106,13 +119,13 @@ function MainApp() {
       case 'database_setup':
         if (!isAdmin) {
           return (
-            <div className="p-8 text-center bg-brand-card rounded-2xl border border-brand-border space-y-3">
-              <ShieldAlert className="w-12 h-12 text-red-400 mx-auto" />
-              <h3 className="text-lg font-bold text-white">Akses Ditolak</h3>
-              <p className="text-sm text-brand-text-muted">Halaman ini hanya dapat diakses oleh Administrator.</p>
+            <div className="p-8 text-center bg-white rounded-2xl border border-gray-200/90 shadow-sm space-y-3 font-sans">
+              <ShieldAlert className="w-12 h-12 text-red-500 mx-auto" />
+              <h3 className="text-lg font-black text-gray-900">Akses Ditolak</h3>
+              <p className="text-xs text-gray-500 font-medium">Halaman ini hanya dapat diakses oleh Administrator.</p>
               <button 
                 onClick={() => setCurrentView('dashboard')}
-                className="mt-2 px-4 py-2 bg-brand-accent text-white rounded-xl text-sm font-semibold hover:bg-blue-600 transition-all"
+                className="mt-2 px-5 py-2.5 bg-[#E65C00] hover:bg-[#CF5300] text-white rounded-xl text-xs font-extrabold shadow-sm transition-all"
               >
                 Kembali ke Dashboard
               </button>

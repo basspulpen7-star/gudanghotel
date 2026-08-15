@@ -284,52 +284,52 @@ export function Reports() {
   }, []);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 p-4 md:p-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl border border-gray-200/90 shadow-sm">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-white">Laporan Inventaris</h2>
-          <p className="text-brand-text-muted">Analisis pergerakan stok barang</p>
+          <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Laporan Inventaris</h2>
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5 font-medium">Analisis pergerakan mutasi dan riwayat stok barang</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-          <div className="flex gap-2 bg-brand-card p-1 rounded-xl border border-brand-border w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
+          <div className="flex gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200 w-full sm:w-auto">
             <button 
               onClick={() => setReportCategory('stock')}
-              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${reportCategory === 'stock' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${reportCategory === 'stock' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
             >
-              <Package className="w-4 h-4" />
+              <Package className="w-3.5 h-3.5" />
               Stok
             </button>
             <button 
               onClick={() => setReportCategory('incoming')}
-              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${reportCategory === 'incoming' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${reportCategory === 'incoming' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
             >
-              <Inbox className="w-4 h-4" />
+              <Inbox className="w-3.5 h-3.5" />
               Masuk
             </button>
             <button 
               onClick={() => setReportCategory('outgoing')}
-              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${reportCategory === 'outgoing' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 ${reportCategory === 'outgoing' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
             >
-              <ArrowUpCircle className="w-4 h-4" />
+              <ArrowUpCircle className="w-3.5 h-3.5" />
               Keluar
             </button>
           </div>
-          <div className="flex gap-2 bg-brand-card p-1 rounded-xl border border-brand-border w-full sm:w-auto">
+          <div className="flex gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200 w-full sm:w-auto">
             <button 
               onClick={() => setReportType('daily')}
-              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${reportType === 'daily' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-extrabold transition-all ${reportType === 'daily' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Harian
             </button>
             <button 
               onClick={() => setReportType('monthly')}
-              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${reportType === 'monthly' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-extrabold transition-all ${reportType === 'monthly' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Bulanan
             </button>
             <button 
               onClick={() => setReportType('custom')}
-              className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all ${reportType === 'custom' ? 'bg-brand-accent text-white' : 'text-brand-text-muted hover:text-white'}`}
+              className={`flex-1 px-3 py-2 rounded-lg text-xs font-extrabold transition-all ${reportType === 'custom' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-600 hover:text-gray-900'}`}
             >
               Custom
             </button>
@@ -338,11 +338,11 @@ export function Reports() {
       </div>
 
       {/* Date Selector */}
-      <div className="flex flex-col sm:flex-row items-center justify-between bg-brand-card p-4 rounded-2xl border border-brand-border gap-4">
-        <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-start">
+      <div className="flex flex-col sm:flex-row items-center justify-between bg-white p-4 rounded-2xl border border-gray-200/90 shadow-sm gap-4">
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
           {reportType !== 'custom' && (
-            <button onClick={prevPeriod} className="p-2 hover:bg-brand-dark rounded-lg text-brand-text-muted hover:text-white">
-              <ChevronLeft className="w-5 h-5" />
+            <button onClick={prevPeriod} className="p-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl text-gray-600 hover:text-gray-900 transition-colors">
+              <ChevronLeft className="w-4 h-4" />
             </button>
           )}
           
@@ -352,24 +352,24 @@ export function Reports() {
                 <div className="relative w-full sm:w-auto">
                   <input 
                     type="date"
-                    className="w-full bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-white text-xs font-bold focus:outline-none focus:border-brand-accent"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 text-xs font-bold focus:outline-none focus:border-amber-500 focus:bg-white"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
                   />
                 </div>
-                <span className="text-brand-text-muted text-xs font-bold">s/d</span>
+                <span className="text-gray-400 text-xs font-bold">s/d</span>
                 <div className="relative w-full sm:w-auto">
                   <input 
                     type="date"
-                    className="w-full bg-brand-dark border border-brand-border rounded-lg px-3 py-2 text-white text-xs font-bold focus:outline-none focus:border-brand-accent"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-gray-900 text-xs font-bold focus:outline-none focus:border-amber-500 focus:bg-white"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
                   />
                 </div>
               </div>
             ) : (
-              <label className="flex items-center gap-2 text-white font-bold cursor-pointer hover:text-brand-accent transition-colors">
-                <CalendarIcon className="w-5 h-5 text-brand-accent" />
+              <label className="flex items-center gap-2.5 text-gray-900 font-extrabold cursor-pointer hover:text-amber-600 transition-colors bg-gray-50 border border-gray-200 px-4 py-2 rounded-xl text-xs sm:text-sm">
+                <CalendarIcon className="w-4 h-4 text-amber-600" />
                 {reportType === 'daily' ? format(currentDate, 'dd MMMM yyyy') : format(currentDate, 'MMMM yyyy')}
                 <input 
                   type={reportType === 'daily' ? "date" : "month"}
@@ -389,108 +389,110 @@ export function Reports() {
           </div>
 
           {reportType !== 'custom' && (
-            <button onClick={nextPeriod} className="p-2 hover:bg-brand-dark rounded-lg text-brand-text-muted hover:text-white">
-              <ChevronRight className="w-5 h-5" />
+            <button onClick={nextPeriod} className="p-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 rounded-xl text-gray-600 hover:text-gray-900 transition-colors">
+              <ChevronRight className="w-4 h-4" />
             </button>
           )}
         </div>
         <button 
           onClick={exportToPDF}
-          className="w-full sm:w-auto bg-brand-accent/10 text-brand-accent hover:bg-brand-accent hover:text-white px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition-all"
+          className="w-full sm:w-auto bg-[#E65C00] hover:bg-[#CF5300] text-white px-4 py-2.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm shadow-orange-500/20 text-xs"
         >
-          <Download className="w-4 h-4" />
-          Export PDF
+          <Download className="w-4 h-4 stroke-[3]" />
+          <span>Export PDF</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-        <div className="bg-brand-card p-4 md:p-6 rounded-2xl border border-brand-border">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-500">
-              <ArrowDownCircle className="w-5 h-5 md:w-6 md:h-6" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+        <div className="bg-white p-4 md:p-5 rounded-2xl border border-gray-200/90 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+              <ArrowDownCircle className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[9px] md:text-[10px] text-brand-text-muted uppercase font-bold tracking-wider">Total Barang Masuk</p>
-              <p className="text-lg md:text-2xl font-bold text-white">{totalIn} <span className="text-xs md:text-sm font-normal text-brand-text-muted">Items</span></p>
+              <p className="text-[10px] text-gray-400 uppercase font-extrabold tracking-wider">Total Barang Masuk</p>
+              <p className="text-xl font-black text-gray-900">{totalIn} <span className="text-xs font-medium text-gray-500">Items</span></p>
             </div>
           </div>
         </div>
-        <div className="bg-brand-card p-4 md:p-6 rounded-2xl border border-brand-border">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-500">
-              <ArrowUpCircle className="w-5 h-5 md:w-6 md:h-6" />
+        <div className="bg-white p-4 md:p-5 rounded-2xl border border-gray-200/90 shadow-sm">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+              <ArrowUpCircle className="w-5 h-5" />
             </div>
             <div>
-              <p className="text-[9px] md:text-[10px] text-brand-text-muted uppercase font-bold tracking-wider">Total Barang Keluar</p>
-              <p className="text-lg md:text-2xl font-bold text-white">{totalOut} <span className="text-xs md:text-sm font-normal text-brand-text-muted">Items</span></p>
+              <p className="text-[10px] text-gray-400 uppercase font-extrabold tracking-wider">Total Barang Keluar</p>
+              <p className="text-xl font-black text-gray-900">{totalOut} <span className="text-xs font-medium text-gray-500">Items</span></p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Detailed Table */}
-      <div className="bg-brand-card rounded-2xl border border-brand-border overflow-hidden">
-        <div className="p-4 md:p-6 border-b border-brand-border flex justify-between items-center">
-          <h3 className="font-bold text-white">
+      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden">
+        <div className="p-4 md:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <h3 className="font-black text-sm text-gray-900">
             {reportCategory === 'stock' ? 'Rincian Stok Barang' : 
              reportCategory === 'incoming' ? 'Rincian Barang Masuk' : 'Rincian Barang Keluar'}
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[600px]">
+          <table className="w-full text-left border-collapse min-w-[600px] text-xs">
             <thead>
-              <tr className="bg-brand-dark/50 text-brand-text-muted text-[10px] md:text-xs font-bold uppercase tracking-wider">
+              <tr className="bg-gray-50 text-gray-500 text-[10px] font-extrabold uppercase tracking-wider border-b border-gray-200">
                 {reportCategory === 'stock' ? (
                   <>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Nama Barang</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Dept</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Awal</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Masuk</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Keluar</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Akhir</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Satuan</th>
+                    <th className="px-4 py-3">Nama Barang</th>
+                    <th className="px-4 py-3">Dept</th>
+                    <th className="px-4 py-3">Awal</th>
+                    <th className="px-4 py-3">Masuk</th>
+                    <th className="px-4 py-3">Keluar</th>
+                    <th className="px-4 py-3">Akhir</th>
+                    <th className="px-4 py-3">Satuan</th>
                   </>
                 ) : (
                   <>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Waktu</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Barang</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Jumlah</th>
-                    <th className="px-3 md:px-6 py-3 md:py-4">Catatan</th>
+                    <th className="px-4 py-3">Waktu</th>
+                    <th className="px-4 py-3">Barang</th>
+                    <th className="px-4 py-3">Jumlah</th>
+                    <th className="px-4 py-3">Catatan</th>
                   </>
                 )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-brand-border">
+            <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-brand-text-muted">Loading...</td></tr>
+                <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-gray-500 font-medium">Memuat data laporan...</td></tr>
               ) : (reportCategory === 'stock' ? items : transactions).length === 0 ? (
-                <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-brand-text-muted">Tidak ada data di periode ini.</td></tr>
+                <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-gray-500 font-medium">Tidak ada data di periode ini.</td></tr>
               ) : reportCategory === 'stock' ? (
                 items.map((item) => {
                   const stats = itemStats[item.id] as any || { initial: 0, in: 0, out: 0, final: 0 };
                   return (
-                    <tr key={item.id} className="hover:bg-brand-dark/30 transition-colors">
-                      <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-white text-xs md:text-sm">{item.name}</td>
-                      <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm">{item.department}</td>
-                      <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm">{stats.initial}</td>
-                      <td className="px-3 md:px-6 py-3 md:py-4 text-blue-400 text-xs md:text-sm">+{stats.in}</td>
-                      <td className="px-3 md:px-6 py-3 md:py-4 text-purple-400 text-xs md:text-sm">-{stats.out}</td>
-                      <td className="px-3 md:px-6 py-3 md:py-4 font-bold text-white text-xs md:text-sm">{stats.final}</td>
-                      <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm">{item.unit}</td>
+                    <tr key={item.id} className="hover:bg-amber-50/20 transition-colors">
+                      <td className="px-4 py-3 font-bold text-gray-900">{item.name}</td>
+                      <td className="px-4 py-3 text-gray-500 font-medium">{item.department}</td>
+                      <td className="px-4 py-3 text-gray-600 font-semibold">{stats.initial}</td>
+                      <td className="px-4 py-3 text-emerald-600 font-bold">+{stats.in}</td>
+                      <td className="px-4 py-3 text-red-600 font-bold">-{stats.out}</td>
+                      <td className="px-4 py-3 font-black text-gray-900">{stats.final}</td>
+                      <td className="px-4 py-3 text-gray-500">{item.unit}</td>
                     </tr>
                   );
                 })
               ) : (
                 transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-brand-dark/30 transition-colors">
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted font-mono text-[10px] md:text-sm">
+                  <tr key={tx.id} className="hover:bg-amber-50/20 transition-colors">
+                    <td className="px-4 py-3 text-gray-500 font-mono text-[11px]">
                       {format(new Date(tx.created_at), 'dd/MM HH:mm')}
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 font-medium text-white text-xs md:text-sm">{tx.items?.name}</td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 font-bold text-white text-xs md:text-sm">
-                      {tx.type === 'IN' ? '+' : '-'}{tx.quantity}
+                    <td className="px-4 py-3 font-bold text-gray-900">{tx.items?.name}</td>
+                    <td className="px-4 py-3 font-black text-gray-900">
+                      <span className={tx.type === 'IN' ? 'text-emerald-600' : 'text-red-600'}>
+                        {tx.type === 'IN' ? '+' : '-'}{tx.quantity}
+                      </span>
                     </td>
-                    <td className="px-3 md:px-6 py-3 md:py-4 text-brand-text-muted text-xs md:text-sm italic">{tx.notes || '-'}</td>
+                    <td className="px-4 py-3 text-gray-500 italic">{tx.notes || '-'}</td>
                   </tr>
                 ))
               )}
