@@ -81,8 +81,8 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center bg-[#F7F8FA] p-4 font-sans">
       <div className="max-w-md w-full bg-white p-8 rounded-2xl border border-gray-200/90 shadow-xl shadow-gray-200/40">
         <div className="flex flex-col items-center mb-6">
-          <div className="w-14 h-14 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center mb-3 text-amber-600 shadow-xs">
-            <Hotel className="w-8 h-8" />
+          <div className="w-14 h-14 flex items-center justify-center mb-3">
+            <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
           </div>
           <span className="text-[11px] font-extrabold text-amber-600 uppercase tracking-widest">HOTEL ALIA</span>
           <h1 className="text-xl font-black text-gray-900 tracking-tight mt-0.5">Warehouse System</h1>

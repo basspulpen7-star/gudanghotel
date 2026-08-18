@@ -436,10 +436,16 @@ export const requestService = {
   },
 
   // Complete request and optionally record outgoing goods
-  async completeAndFulfill(request: HKRequest, recordOutgoing: boolean = true): Promise<void> {
+  async completeAndFulfill(
+    request: HKRequest, 
+    recordOutgoing: boolean = true, 
+    fulfilledItems?: HKRequestItem[]
+  ): Promise<void> {
     await this.updateStatus(request.id, 'SELESAI');
 
-    if (recordOutgoing && request.items && request.items.length > 0) {
+    const itemsToProcess = (fulfilledItems && fulfilledItems.length > 0) ? fulfilledItems : (request.items || []);
+
+    if (recordOutgoing && itemsToProcess.length > 0) {
       try {
         const { data: { user } } = await warehouseSupabase.auth.getUser();
         const userId = user?.id;
@@ -447,12 +453,18 @@ export const requestService = {
         // Query existing inventory to match item IDs if missing
         const { data: masterItems } = await warehouseSupabase.from('items').select('id, name, current_stock');
 
-        for (const reqItem of request.items) {
+        for (const reqItem of itemsToProcess) {
+          const qtyToDeduct = Number(reqItem.quantity || 0);
+          if (qtyToDeduct <= 0) continue;
+
           let matchedItemId = reqItem.item_id;
           let matchedCurrentStock = 0;
 
-          if (!matchedItemId && masterItems) {
-            const found = masterItems.find(m => m.name.toLowerCase() === reqItem.item_name.toLowerCase());
+          if (masterItems) {
+            const found = matchedItemId
+              ? masterItems.find(m => m.id === matchedItemId)
+              : masterItems.find(m => m.name.toLowerCase() === reqItem.item_name.toLowerCase());
+
             if (found) {
               matchedItemId = found.id;
               matchedCurrentStock = found.current_stock || 0;
@@ -465,15 +477,15 @@ export const requestService = {
               id: crypto.randomUUID ? crypto.randomUUID() : `tx-${Date.now()}-${Math.random()}`,
               item_id: matchedItemId,
               type: 'OUT',
-              quantity: reqItem.quantity,
+              quantity: qtyToDeduct,
               department: 'Housekeeping',
               notes: `Fulfillment Permintaan HK ${request.request_number || request.id}`,
               user_id: userId,
               created_at: new Date().toISOString()
             }]);
 
-            // Decrement item stock
-            const targetStock = Math.max(0, matchedCurrentStock - reqItem.quantity);
+            // Decrement item stock based on actual issued/fulfilled quantity
+            const targetStock = Math.max(0, matchedCurrentStock - qtyToDeduct);
             await warehouseSupabase.from('items').update({ current_stock: targetStock }).eq('id', matchedItemId);
           }
         }

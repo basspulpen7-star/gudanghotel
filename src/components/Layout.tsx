@@ -127,8 +127,8 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
         {/* Top Header matching the screenshot */}
         <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200/80 px-4 md:px-8 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-600">
-              <Building2 className="w-4 h-4" />
+            <div className="w-8 h-8 flex items-center justify-center">
+              <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
             <div>
               <span className="text-[10px] font-extrabold text-amber-600 tracking-wider uppercase block leading-none">
@@ -170,8 +170,8 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
       )}>
         <div className="p-5 flex justify-between items-center border-b border-gray-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-600">
-              <Building2 className="w-4 h-4" />
+            <div className="w-8 h-8 flex items-center justify-center">
+              <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
             <div>
               <span className="text-[10px] font-extrabold text-amber-600 tracking-wider uppercase block leading-none">
@@ -243,8 +243,8 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
           <div className="flex items-center gap-2 md:gap-4 flex-1">
             {isHKUser ? (
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600">
-                  <Building2 className="w-4 h-4" />
+                <div className="w-7 h-7 flex items-center justify-center">
+                  <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                 </div>
                 <div>
                   <h1 className="text-xs font-bold text-gray-900">HOTEL ALIA</h1>
