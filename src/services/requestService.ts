@@ -4,6 +4,10 @@ import { HKRequest, HKRequestItem, BreakfastRecord } from '../types';
 
 const LOCAL_STORAGE_KEY = 'gudang_alia_hk_requests';
 
+// Short-term memory cache for occupancy query results (30 seconds TTL)
+const occupancyCache: { [dateStr: string]: { timestamp: number; data: any } } = {};
+const CACHE_TTL_MS = 30000;
+
 // Helper function to ensure YYYY-MM-DD date string without timezone shifting
 export const formatDateForDB = (dateInput: any): string => {
   if (!dateInput) return '';
@@ -320,6 +324,12 @@ export const requestService = {
 
     const occupancyDate = formatDateForDB(rawTargetDate);
 
+    // Return cached response if available and fresh (under 30s)
+    const cached = occupancyCache[occupancyDate];
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+      return cached.data;
+    }
+
     console.log('[BREAKFAST DATE]', {
       occupancyDate,
       type: typeof occupancyDate
@@ -392,7 +402,7 @@ export const requestService = {
         return sum + (isFamily ? 4 : 2);
       }, 0);
 
-      return {
+      const result = {
         roomsOccupied: occupiedRows.length,
         guestCount: totalGuests,
         familyRoomsOccupied: familyCount,
@@ -401,6 +411,14 @@ export const requestService = {
         connected: true,
         date: occupancyDate
       };
+
+      // Store in memory cache
+      occupancyCache[occupancyDate] = {
+        timestamp: Date.now(),
+        data: result
+      };
+
+      return result;
     } catch (err: any) {
       console.error('[BREAKFAST QUERY CATCH ERROR]', err);
       return {

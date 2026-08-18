@@ -167,7 +167,6 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
   const fetchOccupancy = async (dateStr: string) => {
     setLoadingOccupancy(true);
     try {
-      await requestService.testBreakfastConnection();
       const occ = await requestService.getOccupancyData(dateStr);
       setOccupancyRooms(occ.roomsOccupied);
       setGuestCount(occ.guestCount);
