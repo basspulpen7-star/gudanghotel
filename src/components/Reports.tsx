@@ -76,33 +76,103 @@ export function Reports() {
     }
 
     try {
+      // Try RPC get_stock_report first for fast DB-side calculation
       const { data, error } = await supabase.rpc('get_stock_report', {
         p_start: start.toISOString(),
         p_end: end.toISOString()
       });
 
-      if (error) throw error;
+      if (!error && data) {
+        const mappedItems: Item[] = [];
+        const stats: Record<string, { initial: number; in: number; out: number; final: number }> = {};
 
-      const mappedItems: Item[] = [];
+        data.forEach((row: any) => {
+          mappedItems.push({
+            id: row.item_id,
+            name: row.item_name,
+            department: row.department,
+            unit: row.unit,
+          } as Item);
+
+          stats[row.item_id] = {
+            initial: Number(row.initial_stock || 0),
+            in: Number(row.in_qty || 0),
+            out: Number(row.out_qty || 0),
+            final: Number(row.final_stock || 0)
+          };
+        });
+
+        setItems(mappedItems);
+        setItemStats(stats as any);
+        return;
+      }
+
+      // If RPC is missing or failed, log and use client-side calculation fallback
+      if (error) {
+        console.warn('[REPORTS] RPC get_stock_report not available on Supabase, using client-side fallback:', error.message);
+      }
+
+      // Client-side Fallback
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('items')
+        .select('*')
+        .order('name');
+
+      if (itemsError) throw itemsError;
+
+      const { data: transData, error: transError } = await supabase
+        .from('transactions')
+        .select('item_id, type, quantity, created_at')
+        .lte('created_at', end.toISOString());
+
+      if (transError) throw transError;
+
       const stats: Record<string, { initial: number; in: number; out: number; final: number }> = {};
 
-      data?.forEach((row: any) => {
-        mappedItems.push({
-          id: row.item_id,
-          name: row.item_name,
-          department: row.department,
-          unit: row.unit,
-        } as Item);
+      itemsData?.forEach(item => {
+        let beforeIn = 0;
+        let beforeOut = 0;
+        let currentIn = 0;
+        let currentOut = 0;
 
-        stats[row.item_id] = {
-          initial: Number(row.initial_stock || 0),
-          in: Number(row.in_qty || 0),
-          out: Number(row.out_qty || 0),
-          final: Number(row.final_stock || 0)
+        transData?.forEach(tx => {
+          if (tx.item_id === item.id) {
+            const txDate = new Date(tx.created_at);
+            if (txDate < start) {
+              if (tx.type === 'IN') beforeIn += tx.quantity;
+              if (tx.type === 'OUT') beforeOut += tx.quantity;
+            } else if (txDate >= start && txDate <= end) {
+              if (tx.type === 'IN') currentIn += tx.quantity;
+              if (tx.type === 'OUT') currentOut += tx.quantity;
+            }
+          }
+        });
+
+        const itemCreatedAt = new Date(item.created_at);
+        const itemCreatedMonth = startOfMonth(itemCreatedAt);
+
+        let initialForPeriod = 0;
+        let finalForPeriod = 0;
+
+        if (start >= itemCreatedMonth) {
+          initialForPeriod = (item.initial_stock || 0) + beforeIn - beforeOut;
+          finalForPeriod = initialForPeriod + currentIn - currentOut;
+        } else {
+          initialForPeriod = 0;
+          currentIn = 0;
+          currentOut = 0;
+          finalForPeriod = 0;
+        }
+
+        stats[item.id] = {
+          initial: initialForPeriod,
+          in: currentIn,
+          out: currentOut,
+          final: finalForPeriod
         };
       });
 
-      setItems(mappedItems);
+      setItems(itemsData || []);
       setItemStats(stats as any);
     } catch (error: any) {
       console.error('Error fetching stock data:', error);

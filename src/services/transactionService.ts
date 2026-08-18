@@ -90,45 +90,127 @@ export const transactionService = {
   },
 
   /**
-   * Atomic Transaction + Stock Update using Supabase RPC
+   * Atomic Transaction + Stock Update using Supabase RPC with fallback
    */
   async createTransaction(params: CreateTransactionParams) {
     const { itemId, type, quantity, department, notes, userId } = params;
 
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
-      'create_transaction_and_update_stock',
-      {
-        p_item_id: itemId,
-        p_type: type,
-        p_quantity: quantity,
-        p_department: department || 'General',
-        p_notes: notes || '',
-        p_user_id: userId
-      }
-    );
+    // Try RPC first for atomic DB operation
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'create_transaction_and_update_stock',
+        {
+          p_item_id: itemId,
+          p_type: type,
+          p_quantity: quantity,
+          p_department: department || 'General',
+          p_notes: notes || '',
+          p_user_id: userId
+        }
+      );
 
-    if (rpcError) {
-      throw new Error(rpcError.message || 'Gagal membuat transaksi');
+      if (!rpcError) return rpcData;
+
+      // If function doesn't exist, log and proceed to fallback
+      if (rpcError.code === 'PGRST202' || rpcError.message?.includes('function')) {
+        console.warn('[TRANSACTION SERVICE] RPC create_transaction_and_update_stock not found, using client fallback');
+      } else {
+        throw new Error(rpcError.message || 'Gagal membuat transaksi');
+      }
+    } catch (e: any) {
+      if (e.message && !e.message.includes('function') && e.code !== 'PGRST202') {
+        throw e;
+      }
     }
 
-    return rpcData;
+    // Client-side fallback
+    const { data: item, error: itemErr } = await supabase
+      .from('items')
+      .select('id, current_stock')
+      .eq('id', itemId)
+      .single();
+
+    if (itemErr || !item) throw new Error('Barang tidak ditemukan');
+
+    if (type === 'OUT' && item.current_stock < quantity) {
+      throw new Error(`Stok tidak mencukupi. Stok tersedia: ${item.current_stock}`);
+    }
+
+    const transId = crypto.randomUUID();
+    const { error: transErr } = await supabase.from('transactions').insert([{
+      id: transId,
+      item_id: itemId,
+      type,
+      quantity,
+      department: department || 'General',
+      notes,
+      user_id: userId
+    }]);
+
+    if (transErr) throw transErr;
+
+    const newStock = type === 'IN' 
+      ? item.current_stock + quantity 
+      : item.current_stock - quantity;
+
+    const { error: stockErr } = await supabase
+      .from('items')
+      .update({ current_stock: Math.max(0, newStock) })
+      .eq('id', itemId);
+
+    if (stockErr) throw stockErr;
+
+    return { id: transId, new_stock: newStock };
   },
 
   /**
-   * Delete transaction and revert stock atomically using Supabase RPC
+   * Delete transaction and revert stock using Supabase RPC with fallback
    */
   async deleteTransaction(transaction: Transaction) {
-    const { data: rpcData, error: rpcError } = await supabase.rpc(
-      'delete_transaction_and_revert_stock',
-      {
-        p_transaction_id: transaction.id
-      }
-    );
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'delete_transaction_and_revert_stock',
+        {
+          p_transaction_id: transaction.id
+        }
+      );
 
-    if (rpcError) {
-      throw new Error(rpcError.message || 'Gagal menghapus transaksi');
+      if (!rpcError) return rpcData;
+
+      if (rpcError.code === 'PGRST202' || rpcError.message?.includes('function')) {
+        console.warn('[TRANSACTION SERVICE] RPC delete_transaction_and_revert_stock not found, using client fallback');
+      } else {
+        throw new Error(rpcError.message || 'Gagal menghapus transaksi');
+      }
+    } catch (e: any) {
+      if (e.message && !e.message.includes('function') && e.code !== 'PGRST202') {
+        throw e;
+      }
     }
 
-    return rpcData;
+    // Client-side fallback
+    const { error: delErr } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', transaction.id);
+
+    if (delErr) throw delErr;
+
+    const { data: item } = await supabase
+      .from('items')
+      .select('id, current_stock')
+      .eq('id', transaction.item_id)
+      .single();
+
+    if (item) {
+      const revertedStock = transaction.type === 'IN'
+        ? item.current_stock - transaction.quantity
+        : item.current_stock + transaction.quantity;
+
+      await supabase
+        .from('items')
+        .update({ current_stock: Math.max(0, revertedStock) })
+        .eq('id', item.id);
+    }
   }
 };
