@@ -107,7 +107,7 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
       {/* Quick Action Buttons */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <button
-          onClick={() => onNavigate('transactions', 'IN')}
+          onClick={() => onNavigate('incoming')}
           className="bg-white hover:bg-emerald-50/40 border border-gray-200 hover:border-emerald-300 p-4 rounded-2xl flex items-center justify-between transition-all group active:scale-[0.99] shadow-[0_2px_8px_rgba(0,0,0,0.03)]"
         >
           <div className="flex items-center gap-3.5">
@@ -123,7 +123,7 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
         </button>
 
         <button
-          onClick={() => onNavigate('transactions', 'OUT')}
+          onClick={() => onNavigate('outgoing')}
           className="bg-white hover:bg-amber-50/40 border border-gray-200 hover:border-amber-300 p-4 rounded-2xl flex items-center justify-between transition-all group active:scale-[0.99] shadow-[0_2px_8px_rgba(0,0,0,0.03)]"
         >
           <div className="flex items-center gap-3.5">
@@ -162,7 +162,7 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
 
         {/* KPI 2: Today Incoming */}
         <div 
-          onClick={() => onNavigate('transactions', 'IN')}
+          onClick={() => onNavigate('incoming')}
           className="bg-white p-4 rounded-2xl border border-gray-200/90 hover:border-emerald-400 cursor-pointer transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)] group"
         >
           <div className="flex items-center justify-between mb-2">
@@ -179,7 +179,7 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
 
         {/* KPI 3: Today Outgoing */}
         <div 
-          onClick={() => onNavigate('transactions', 'OUT')}
+          onClick={() => onNavigate('outgoing')}
           className="bg-white p-4 rounded-2xl border border-gray-200/90 hover:border-purple-400 cursor-pointer transition-all shadow-[0_2px_8px_rgba(0,0,0,0.03)] group"
         >
           <div className="flex items-center justify-between mb-2">
@@ -280,7 +280,7 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
                 <h2 className="text-sm md:text-base font-bold text-gray-900">Aktivitas Terbaru</h2>
               </div>
               <button 
-                onClick={() => onNavigate('transactions')}
+                onClick={() => onNavigate('incoming')}
                 className="text-xs font-bold text-amber-700 hover:text-amber-800 flex items-center gap-1"
               >
                 <span>Lihat Semua</span>

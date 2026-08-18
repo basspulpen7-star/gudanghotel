@@ -112,21 +112,53 @@ export const inventoryService = {
   },
 
   /**
+   * Check if an item has any transactions recorded
+   */
+  async hasTransactions(itemId: string): Promise<boolean> {
+    const { count, error } = await supabase
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('item_id', itemId);
+    if (error) return false;
+    return (count || 0) > 0;
+  },
+
+  /**
    * Add or Edit Item
    */
   async saveItem(itemData: Partial<Item> & { name: string; department: string; unit: string; initial_stock: number; min_stock: number }, id?: string) {
     if (id) {
-      const { error } = await supabase
-        .from('items')
-        .update({
-          name: itemData.name,
-          department: itemData.department,
-          unit: itemData.unit,
-          min_stock: itemData.min_stock
-        })
-        .eq('id', id);
+      const hasTx = await this.hasTransactions(id);
 
-      if (error) throw error;
+      if (hasTx) {
+        // Item already has transactions: do NOT modify initial_stock or current_stock
+        const { error } = await supabase
+          .from('items')
+          .update({
+            name: itemData.name,
+            department: itemData.department,
+            unit: itemData.unit,
+            min_stock: itemData.min_stock
+          })
+          .eq('id', id);
+
+        if (error) throw error;
+      } else {
+        // Item has NO transactions: user can adjust initial_stock, current_stock equals initial_stock
+        const { error } = await supabase
+          .from('items')
+          .update({
+            name: itemData.name,
+            department: itemData.department,
+            unit: itemData.unit,
+            initial_stock: itemData.initial_stock,
+            current_stock: itemData.initial_stock,
+            min_stock: itemData.min_stock
+          })
+          .eq('id', id);
+
+        if (error) throw error;
+      }
     } else {
       const newItemId = crypto.randomUUID();
       const { error } = await supabase

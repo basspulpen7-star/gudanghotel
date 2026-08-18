@@ -100,7 +100,7 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
     const oldQuantity = editingTransaction?.quantity || 0;
     const availableStock = item.current_stock + oldQuantity;
     if (availableStock < quantity) {
-      alert('Stok tidak mencukupi!');
+      alert(`Stok tidak mencukupi! Stok tersedia: ${availableStock} ${item.unit || 'pcs'}, Jumlah yang diminta: ${quantity} ${item.unit || 'pcs'}`);
       return;
     }
 

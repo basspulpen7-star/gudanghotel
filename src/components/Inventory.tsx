@@ -9,11 +9,13 @@ import {
   Activity, 
   ChevronLeft, 
   ChevronRight, 
-  Package, 
   X,
-  Layers
+  SlidersHorizontal,
+  CheckCircle2
 } from 'lucide-react';
 import { inventoryService } from '../services/inventoryService';
+import { transactionService } from '../services/transactionService';
+import { supabase } from '../lib/supabase';
 import { Item } from '../types';
 import { cn } from '../lib/utils';
 
@@ -35,6 +37,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   // Form & Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [editingItemHasTx, setEditingItemHasTx] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -45,6 +48,15 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   const [unit, setUnit] = useState('pcs');
   const [initialStock, setInitialStock] = useState<number | ''>(0);
   const [minStock, setMinStock] = useState<number | ''>(5);
+
+  // Koreksi Stok (Stock Adjustment) State
+  const [isAdjustmentModalOpen, setIsAdjustmentModalOpen] = useState(false);
+  const [adjustmentItem, setAdjustmentItem] = useState<Item | null>(null);
+  const [physicalStockInput, setPhysicalStockInput] = useState<number | ''>(0);
+  const [adjustmentNotes, setAdjustmentNotes] = useState('');
+  const [isSubmittingAdjustment, setIsSubmittingAdjustment] = useState(false);
+  const [adjustmentError, setAdjustmentError] = useState<string | null>(null);
+  const [adjustmentSuccess, setAdjustmentSuccess] = useState<string | null>(null);
 
   const departments = ['Housekeeping', 'Resto', 'Teknik', 'Front Office', 'General'];
 
@@ -96,6 +108,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
     setInitialStock(0);
     setMinStock(5);
     setFormError(null);
+    setEditingItemHasTx(false);
   };
 
   const openAddItemModal = () => {
@@ -104,15 +117,30 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
     setIsModalOpen(true);
   };
 
-  const openEditItemModal = (item: Item) => {
+  const openEditItemModal = async (item: Item) => {
     setEditingItem(item);
     setName(item.name);
     setDepartment(item.department || 'Housekeeping');
     setUnit(item.unit || 'pcs');
-    setInitialStock(item.initial_stock || 0);
-    setMinStock(item.min_stock || 0);
+    setInitialStock(item.initial_stock ?? 0);
+    setMinStock(item.min_stock ?? 0);
     setFormError(null);
+
+    // Check if item has transactions
+    const hasTx = await inventoryService.hasTransactions(item.id);
+    setEditingItemHasTx(hasTx);
+
     setIsModalOpen(true);
+  };
+
+  const openAdjustmentModal = (item?: Item) => {
+    const targetItem = item || (items.length > 0 ? items[0] : null);
+    setAdjustmentItem(targetItem);
+    setPhysicalStockInput(targetItem ? targetItem.current_stock : 0);
+    setAdjustmentNotes('');
+    setAdjustmentError(null);
+    setAdjustmentSuccess(null);
+    setIsAdjustmentModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,8 +152,10 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
       return;
     }
 
-    const numInitial = typeof initialStock === 'number' ? initialStock : parseInt(initialStock || '0', 10);
-    const numMin = typeof minStock === 'number' ? minStock : parseInt(minStock || '0', 10);
+    const parsedInitial = typeof initialStock === 'number' ? initialStock : parseInt(String(initialStock || '0'), 10);
+    const parsedMin = typeof minStock === 'number' ? minStock : parseInt(String(minStock || '0'), 10);
+    const numInitial = isNaN(parsedInitial) ? 0 : Math.max(0, parsedInitial);
+    const numMin = isNaN(parsedMin) ? 0 : Math.max(0, parsedMin);
 
     setIsSubmitting(true);
     try {
@@ -148,6 +178,60 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
       setFormError(err.message || 'Gagal menyimpan barang');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleAdjustmentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdjustmentError(null);
+    setAdjustmentSuccess(null);
+
+    if (!adjustmentItem) {
+      setAdjustmentError('Pilih barang yang ingin dikoreksi.');
+      return;
+    }
+
+    const currentSys = adjustmentItem.current_stock;
+    const parsedPhysical = typeof physicalStockInput === 'number' ? physicalStockInput : parseInt(String(physicalStockInput || '0'), 10);
+    const targetPhysical = isNaN(parsedPhysical) ? 0 : Math.max(0, parsedPhysical);
+    const diff = targetPhysical - currentSys;
+
+    if (diff === 0) {
+      setAdjustmentError('Stok fisik sama dengan stok sistem. Tidak ada selisih yang perlu dikoreksi.');
+      return;
+    }
+
+    setIsSubmittingAdjustment(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const type = diff > 0 ? 'IN' : 'OUT';
+      const quantity = Math.abs(diff);
+      const noteText = adjustmentNotes.trim() 
+        ? `Koreksi Stok (Penyesuaian Fisik): ${adjustmentNotes.trim()}` 
+        : `Koreksi Stok (Penyesuaian Fisik dari ${currentSys} ke ${targetPhysical})`;
+
+      await transactionService.createTransaction({
+        itemId: adjustmentItem.id,
+        type,
+        quantity,
+        department: adjustmentItem.department || 'General',
+        notes: noteText,
+        userId: user?.id
+      });
+
+      setAdjustmentSuccess(`Koreksi stok berhasil! Stok ${adjustmentItem.name} kini disesuaikan menjadi ${targetPhysical} ${adjustmentItem.unit}.`);
+      fetchItemsData();
+
+      setTimeout(() => {
+        setIsAdjustmentModalOpen(false);
+        setAdjustmentSuccess(null);
+      }, 1500);
+    } catch (err: any) {
+      console.error('Stock adjustment error:', err);
+      setAdjustmentError(err.message || 'Gagal melakukan koreksi stok.');
+    } finally {
+      setIsSubmittingAdjustment(false);
     }
   };
 
@@ -186,20 +270,29 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
-      {/* Header & Main Button */}
+      {/* Header & Main Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl border border-gray-200/90 shadow-sm">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Stok Barang (Inventory)</h1>
           <p className="text-xs md:text-sm text-gray-500 mt-0.5 font-medium">Daftar lengkap ketersediaan item inventaris hotel</p>
         </div>
 
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full md:w-auto">
           <button
             onClick={fetchItemsData}
             className="bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 p-2.5 rounded-xl border border-gray-200 transition-all flex items-center justify-center min-h-[44px]"
             title="Refresh Data"
           >
             <Activity className={cn("w-5 h-5", loading && "animate-spin text-amber-600")} />
+          </button>
+
+          <button
+            onClick={() => openAdjustmentModal()}
+            className="flex-1 md:flex-none bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold py-2.5 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border border-blue-200 min-h-[44px]"
+            title="Koreksi Stok Fisik"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            <span>Koreksi Stok</span>
           </button>
 
           <button
@@ -287,12 +380,19 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                       <td className="p-4 text-center">
                         {getStockBadge(item.current_stock, item.min_stock)}
                       </td>
-                      <td className="p-4 text-right text-gray-500 font-semibold">{item.initial_stock || 0}</td>
+                      <td className="p-4 text-right text-gray-500 font-semibold">{item.initial_stock ?? 0}</td>
                       <td className="p-4 text-right font-black text-sm text-gray-900">{item.current_stock}</td>
                       <td className="p-4 text-right text-gray-500 font-medium">{item.min_stock}</td>
                       <td className="p-4 text-center text-gray-600 font-medium">{item.unit || 'pcs'}</td>
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => openAdjustmentModal(item)}
+                            className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
+                            title="Koreksi Stok"
+                          >
+                            <SlidersHorizontal className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => openEditItemModal(item)}
                             className="p-1.5 hover:bg-amber-50 text-amber-600 rounded-lg transition-colors"
@@ -315,7 +415,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
               </table>
             </div>
 
-            {/* Mobile Cards View (One-hand optimized, no horizontal scroll) */}
+            {/* Mobile Cards View */}
             <div className="block md:hidden divide-y divide-gray-100">
               {items.map((item) => (
                 <div key={item.id} className="p-3.5 space-y-2 hover:bg-amber-50/20 transition-colors">
@@ -342,6 +442,13 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                     </div>
 
                     <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openAdjustmentModal(item)}
+                        className="p-2 bg-blue-50 rounded-xl text-blue-600 border border-blue-200 active:scale-95"
+                        title="Koreksi Stok"
+                      >
+                        <SlidersHorizontal className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => openEditItemModal(item)}
                         className="p-2 bg-gray-50 rounded-xl text-amber-600 border border-gray-200 active:scale-95 hover:bg-amber-50"
@@ -408,6 +515,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                 </div>
               )}
 
+              {/* 1. Nama Barang */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Nama Barang *</label>
                 <input
@@ -420,6 +528,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                 />
               </div>
 
+              {/* 2. Departemen & 3. Satuan */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Departemen *</label>
@@ -448,30 +557,50 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* 4. Stok Awal & 5. Minimum Stok Alert */}
+              <div className="space-y-4 pt-1 border-t border-gray-100">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Stok Awal *</label>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-0.5">Stok Awal *</label>
+                  <p className="text-[11px] text-gray-500 mb-1.5 font-medium">Jumlah barang yang tersedia saat barang pertama kali dicatat.</p>
                   <input
                     type="number"
                     inputMode="numeric"
                     min="0"
                     placeholder="0"
                     value={initialStock}
-                    onChange={(e) => setInitialStock(e.target.value ? parseInt(e.target.value, 10) : '')}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                    disabled={Boolean(editingItem && editingItemHasTx)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setInitialStock(val === '' ? '' : parseInt(val, 10));
+                    }}
+                    className={cn(
+                      "w-full border rounded-xl p-3 text-sm font-bold min-h-[44px] transition-colors",
+                      editingItem && editingItemHasTx
+                        ? "bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed"
+                        : "bg-gray-50 border-gray-200 text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white"
+                    )}
                     required
                   />
+                  {editingItem && editingItemHasTx && (
+                    <p className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200 mt-2 font-medium">
+                      🔒 <strong>Stok Awal terkunci:</strong> Barang ini sudah memiliki riwayat transaksi. Stok saat ini berjalan otomatis melalui Barang Masuk/Keluar atau fitur Koreksi Stok.
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Min. Stok Alert *</label>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-0.5">Minimum Stok Alert *</label>
+                  <p className="text-[11px] text-gray-500 mb-1.5 font-medium">Batas minimum stok sebelum muncul peringatan status MENIPIS.</p>
                   <input
                     type="number"
                     inputMode="numeric"
                     min="0"
                     placeholder="5"
                     value={minStock}
-                    onChange={(e) => setMinStock(e.target.value ? parseInt(e.target.value, 10) : '')}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setMinStock(val === '' ? '' : parseInt(val, 10));
+                    }}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
                     required
                   />
@@ -495,6 +624,144 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                 className="flex-1 bg-[#E65C00] hover:bg-[#CF5300] font-extrabold text-xs text-white py-3 rounded-xl transition-all shadow-sm shadow-orange-500/20 min-h-[44px]"
               >
                 {isSubmitting ? 'Menyimpan...' : editingItem ? 'Simpan Perubahan' : 'Tambah Barang'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Koreksi Stok (Stock Adjustment) Modal */}
+      {isAdjustmentModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+                  <SlidersHorizontal className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900 tracking-tight">Koreksi Stok Fisik</h3>
+                  <p className="text-[11px] text-gray-500 font-medium">Sesuaikan stok sistem dengan hasil perhitungan fisik (Stock Opname)</p>
+                </div>
+              </div>
+              <button onClick={() => setIsAdjustmentModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-2">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form id="adjustment-form" onSubmit={handleAdjustmentSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
+              {adjustmentError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 font-medium">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                  <span>{adjustmentError}</span>
+                </div>
+              )}
+
+              {adjustmentSuccess && (
+                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2 font-bold">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                  <span>{adjustmentSuccess}</span>
+                </div>
+              )}
+
+              {/* Pilih Barang */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Pilih Barang *</label>
+                <select
+                  value={adjustmentItem?.id || ''}
+                  onChange={(e) => {
+                    const found = items.find(i => i.id === e.target.value);
+                    if (found) {
+                      setAdjustmentItem(found);
+                      setPhysicalStockInput(found.current_stock);
+                    }
+                  }}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                  required
+                >
+                  {items.map(i => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} ({i.department}) — Stok Sistem: {i.current_stock} {i.unit}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {adjustmentItem && (
+                <>
+                  <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-500 font-bold uppercase">Stok Saat Ini (Sistem):</span>
+                      <span className="font-black text-gray-900 text-sm">
+                        {adjustmentItem.current_stock} {adjustmentItem.unit}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs border-t border-gray-200/80 pt-2">
+                      <span className="text-gray-500 font-bold uppercase">Selisih Koreksi:</span>
+                      {(() => {
+                        const parsedP = typeof physicalStockInput === 'number' ? physicalStockInput : parseInt(String(physicalStockInput || '0'), 10);
+                        const numP = isNaN(parsedP) ? 0 : Math.max(0, parsedP);
+                        const diff = numP - adjustmentItem.current_stock;
+                        if (diff > 0) {
+                          return <span className="font-black text-emerald-600 text-xs">+{diff} {adjustmentItem.unit} (Penambahan)</span>;
+                        } else if (diff < 0) {
+                          return <span className="font-black text-red-600 text-xs">{diff} {adjustmentItem.unit} (Pengurangan)</span>;
+                        }
+                        return <span className="font-bold text-gray-500 text-xs">0 {adjustmentItem.unit} (Sesuai)</span>;
+                      })()}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Stok Fisik Hasil Cek (Jumlah Nyata) *</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      placeholder="Masukkan stok fisik aktual"
+                      value={physicalStockInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPhysicalStockInput(val === '' ? '' : parseInt(val, 10));
+                      }}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-black text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Catatan / Alasan Koreksi</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Hasil Stock Opname, Barang Rusak, Hilang"
+                      value={adjustmentNotes}
+                      onChange={(e) => setAdjustmentNotes(e.target.value)}
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                    />
+                  </div>
+                </>
+              )}
+            </form>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsAdjustmentModalOpen(false)}
+                className="flex-1 bg-white border border-gray-200 py-3 rounded-xl font-bold text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all min-h-[44px]"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                form="adjustment-form"
+                disabled={isSubmittingAdjustment}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 font-extrabold text-xs text-white py-3 rounded-xl transition-all shadow-sm min-h-[44px]"
+              >
+                {isSubmittingAdjustment ? 'Proses Koreksi...' : 'Simpan Koreksi Stok'}
               </button>
             </div>
           </div>
