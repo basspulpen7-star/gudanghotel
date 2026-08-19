@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import { purchaseOrderService } from '../services/purchaseOrderService';
+import { inventoryService } from '../services/inventoryService';
+import { queryCache } from '../lib/queryCache';
+import { useAuth } from '../contexts/AuthContext';
 import { Supplier, Item, PurchaseOrder, PurchaseOrderItem } from '../types';
 import { 
   Plus, 
@@ -27,6 +30,7 @@ import autoTable from 'jspdf-autotable';
 import { PurchaseOrderDocument } from './PurchaseOrderDocument';
 
 export function PurchaseOrders() {
+  const { user } = useAuth();
   const [pos, setPos] = useState<PurchaseOrder[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [items, setItems] = useState<Item[]>([]);
@@ -51,18 +55,30 @@ export function PurchaseOrders() {
     fetchData();
   }, []);
 
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
     setLoading(true);
     try {
-      const [posData, suppliersRes, itemsRes] = await Promise.all([
-        purchaseOrderService.getPurchaseOrders(),
-        supabase.from('suppliers').select('id, name, contact_person, phone, address, category').order('name'),
-        supabase.from('items').select('id, name, unit, current_stock').order('name')
+      const [posData, suppliersData, itemsData] = await Promise.all([
+        purchaseOrderService.getPurchaseOrders(forceRefresh),
+        queryCache.fetchWithCache<Supplier[]>(
+          'suppliers:all',
+          async () => {
+            const { data: res, error } = await supabase
+              .from('suppliers')
+              .select('id, name, contact_person, phone, address, category')
+              .order('name');
+            if (error) throw error;
+            return (res || []) as Supplier[];
+          },
+          60000,
+          forceRefresh
+        ),
+        inventoryService.getCachedItems(forceRefresh)
       ]);
 
       setPos(posData);
-      setSuppliers(suppliersRes.data || []);
-      setItems(itemsRes.data || []);
+      setSuppliers(suppliersData || []);
+      setItems(itemsData || []);
     } catch (error: any) {
       console.error('Error fetching PO data:', error);
       alert(error.message || 'Gagal memuat data Purchase Orders');
@@ -268,12 +284,12 @@ export function PurchaseOrders() {
   const updateStatus = async (po: PurchaseOrder, status: 'completed' | 'cancelled') => {
     try {
       if (status === 'completed') {
-        await purchaseOrderService.completePurchaseOrder(po);
+        await purchaseOrderService.completePurchaseOrder(po, user?.id);
       } else {
         const { error } = await supabase.from('purchase_orders').update({ status }).eq('id', po.id);
         if (error) throw error;
       }
-      fetchData();
+      fetchData(true);
     } catch (error: any) {
       alert('Gagal update status: ' + error.message);
     }

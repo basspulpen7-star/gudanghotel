@@ -25,6 +25,8 @@ import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { inventoryService } from '../services/inventoryService';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
+import { WifiOff } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,6 +40,7 @@ interface LayoutProps {
 
 export function Layout({ children, currentView, setView, user, profile, searchTerm, setSearchTerm }: LayoutProps) {
   const { signOut, isAdmin, isHK } = useAuth();
+  const { isOnline } = useNetworkStatus();
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -132,6 +135,12 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
           </div>
 
           <div className="flex items-center gap-3">
+            {!isOnline && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-800 rounded-lg text-xs font-bold animate-pulse">
+                <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+                Offline
+              </span>
+            )}
             <span className="text-xs md:text-sm font-bold text-gray-800">
               HK • {profile?.full_name || user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'hk'}
             </span>
@@ -286,6 +295,14 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
           </div>
 
           <div className="flex items-center gap-3 md:gap-5">
+            {!isOnline && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-800 rounded-xl text-xs font-bold animate-pulse">
+                <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+                <span className="hidden sm:inline">Koneksi Offline (Cache Aktif)</span>
+                <span className="sm:hidden">Offline</span>
+              </span>
+            )}
+
             {!isHKUser && (
               <div className="relative" ref={notificationRef}>
                 <button 

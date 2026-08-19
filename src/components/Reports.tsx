@@ -112,10 +112,10 @@ export function Reports() {
         console.warn('[REPORTS] RPC get_stock_report not available on Supabase, using client-side fallback:', error.message);
       }
 
-      // Client-side Fallback
+      // Client-side Fallback: Only fetch required fields to save bandwidth
       const { data: itemsData, error: itemsError } = await supabase
         .from('items')
-        .select('*')
+        .select('id, name, department, unit, initial_stock, created_at')
         .order('name');
 
       if (itemsError) throw itemsError;

@@ -222,6 +222,7 @@ export const requestService = {
     notes?: string;
     request_type?: 'occupancy' | 'manual';
     items: Array<{
+      item_id?: string;
       item_name: string;
       quantity: number;
       unit: string;
@@ -262,6 +263,7 @@ export const requestService = {
       items: req.items.map(it => ({
         id: crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`,
         request_id: newRequestId,
+        item_id: it.item_id || undefined,
         item_name: it.item_name,
         quantity: it.quantity,
         unit: it.unit,
@@ -295,11 +297,12 @@ export const requestService = {
         await warehouseSupabase.from('requests').insert([insertPayload]);
       }
 
-      // Insert items
+      // Insert items with item_id if available
       if (newRequest.items && newRequest.items.length > 0) {
         const itemsToInsert = newRequest.items.map(it => ({
           id: it.id,
           request_id: newRequest.id,
+          item_id: it.item_id || null,
           item_name: it.item_name,
           quantity: it.quantity,
           unit: it.unit,
@@ -437,58 +440,97 @@ export const requestService = {
     recordOutgoing: boolean = true, 
     fulfilledItems?: HKRequestItem[]
   ): Promise<void> {
-    await this.updateStatus(request.id, 'SELESAI');
-
     const itemsToProcess = (fulfilledItems && fulfilledItems.length > 0) ? fulfilledItems : (request.items || []);
 
-    if (recordOutgoing && itemsToProcess.length > 0) {
-      try {
-        const { data: { user } } = await warehouseSupabase.auth.getUser();
-        const userId = user?.id;
+    if (!recordOutgoing || itemsToProcess.length === 0) {
+      await this.updateStatus(request.id, 'SELESAI');
+      return;
+    }
 
-        // Use cached items instead of raw query
-        const masterItems = await inventoryService.getCachedItems();
+    let userId: string | undefined = undefined;
+    try {
+      const { data: { user } } = await warehouseSupabase.auth.getUser();
+      userId = user?.id;
+    } catch (e) {
+      // ignore
+    }
 
-        for (const reqItem of itemsToProcess) {
-          const qtyToDeduct = Number(reqItem.quantity || 0);
-          if (qtyToDeduct <= 0) continue;
+    // 1. Try atomic PostgreSQL RPC execution first (1 Single Network Request)
+    try {
+      const itemsPayload = itemsToProcess.map(it => ({
+        item_id: it.item_id || null,
+        item_name: it.item_name,
+        quantity: Number(it.quantity || 0),
+        unit: it.unit || 'pcs',
+        notes: it.notes || ''
+      }));
 
-          let matchedItemId = reqItem.item_id;
-          let matchedCurrentStock = 0;
+      const { data: rpcRes, error: rpcErr } = await warehouseSupabase.rpc('complete_hk_request', {
+        p_request_id: request.id,
+        p_items_json: itemsPayload,
+        p_user_id: userId || null
+      });
 
-          if (masterItems) {
-            const found = matchedItemId
-              ? masterItems.find(m => m.id === matchedItemId)
-              : masterItems.find(m => m.name.toLowerCase() === reqItem.item_name.toLowerCase());
+      if (!rpcErr && rpcRes?.success) {
+        // Update local memory state
+        const list = this.getLocalRequests();
+        const index = list.findIndex(r => r.id === request.id);
+        if (index !== -1) {
+          list[index].status = 'SELESAI';
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+        }
+        queryCache.invalidate('requests');
+        queryCache.invalidate('items');
+        queryCache.invalidate('dashboard');
+        return;
+      }
+    } catch (rpcCatchErr) {
+      console.warn('[REQUEST SERVICE] RPC complete_hk_request notice, using resilient fallback:', rpcCatchErr);
+    }
 
-            if (found) {
-              matchedItemId = found.id;
-              matchedCurrentStock = found.current_stock || 0;
-            }
-          }
+    // 2. Resilient Client Fallback if RPC is not yet executed in database
+    await this.updateStatus(request.id, 'SELESAI');
 
-          if (matchedItemId) {
-            // Insert outgoing transaction
-            await warehouseSupabase.from('transactions').insert([{
-              id: crypto.randomUUID ? crypto.randomUUID() : `tx-${Date.now()}-${Math.random()}`,
-              item_id: matchedItemId,
-              type: 'OUT',
-              quantity: qtyToDeduct,
-              department: 'Housekeeping',
-              notes: `Fulfillment Permintaan HK ${request.request_number || request.id}`,
-              user_id: userId,
-              created_at: new Date().toISOString()
-            }]);
+    try {
+      const masterItems = await inventoryService.getCachedItems();
 
-            // Decrement item stock based on actual issued/fulfilled quantity
-            const targetStock = Math.max(0, matchedCurrentStock - qtyToDeduct);
-            await warehouseSupabase.from('items').update({ current_stock: targetStock }).eq('id', matchedItemId);
+      for (const reqItem of itemsToProcess) {
+        const qtyToDeduct = Number(reqItem.quantity || 0);
+        if (qtyToDeduct <= 0) continue;
+
+        let matchedItemId = reqItem.item_id;
+        let matchedCurrentStock = 0;
+
+        if (masterItems) {
+          const found = matchedItemId
+            ? masterItems.find(m => m.id === matchedItemId)
+            : masterItems.find(m => m.name.toLowerCase() === reqItem.item_name.toLowerCase());
+
+          if (found) {
+            matchedItemId = found.id;
+            matchedCurrentStock = found.current_stock || 0;
           }
         }
-        inventoryService.invalidateCache();
-      } catch (err: any) {
-        console.warn('[REQUEST SERVICE] Auto outgoing transaction notice:', err?.message || err);
+
+        if (matchedItemId) {
+          await warehouseSupabase.from('transactions').insert([{
+            id: crypto.randomUUID ? crypto.randomUUID() : `tx-${Date.now()}-${Math.random()}`,
+            item_id: matchedItemId,
+            type: 'OUT',
+            quantity: qtyToDeduct,
+            department: 'Housekeeping',
+            notes: `Fulfillment Permintaan HK ${request.request_number || request.id}`,
+            user_id: userId,
+            created_at: new Date().toISOString()
+          }]);
+
+          const targetStock = Math.max(0, matchedCurrentStock - qtyToDeduct);
+          await warehouseSupabase.from('items').update({ current_stock: targetStock }).eq('id', matchedItemId);
+        }
       }
+      inventoryService.invalidateCache();
+    } catch (err: any) {
+      console.warn('[REQUEST SERVICE] Auto outgoing transaction fallback notice:', err?.message || err);
     }
   }
 };

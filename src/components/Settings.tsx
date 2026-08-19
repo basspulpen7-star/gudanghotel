@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Mail, Shield, Camera, Save, Loader2, LogOut, Smartphone } from 'lucide-react';
+import { User, Mail, Shield, Camera, Save, Loader2, LogOut, Smartphone, Download, Database, RefreshCw, HardDrive, CheckCircle2, AlertCircle } from 'lucide-react';
+import { backupService } from '../services/backupService';
+import { queryCache } from '../lib/queryCache';
 
 interface SettingsProps {
   user: any;
@@ -10,14 +12,54 @@ interface SettingsProps {
 }
 
 export function Settings({ user, profile, onProfileUpdate }: SettingsProps) {
-  const { signOut, role } = useAuth();
+  const { signOut, role, isAdmin } = useAuth();
   const [displayName, setDisplayName] = useState(profile?.full_name || user?.user_metadata?.display_name || '');
   const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || user?.user_metadata?.avatar_url || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
+  // Backup & Cache states
+  const [exportingJson, setExportingJson] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [backupNotice, setBackupNotice] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [cacheStats, setCacheStats] = useState(queryCache.getStats());
+  const [cacheCleared, setCacheCleared] = useState(false);
+
   const handleLogout = async () => {
     await signOut();
+  };
+
+  const handleExportJson = async () => {
+    setExportingJson(true);
+    setBackupNotice(null);
+    try {
+      await backupService.exportFullBackupJson();
+      setBackupNotice({ type: 'success', text: 'Full Backup JSON berhasil diunduh!' });
+    } catch (err: any) {
+      setBackupNotice({ type: 'error', text: err.message || 'Gagal membuat backup JSON' });
+    } finally {
+      setExportingJson(false);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    setExportingCsv(true);
+    setBackupNotice(null);
+    try {
+      await backupService.exportItemsCsv();
+      setBackupNotice({ type: 'success', text: 'Data Stok CSV berhasil diekspor!' });
+    } catch (err: any) {
+      setBackupNotice({ type: 'error', text: err.message || 'Gagal mengekspor data CSV' });
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
+  const handleClearCache = () => {
+    queryCache.invalidate();
+    setCacheStats(queryCache.getStats());
+    setCacheCleared(true);
+    setTimeout(() => setCacheCleared(false), 3000);
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -173,6 +215,95 @@ export function Settings({ user, profile, onProfileUpdate }: SettingsProps) {
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* Backup & Disaster Recovery Center */}
+          <div className="bg-white border border-gray-200/90 rounded-2xl p-5 md:p-6 shadow-sm space-y-4">
+            <div>
+              <h4 className="text-sm font-black text-gray-900 mb-0.5 flex items-center gap-2">
+                <Database className="w-4 h-4 text-[#E65C00]" />
+                Pusat Backup & Disaster Recovery
+              </h4>
+              <p className="text-gray-500 text-xs">
+                Unduh salinan data lengkap database secara lokal untuk memastikan data aman tanpa biaya tambahan pada Supabase Free Tier.
+              </p>
+            </div>
+
+            {backupNotice && (
+              <div className={`p-3.5 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                backupNotice.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+              }`}>
+                {backupNotice.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />}
+                <span>{backupNotice.text}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <button
+                type="button"
+                disabled={exportingJson}
+                onClick={handleExportJson}
+                className="flex items-center justify-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-4 py-2.5 rounded-xl font-bold text-xs transition-all shadow-xs disabled:opacity-50 min-h-[42px]"
+              >
+                {exportingJson ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 text-emerald-400" />}
+                <span>Download Full Backup (JSON)</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={exportingCsv}
+                onClick={handleExportCsv}
+                className="flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 px-4 py-2.5 rounded-xl font-bold text-xs transition-all shadow-xs disabled:opacity-50 min-h-[42px]"
+              >
+                {exportingCsv ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 text-emerald-600" />}
+                <span>Ekspor Stok Barang (CSV)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Cache & Quota Management */}
+          <div className="bg-white border border-gray-200/90 rounded-2xl p-5 md:p-6 shadow-sm space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h4 className="text-sm font-black text-gray-900 mb-0.5 flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-blue-600" />
+                  Manajemen Cache & Kuota Free Tier
+                </h4>
+                <p className="text-gray-500 text-xs">
+                  Aplikasi menyimpan data master secara lokal untuk mencegah pemborosan kuota API Supabase.
+                </p>
+              </div>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+                Hit Rate {cacheStats.hitRate}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-200/70 text-xs">
+              <div>
+                <p className="text-gray-500 text-[11px]">Request Dicegah</p>
+                <p className="font-black text-gray-900 text-sm">{cacheStats.totalHits} Calls</p>
+              </div>
+              <div>
+                <p className="text-gray-500 text-[11px]">Kunci Cache Aktif</p>
+                <p className="font-black text-gray-900 text-sm">{cacheStats.cachedKeysCount} Data Set</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <button
+                type="button"
+                onClick={handleClearCache}
+                className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2 rounded-xl font-bold text-xs border border-gray-200 transition-all min-h-[40px]"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-gray-600" />
+                <span>Bersihkan Cache & Sinkron Ulang</span>
+              </button>
+              {cacheCleared && (
+                <span className="text-xs text-emerald-600 font-bold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Cache Dibersihkan
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="bg-white border border-gray-200/90 rounded-2xl p-5 md:p-6 shadow-sm">

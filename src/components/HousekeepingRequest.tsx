@@ -97,9 +97,14 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
   const [fulfilledQuantities, setFulfilledQuantities] = useState<{ [itemKey: string]: number }>({});
 
   useEffect(() => {
-    loadMasterItems();
-    loadRequests();
-    fetchOccupancy(selectedDate);
+    const initData = async () => {
+      await Promise.all([
+        loadMasterItems(),
+        loadRequests(),
+        fetchOccupancy(selectedDate)
+      ]);
+    };
+    initData();
   }, []);
 
   useEffect(() => {
@@ -116,9 +121,9 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
   const loadMasterItems = async () => {
     setLoadingMaster(true);
     try {
-      const res = await inventoryService.getItems({ limit: 1000 });
-      if (res && res.data) {
-        setMasterItems(res.data);
+      const items = await inventoryService.getCachedItems();
+      if (items) {
+        setMasterItems(items);
       }
     } catch (e) {
       console.warn('Error loading master items:', e);
@@ -171,8 +176,6 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
       setOccupancyRooms(occ.roomsOccupied);
       setGuestCount(occ.guestCount);
       setOccupancyConnected(occ.connected);
-
-      await checkTodayOrder(dateStr);
     } catch (e: any) {
       console.warn('Failed to fetch occupancy:', e);
       setOccupancyRooms(0);

@@ -100,12 +100,28 @@ export const purchaseOrderService = {
   },
 
   /**
-   * Complete Purchase Order and add stock to inventory
+   * Complete Purchase Order and add stock to inventory atomically via RPC with fallback
    */
-  async completePurchaseOrder(po: PurchaseOrder) {
+  async completePurchaseOrder(po: PurchaseOrder, userId?: string) {
     if (po.status === 'completed') return;
 
-    // 1. Update PO Status
+    // 1. Try atomic PostgreSQL RPC execution first (1 Single Network Request)
+    try {
+      const { data: rpcRes, error: rpcErr } = await supabase.rpc('complete_purchase_order', {
+        p_po_id: po.id,
+        p_user_id: userId || po.user_id || null
+      });
+
+      if (!rpcErr && rpcRes?.success) {
+        queryCache.invalidate('purchase_orders');
+        inventoryService.invalidateCache();
+        return;
+      }
+    } catch (rpcCatchErr) {
+      console.warn('[PO SERVICE] RPC complete_purchase_order notice, using resilient fallback:', rpcCatchErr);
+    }
+
+    // 2. Resilient Client Fallback if RPC is not yet executed in database
     const { error: updateErr } = await supabase
       .from('purchase_orders')
       .update({ status: 'completed' })
@@ -113,12 +129,11 @@ export const purchaseOrderService = {
 
     if (updateErr) throw updateErr;
 
-    // 2. Add stock to inventory & record IN transaction for each item
+    // Add stock to inventory & record IN transaction for each item
     if (po.items && po.items.length > 0) {
       for (const poItem of po.items) {
         if (!poItem.item_id) continue;
 
-        // Fetch current stock
         const { data: item } = await supabase
           .from('items')
           .select('id, current_stock')
@@ -126,13 +141,11 @@ export const purchaseOrderService = {
           .single();
 
         if (item) {
-          // Update item stock
           await supabase
             .from('items')
             .update({ current_stock: item.current_stock + poItem.quantity })
             .eq('id', item.id);
 
-          // Record IN Transaction
           await supabase
             .from('transactions')
             .insert([{
@@ -142,7 +155,7 @@ export const purchaseOrderService = {
               quantity: poItem.quantity,
               department: 'Pembelian PO',
               notes: `Auto-generated from PO #${po.po_number || po.id.slice(0, 8)}`,
-              user_id: po.user_id
+              user_id: userId || po.user_id
             }]);
         }
       }
