@@ -289,7 +289,7 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
     const requesterName = profile?.full_name || user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'hk';
 
     try {
-      const itemsToSubmit: Array<{
+      const rawItemsToSubmit: Array<{
         item_id?: string;
         item_name: string;
         quantity: number;
@@ -300,9 +300,9 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
       if (!occupancyAlreadyOrdered) {
         // Iterate over master items from Warehouse DB
         masterItems.forEach(item => {
-          const qty = quantities[item.id] || 0;
-          if (qty > 0) {
-            itemsToSubmit.push({
+          const qty = Number(quantities[item.id] !== undefined ? quantities[item.id] : 0);
+          if (Number.isFinite(qty) && qty > 0) {
+            rawItemsToSubmit.push({
               item_id: item.id,
               item_name: item.name,
               quantity: qty,
@@ -314,21 +314,28 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
 
         // Include any custom items added via "+ TAMBAH BARANG LAIN"
         customItems.forEach(c => {
-          if (c.quantity > 0) {
-            itemsToSubmit.push({
+          const qty = Number(c.quantity || 0);
+          if (Number.isFinite(qty) && qty > 0) {
+            rawItemsToSubmit.push({
               item_id: c.item_id && !c.id.startsWith('manual-') ? c.item_id : undefined,
               item_name: c.item_name,
-              quantity: c.quantity,
+              quantity: qty,
               unit: c.unit,
               notes: c.notes || 'Barang Tambahan'
             });
           }
         });
 
+        // Strict quantity > 0 filtering
+        const itemsToSubmit = rawItemsToSubmit.filter(item => {
+          const qty = Number(item.quantity);
+          return Number.isFinite(qty) && qty > 0;
+        });
+
         if (itemsToSubmit.length === 0) {
           setNotification({ 
             type: 'error', 
-            message: 'Harap masukkan minimal 1 barang dengan jumlah lebih dari 0.' 
+            message: 'Silakan masukkan jumlah minimal 1 barang yang ingin diminta.' 
           });
           setSubmitting(false);
           return;
@@ -358,21 +365,28 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
       } else {
         // Additional request when main request already sent
         customItems.forEach(c => {
-          if (c.quantity > 0) {
-            itemsToSubmit.push({
+          const qty = Number(c.quantity || 0);
+          if (Number.isFinite(qty) && qty > 0) {
+            rawItemsToSubmit.push({
               item_id: c.item_id || c.id,
               item_name: c.item_name,
-              quantity: c.quantity,
+              quantity: qty,
               unit: c.unit,
               notes: 'Barang Tambahan'
             });
           }
         });
 
+        // Strict quantity > 0 filtering
+        const itemsToSubmit = rawItemsToSubmit.filter(item => {
+          const qty = Number(item.quantity);
+          return Number.isFinite(qty) && qty > 0;
+        });
+
         if (itemsToSubmit.length === 0) {
           setNotification({
             type: 'error',
-            message: 'Harap tambahkan minimal 1 barang tambahan dengan jumlah lebih dari 0 (+ Tambah Barang Lain).'
+            message: 'Silakan masukkan jumlah minimal 1 barang yang ingin diminta.'
           });
           setSubmitting(false);
           return;
@@ -409,14 +423,19 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
     setProcessingId(requestId);
     try {
       if (newStatus === 'SELESAI' && selectedRequest) {
-        const fulfilledPayload = selectedRequest.items?.map(it => {
+        const validRequestItems = (selectedRequest.items || []).filter(item => {
+          const qty = Number(item.quantity);
+          return Number.isFinite(qty) && qty > 0;
+        });
+
+        const fulfilledPayload = validRequestItems.map(it => {
           const key = it.id || it.item_name;
           const qty = fulfilledQuantities[key] !== undefined ? fulfilledQuantities[key] : it.quantity;
           return {
             ...it,
-            quantity: qty
+            quantity: Number(qty)
           };
-        });
+        }).filter(it => Number(it.quantity) > 0);
 
         await requestService.completeAndFulfill(selectedRequest, true, fulfilledPayload);
       } else {
@@ -541,11 +560,22 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
     }
   };
 
+  // Filter valid requests and valid items (strictly quantity > 0)
+  const validRequests = requests
+    .map(r => ({
+      ...r,
+      items: (r.items || []).filter(it => {
+        const qty = Number(it.quantity);
+        return Number.isFinite(qty) && qty > 0;
+      })
+    }))
+    .filter(r => r.items.length > 0);
+
   // Counts for filter chips
-  const countAll = requests.length;
-  const countMenunggu = requests.filter(r => (r.status || '').toUpperCase() === 'MENUNGGU' || (r.status || '').toUpperCase() === 'PENDING').length;
-  const countDiproses = requests.filter(r => (r.status || '').toUpperCase() === 'DIPROSES' || (r.status || '').toUpperCase() === 'PROCESSING').length;
-  const countSelesai = requests.filter(r => (r.status || '').toUpperCase() === 'SELESAI' || (r.status || '').toUpperCase() === 'COMPLETED').length;
+  const countAll = validRequests.length;
+  const countMenunggu = validRequests.filter(r => (r.status || '').toUpperCase() === 'MENUNGGU' || (r.status || '').toUpperCase() === 'PENDING').length;
+  const countDiproses = validRequests.filter(r => (r.status || '').toUpperCase() === 'DIPROSES' || (r.status || '').toUpperCase() === 'PROCESSING').length;
+  const countSelesai = validRequests.filter(r => (r.status || '').toUpperCase() === 'SELESAI' || (r.status || '').toUpperCase() === 'COMPLETED').length;
 
   const searchFilteredMasterItems = masterSearchQuery.trim()
     ? masterItems.filter(m => 
@@ -554,7 +584,7 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
       )
     : masterItems.slice(0, 8);
 
-  const filteredRequests = requests.filter(r => {
+  const filteredRequests = validRequests.filter(r => {
     const s = (r.status || '').toUpperCase();
     if (filterStatus === 'MENUNGGU') return s === 'MENUNGGU' || s === 'PENDING';
     if (filterStatus === 'DIPROSES') return s === 'DIPROSES' || s === 'PROCESSING';
@@ -1462,79 +1492,95 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
               )}
 
               {/* Table / List of items */}
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="font-bold text-gray-800 uppercase tracking-wide text-xs">
-                    Daftar Barang Diminta ({selectedRequest.items?.length || 0})
-                  </span>
-                  {!isHKUser && ((selectedRequest.status || '').toUpperCase() === 'DIPROSES' || (selectedRequest.status || '').toUpperCase() === 'PROCESSING') && (
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                      Logistik dapat menyesuaikan jumlah dipenuhi
-                    </span>
-                  )}
-                </div>
-                <div className="border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[320px]">
-                    <thead className="bg-gray-100 text-gray-600 font-bold text-[10px] uppercase">
-                      <tr>
-                        <th className="p-2.5 w-8 text-center">No</th>
-                        <th className="p-2.5">Nama Barang</th>
-                        <th className="p-2.5 text-center w-20">Diminta</th>
-                        <th className="p-2.5 text-center w-24">Dipenuhi</th>
-                        <th className="p-2.5">Ket</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {(selectedRequest.items || []).map((it, idx) => {
-                        const masterMatch = masterItems.find(m => 
-                          (it.item_id && m.id === it.item_id) || m.name.toLowerCase() === it.item_name.toLowerCase()
-                        );
+              {(() => {
+                const validModalItems = (selectedRequest.items || []).filter(it => {
+                  const qty = Number(it.quantity);
+                  return Number.isFinite(qty) && qty > 0;
+                });
 
-                        const stockDisplay = masterMatch ? `${masterMatch.current_stock} ${masterMatch.unit}` : '-';
-                        const itemKey = it.id || it.item_name;
-                        const currentFulfilledQty = fulfilledQuantities[itemKey] !== undefined ? fulfilledQuantities[itemKey] : it.quantity;
-
-                        const isEditable = !isHKUser && ((selectedRequest.status || '').toUpperCase() === 'DIPROSES' || (selectedRequest.status || '').toUpperCase() === 'PROCESSING');
-
-                        return (
-                          <tr key={idx} className="hover:bg-gray-50/60">
-                            <td className="p-2.5 text-gray-400 font-mono text-center text-xs">{idx + 1}</td>
-                            <td className="p-2.5 font-bold text-gray-900 text-xs">
-                              {it.item_name}
-                              <div className="text-[10px] text-gray-400 font-normal">Stok Gudang: <strong className="text-gray-700">{stockDisplay}</strong></div>
-                            </td>
-                            <td className="p-2.5 text-center whitespace-nowrap">
-                              <span className="font-extrabold text-amber-700 font-mono text-xs mr-1">{it.quantity}</span>
-                              <span className="text-gray-500 text-[11px] font-normal">{it.unit}</span>
-                            </td>
-                            <td className="p-2.5 text-center">
-                              {isEditable ? (
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={currentFulfilledQty}
-                                  onFocus={(e) => e.currentTarget.select()}
-                                  onClick={(e) => e.currentTarget.select()}
-                                  onChange={(e) => {
-                                    const val = Math.max(0, parseInt(e.target.value) || 0);
-                                    setFulfilledQuantities(prev => ({ ...prev, [itemKey]: val }));
-                                  }}
-                                  className="w-16 h-7 text-center font-bold text-xs text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg outline-none font-mono"
-                                />
-                              ) : (
-                                <span className="font-bold text-emerald-700 font-mono text-xs">
-                                  {currentFulfilledQty} {it.unit}
-                                </span>
-                              )}
-                            </td>
-                            <td className="p-2.5 text-gray-500 text-[11px]">{it.notes || '-'}</td>
+                return (
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-bold text-gray-800 uppercase tracking-wide text-xs">
+                        Daftar Barang Diminta ({validModalItems.length})
+                      </span>
+                      {!isHKUser && ((selectedRequest.status || '').toUpperCase() === 'DIPROSES' || (selectedRequest.status || '').toUpperCase() === 'PROCESSING') && (
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                          Logistik dapat menyesuaikan jumlah dipenuhi
+                        </span>
+                      )}
+                    </div>
+                    <div className="border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
+                      <table className="w-full text-left border-collapse min-w-[320px]">
+                        <thead className="bg-gray-100 text-gray-600 font-bold text-[10px] uppercase">
+                          <tr>
+                            <th className="p-2.5 w-8 text-center">No</th>
+                            <th className="p-2.5">Nama Barang</th>
+                            <th className="p-2.5 text-center w-20">Diminta</th>
+                            <th className="p-2.5 text-center w-24">Dipenuhi</th>
+                            <th className="p-2.5">Ket</th>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {validModalItems.map((it, idx) => {
+                            const masterMatch = masterItems.find(m => 
+                              (it.item_id && m.id === it.item_id) || m.name.toLowerCase() === it.item_name.toLowerCase()
+                            );
+
+                            const stockDisplay = masterMatch ? `${masterMatch.current_stock} ${masterMatch.unit}` : '-';
+                            const itemKey = it.id || it.item_name;
+                            const currentFulfilledQty = fulfilledQuantities[itemKey] !== undefined ? fulfilledQuantities[itemKey] : it.quantity;
+
+                            const isEditable = !isHKUser && ((selectedRequest.status || '').toUpperCase() === 'DIPROSES' || (selectedRequest.status || '').toUpperCase() === 'PROCESSING');
+
+                            return (
+                              <tr key={idx} className="hover:bg-gray-50/60">
+                                <td className="p-2.5 text-gray-400 font-mono text-center text-xs">{idx + 1}</td>
+                                <td className="p-2.5 font-bold text-gray-900 text-xs">
+                                  {it.item_name}
+                                  <div className="text-[10px] text-gray-400 font-normal">Stok Gudang: <strong className="text-gray-700">{stockDisplay}</strong></div>
+                                </td>
+                                <td className="p-2.5 text-center whitespace-nowrap">
+                                  <span className="font-extrabold text-amber-700 font-mono text-xs mr-1">{it.quantity}</span>
+                                  <span className="text-gray-500 text-[11px] font-normal">{it.unit}</span>
+                                </td>
+                                <td className="p-2.5 text-center">
+                                  {isEditable ? (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={currentFulfilledQty}
+                                      onFocus={(e) => e.currentTarget.select()}
+                                      onClick={(e) => e.currentTarget.select()}
+                                      onChange={(e) => {
+                                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                                        setFulfilledQuantities(prev => ({ ...prev, [itemKey]: val }));
+                                      }}
+                                      className="w-16 h-7 text-center font-bold text-xs text-emerald-800 bg-emerald-50 border border-emerald-300 rounded-lg outline-none font-mono"
+                                    />
+                                  ) : (
+                                    <span className="font-bold text-emerald-700 font-mono text-xs">
+                                      {currentFulfilledQty} {it.unit}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="p-2.5 text-gray-500 text-[11px]">{it.notes || '-'}</td>
+                              </tr>
+                            );
+                          })}
+                          {validModalItems.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="p-4 text-center text-gray-400 italic text-xs">
+                                Tidak ada barang dengan jumlah lebih dari 0.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Status Action Buttons for Logistik & Admin */}
               {!isHKUser && (

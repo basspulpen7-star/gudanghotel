@@ -87,35 +87,44 @@ export function HousekeepingRequestDocument({ request }: HousekeepingRequestDocu
           DAFTAR BARANG YANG DIMINTA
         </h3>
 
-        <table className="w-full border-collapse border border-gray-400 text-[9pt]">
-          <thead>
-            <tr className="bg-gray-100 border-b border-gray-400">
-              <th className="border-r border-gray-400 py-1.5 px-2 text-center w-[40px] font-bold text-black uppercase">NO</th>
-              <th className="border-r border-gray-400 py-1.5 px-3 text-left font-bold text-black uppercase">NAMA BARANG</th>
-              <th className="border-r border-gray-400 py-1.5 px-3 text-right w-[85px] font-bold text-black uppercase">JUMLAH</th>
-              <th className="border-r border-gray-400 py-1.5 px-2 text-center w-[70px] font-bold text-black uppercase">SATUAN</th>
-              <th className="py-1.5 px-3 text-left w-[180px] font-bold text-black uppercase">KETERANGAN</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(request.items || []).map((item, idx) => (
-              <tr key={idx} className="border-b border-gray-300">
-                <td className="border-r border-gray-300 py-1.5 px-2 text-center font-mono">{idx + 1}</td>
-                <td className="border-r border-gray-300 py-1.5 px-3 font-bold text-black">{item.item_name}</td>
-                <td className="border-r border-gray-300 py-1.5 px-3 text-right font-bold font-mono text-black">{item.quantity}</td>
-                <td className="border-r border-gray-300 py-1.5 px-2 text-center text-gray-900">{item.unit}</td>
-                <td className="py-1.5 px-3 text-gray-800 text-[8.5pt]">{item.notes || '-'}</td>
-              </tr>
-            ))}
-            {(!request.items || request.items.length === 0) && (
-              <tr>
-                <td colSpan={5} className="py-4 text-center text-gray-500 italic">
-                  Tidak ada barang yang diminta.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        {(() => {
+          const validPrintItems = (request.items || []).filter((item) => {
+            const qty = Number(item.quantity);
+            return Number.isFinite(qty) && qty > 0;
+          });
+
+          return (
+            <table className="w-full border-collapse border border-gray-400 text-[9pt]">
+              <thead>
+                <tr className="bg-gray-100 border-b border-gray-400">
+                  <th className="border-r border-gray-400 py-1.5 px-2 text-center w-[40px] font-bold text-black uppercase">NO</th>
+                  <th className="border-r border-gray-400 py-1.5 px-3 text-left font-bold text-black uppercase">NAMA BARANG</th>
+                  <th className="border-r border-gray-400 py-1.5 px-3 text-right w-[85px] font-bold text-black uppercase">JUMLAH</th>
+                  <th className="border-r border-gray-400 py-1.5 px-2 text-center w-[70px] font-bold text-black uppercase">SATUAN</th>
+                  <th className="py-1.5 px-3 text-left w-[180px] font-bold text-black uppercase">KETERANGAN</th>
+                </tr>
+              </thead>
+              <tbody>
+                {validPrintItems.map((item, idx) => (
+                  <tr key={idx} className="border-b border-gray-300">
+                    <td className="border-r border-gray-300 py-1.5 px-2 text-center font-mono">{idx + 1}</td>
+                    <td className="border-r border-gray-300 py-1.5 px-3 font-bold text-black">{item.item_name}</td>
+                    <td className="border-r border-gray-300 py-1.5 px-3 text-right font-bold font-mono text-black">{item.quantity}</td>
+                    <td className="border-r border-gray-300 py-1.5 px-2 text-center text-gray-900">{item.unit}</td>
+                    <td className="py-1.5 px-3 text-gray-800 text-[8.5pt]">{item.notes || '-'}</td>
+                  </tr>
+                ))}
+                {validPrintItems.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-4 text-center text-gray-500 italic">
+                      Tidak ada barang yang diminta.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          );
+        })()}
       </div>
 
       {/* CATATAN (JIKA ADA) */}

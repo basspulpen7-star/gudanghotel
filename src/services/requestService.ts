@@ -78,29 +78,42 @@ export const requestService = {
           }
 
           if (data && data.length > 0) {
-            // Map database response to standardized HKRequest
-            const formatted: HKRequest[] = data.map((r: any) => ({
-              id: r.id,
-              request_number: r.request_number || r.req_number || `REQ-${r.id.slice(0, 4).toUpperCase()}`,
-              department: r.department || 'Housekeeping',
-              requester_name: r.requester_name || r.requested_by || 'Housekeeping Staff',
-              user_id: r.user_id,
-              request_type: r.request_type || (r.notes?.includes('[MANUAL]') ? 'manual' : (r.notes?.includes('[OCCUPANCY]') ? 'occupancy' : undefined)),
-              status: (r.status || 'MENUNGGU').toUpperCase(),
-              occupancy_count: r.occupancy_count || r.rooms_occupied || 0,
-              breakfast_pax: r.breakfast_pax || 0,
-              notes: r.notes || '',
-              created_at: r.created_at || new Date().toISOString(),
-              items: (r.request_items || []).map((it: any) => ({
-                id: it.id,
-                request_id: it.request_id || r.id,
-                item_id: it.item_id,
-                item_name: it.item_name || it.name || 'Barang',
-                quantity: Number(it.quantity || it.quantity_requested || 0),
-                unit: it.unit || 'pcs',
-                notes: it.notes || ''
-              }))
-            }));
+            // Map database response to standardized HKRequest and strictly filter quantity > 0
+            const formatted: HKRequest[] = data
+              .map((r: any) => {
+                const rawItems = r.request_items || [];
+                const validItems: HKRequestItem[] = rawItems
+                  .filter((it: any) => {
+                    const qty = Number(it.quantity ?? it.quantity_requested ?? 0);
+                    return Number.isFinite(qty) && qty > 0;
+                  })
+                  .map((it: any) => ({
+                    id: it.id,
+                    request_id: it.request_id || r.id,
+                    item_id: it.item_id || undefined,
+                    item_name: it.item_name || it.name || 'Barang',
+                    quantity: Number(it.quantity ?? it.quantity_requested ?? 0),
+                    unit: it.unit || 'pcs',
+                    notes: it.notes || ''
+                  }));
+
+                return {
+                  id: r.id,
+                  request_number: r.request_number || r.req_number || `REQ-${r.id.slice(0, 4).toUpperCase()}`,
+                  department: r.department || 'Housekeeping',
+                  requester_name: r.requester_name || r.requested_by || 'Housekeeping Staff',
+                  user_id: r.user_id,
+                  request_type: r.request_type || (r.notes?.includes('[MANUAL]') ? 'manual' : (r.notes?.includes('[OCCUPANCY]') ? 'occupancy' : undefined)),
+                  status: (r.status || 'MENUNGGU').toUpperCase(),
+                  occupancy_count: r.occupancy_count || r.rooms_occupied || 0,
+                  breakfast_pax: r.breakfast_pax || 0,
+                  notes: r.notes || '',
+                  created_at: r.created_at || new Date().toISOString(),
+                  items: validItems
+                };
+              })
+              // Legacy request filter: Exclude requests that have 0 valid items
+              .filter((r: HKRequest) => r.items && r.items.length > 0);
 
             // Cache locally for offline/fallback
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(formatted));
@@ -124,10 +137,20 @@ export const requestService = {
       const cached = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached);
-        // Filter out dummy/mock requests
-        const cleaned = Array.isArray(parsed) 
-          ? parsed.filter((r: HKRequest) => !r.id.startsWith('req-hk-00')) 
+        // Filter out dummy/mock requests and ensure all items have quantity > 0
+        const cleaned: HKRequest[] = Array.isArray(parsed)
+          ? parsed
+              .filter((r: HKRequest) => !r.id.startsWith('req-hk-00'))
+              .map((r: HKRequest) => ({
+                ...r,
+                items: (r.items || []).filter((it: HKRequestItem) => {
+                  const qty = Number(it.quantity);
+                  return Number.isFinite(qty) && qty > 0;
+                })
+              }))
+              .filter((r: HKRequest) => r.items && r.items.length > 0)
           : [];
+
         if (cleaned.length !== (Array.isArray(parsed) ? parsed.length : 0)) {
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleaned));
         }
@@ -229,6 +252,16 @@ export const requestService = {
       notes?: string;
     }>;
   }): Promise<HKRequest> {
+    // 1. Strict Server/Service Validation: Filter items with quantity > 0
+    const validItems = (req.items || []).filter(it => {
+      const qty = Number(it.quantity);
+      return Number.isFinite(qty) && qty > 0;
+    });
+
+    if (validItems.length === 0) {
+      throw new Error('Silakan masukkan jumlah minimal 1 barang yang ingin diminta.');
+    }
+
     const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const randSuffix = Math.floor(100 + Math.random() * 900);
     const reqNumber = `REQ-HK-${todayStr}-${randSuffix}`;
@@ -260,12 +293,12 @@ export const requestService = {
       breakfast_pax: req.breakfast_pax,
       notes: finalNotes,
       created_at: new Date().toISOString(),
-      items: req.items.map(it => ({
+      items: validItems.map(it => ({
         id: crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`,
         request_id: newRequestId,
         item_id: it.item_id || undefined,
         item_name: it.item_name,
-        quantity: it.quantity,
+        quantity: Number(it.quantity),
         unit: it.unit,
         notes: it.notes || ''
       }))
@@ -297,7 +330,7 @@ export const requestService = {
         await warehouseSupabase.from('requests').insert([insertPayload]);
       }
 
-      // Insert items with item_id if available
+      // Insert items with item_id if available (ONLY VALID ITEMS > 0)
       if (newRequest.items && newRequest.items.length > 0) {
         const itemsToInsert = newRequest.items.map(it => ({
           id: it.id,
