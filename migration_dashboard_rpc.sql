@@ -62,4 +62,4 @@ AS $$
   );
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_dashboard_summary(INT, INT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_dashboard_summary(INT, INT) TO anon, authenticated, service_role;

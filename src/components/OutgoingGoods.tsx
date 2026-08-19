@@ -3,12 +3,15 @@ import { supabase } from '../lib/supabase';
 import { Item, Transaction } from '../types';
 import { ArrowUpCircle, Search, Plus, Package, AlertCircle, Activity, Edit2, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { inventoryService } from '../services/inventoryService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface OutgoingGoodsProps {
   globalSearch?: string;
 }
 
 export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
+  const { user } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,44 +47,39 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
 
   const departments = ['Housekeeping', 'Resto', 'Tekhnisi', 'Front Office', 'General'];
 
-  const [dbStatus, setDbStatus] = useState<{ ok: boolean; message: string } | null>(null);
-
   useEffect(() => {
     fetchData();
-    checkDatabase();
   }, []);
 
-  const checkDatabase = async () => {
-    try {
-      const { error } = await supabase.from('transactions').select('department, notes').limit(1);
-      if (error) {
-        if (error.message.includes('column "department" does not exist') || error.message.includes('column "notes" does not exist')) {
-          setDbStatus({ ok: false, message: 'Kolom "department" atau "notes" belum ada di tabel transactions. Silakan jalankan SQL update.' });
-        } else if (error.message.includes('does not exist') || error.message.includes('relation') || error.code === '42P01') {
-          setDbStatus({ ok: false, message: 'Tabel "transactions" belum dibuat di Supabase.' });
-        } else {
-          setDbStatus({ ok: false, message: 'Error database: ' + error.message });
-        }
-      } else {
-        setDbStatus({ ok: true, message: 'Database terhubung dengan benar.' });
-      }
-    } catch (err) {
-      setDbStatus({ ok: false, message: 'Gagal mengecek status database.' });
-    }
-  };
-
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
     setLoading(true);
     try {
-      const { data: itemsData } = await supabase.from('items').select('*').order('name');
+      const itemsData = await inventoryService.getCachedItems(forceRefresh);
       const { data: transData } = await supabase
         .from('transactions')
-        .select('*, items(*)')
+        .select(`
+          id,
+          item_id,
+          type,
+          quantity,
+          department,
+          notes,
+          created_at,
+          user_id,
+          items:items (
+            id,
+            name,
+            unit,
+            current_stock,
+            min_stock
+          )
+        `)
         .eq('type', 'OUT')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (itemsData) setItems(itemsData);
-      if (transData) setTransactions(transData);
+      if (transData) setTransactions(transData as any);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -107,8 +105,8 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
     setIsSubmitting(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const currentUserId = user?.id;
+      if (!currentUserId) {
         setIsSubmitting(false);
         return;
       }
@@ -139,7 +137,7 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
           quantity,
           department,
           notes,
-          user_id: user.id
+          user_id: currentUserId
         }]);
 
         if (transError) throw transError;
@@ -151,10 +149,11 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
         if (updateError) throw updateError;
       }
 
+      inventoryService.invalidateCache();
       setIsModalOpen(false);
       setEditingTransaction(null);
       resetForm();
-      fetchData();
+      fetchData(true);
     } catch (error: any) {
       console.error('Submit error:', error);
       alert('Gagal menyimpan transaksi: ' + (error.message || 'Error tidak diketahui'));
@@ -195,8 +194,9 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
         if (updateError) throw updateError;
       }
 
+      inventoryService.invalidateCache();
       setTransactionToDelete(null);
-      fetchData();
+      fetchData(true);
     } catch (error: any) {
       console.error('Delete error:', error);
       alert('Gagal menghapus transaksi: ' + error.message);
@@ -220,16 +220,10 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
         <div>
           <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Barang Keluar</h2>
           <p className="text-xs md:text-sm text-gray-500 mt-0.5 font-medium">Catat distribusi barang ke departemen / operasional</p>
-          {dbStatus && !dbStatus.ok && (
-            <p className="text-xs text-red-600 mt-1 flex items-center gap-1 font-medium">
-              <AlertCircle className="w-3.5 h-3.5" />
-              {dbStatus.message}
-            </p>
-          )}
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <button 
-            onClick={fetchData}
+            onClick={() => fetchData(true)}
             className="flex-1 md:flex-none bg-gray-100 text-gray-700 hover:text-gray-900 px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-200 transition-all flex items-center justify-center gap-2 text-xs font-bold min-h-[44px]"
           >
             <Activity className="w-4 h-4 text-amber-600" />

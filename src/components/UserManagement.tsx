@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { supabase, supabaseUrl, supabaseKey } from '../lib/supabase';
 import { UserProfile } from '../types';
+import { queryCache } from '../lib/queryCache';
 import { 
   Plus, 
   Search, 
@@ -60,20 +61,28 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
     fetchProfiles();
   }, []);
 
-  const fetchProfiles = async () => {
+  const fetchProfiles = async (forceRefresh = false) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('full_name');
-      
-      if (error) {
-        if (error.message.includes('does not exist')) {
-          throw new Error('Tabel "profiles" belum ada. Silakan buka menu "Database Setup" untuk membuat tabel.');
-        }
-        throw error;
-      }
+      const data = await queryCache.fetchWithCache<UserProfile[]>(
+        'profiles:all',
+        async () => {
+          const { data: res, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, username, email, role, avatar_url, created_at')
+            .order('full_name');
+          
+          if (error) {
+            if (error.message.includes('does not exist')) {
+              throw new Error('Tabel "profiles" belum ada. Silakan buka menu "Database Setup" untuk membuat tabel.');
+            }
+            throw error;
+          }
+          return res || [];
+        },
+        60000,
+        forceRefresh
+      );
       setProfiles(data || []);
     } catch (error: any) {
       console.error('Error fetching profiles:', error);
@@ -197,9 +206,10 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
         });
       }
 
+      queryCache.invalidate('profiles');
       setIsModalOpen(false);
       resetForm();
-      fetchProfiles();
+      fetchProfiles(true);
     } catch (error: any) {
       console.error('Error saving profile:', error);
       const isFk = error.message?.includes('profiles_id_fkey');
@@ -242,7 +252,8 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
         const { error } = await supabase.from('profiles').delete().eq('id', id);
         if (error) throw error;
         setNotification({ type: 'success', message: 'User berhasil dihapus dari daftar.' });
-        fetchProfiles();
+        queryCache.invalidate('profiles');
+        fetchProfiles(true);
       } catch (error: any) {
         setNotification({ type: 'error', message: 'Gagal menghapus user: ' + error.message });
       }

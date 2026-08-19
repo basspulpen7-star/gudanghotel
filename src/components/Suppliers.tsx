@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Supplier } from '../types';
 import { Plus, Search, Edit2, Trash2, Phone, User, MapPin, Activity } from 'lucide-react';
+import { queryCache } from '../lib/queryCache';
+import { useAuth } from '../contexts/AuthContext';
 
 interface SuppliersProps {
   globalSearch?: string;
 }
 
 export function Suppliers({ globalSearch = '' }: SuppliersProps) {
+  const { user } = useAuth();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,32 +34,24 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
 
   useEffect(() => {
     fetchSuppliers();
-    checkDatabase();
   }, []);
 
-  const checkDatabase = async () => {
-    try {
-      const { error } = await supabase.from('suppliers').select('category, user_id').limit(1);
-      if (error) {
-        if (error.message.includes('column "category" does not exist') || error.message.includes('column "user_id" does not exist')) {
-          alert(`Peringatan: Kolom "category" atau "user_id" belum ada di tabel "suppliers".\n\nSilakan jalankan SQL update di menu Database Setup.`);
-        } else if (error.message.includes('does not exist') || error.message.includes('relation') || error.code === '42P01') {
-          console.error('Tabel suppliers belum ada');
-        }
-      }
-    } catch (e) {
-      // Ignore
-    }
-  };
-
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = async (forceRefresh = false) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('id, name, contact_person, phone, address, category')
-        .order('name');
-      if (error) throw error;
+      const data = await queryCache.fetchWithCache<Supplier[]>(
+        'suppliers:all',
+        async () => {
+          const { data: res, error } = await supabase
+            .from('suppliers')
+            .select('id, name, contact_person, phone, address, category, user_id, created_at')
+            .order('name');
+          if (error) throw error;
+          return (res || []) as Supplier[];
+        },
+        60000,
+        forceRefresh
+      );
       if (data) setSuppliers(data);
     } catch (error: any) {
       console.error('Error fetching suppliers:', error);
@@ -71,7 +66,6 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
     setIsSubmitting(true);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         alert('Anda harus login untuk menyimpan data.');
         setIsSubmitting(false);
@@ -98,10 +92,11 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
         if (error) throw error;
       }
 
+      queryCache.invalidate('suppliers');
       setIsModalOpen(false);
       setEditingSupplier(null);
       resetForm();
-      fetchSuppliers();
+      fetchSuppliers(true);
     } catch (error: any) {
       console.error('Error saving supplier:', error);
       let errorMessage = 'Gagal menyimpan data supplier: ' + (error.message || 'Error tidak diketahui');
@@ -142,7 +137,8 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
     if (confirm('Apakah Anda yakin ingin menghapus supplier ini?')) {
       try {
         await supabase.from('suppliers').delete().eq('id', id);
-        fetchSuppliers();
+        queryCache.invalidate('suppliers');
+        fetchSuppliers(true);
       } catch (error) {
         console.error('Error deleting supplier:', error);
         alert('Gagal menghapus supplier.');

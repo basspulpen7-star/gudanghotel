@@ -1,47 +1,56 @@
 import { supabase } from '../lib/supabase';
 import { PurchaseOrder } from '../types';
+import { queryCache } from '../lib/queryCache';
+import { inventoryService } from './inventoryService';
 
 export const purchaseOrderService = {
   /**
    * Fetch Purchase Orders WITH relational items in ONE query (eliminates N+1)
    */
-  async getPurchaseOrders() {
-    const { data, error } = await supabase
-      .from('purchase_orders')
-      .select(`
-        id,
-        po_number,
-        supplier_id,
-        status,
-        total_amount,
-        created_at,
-        user_id,
-        supplier:suppliers (
-          id,
-          name,
-          contact_person,
-          phone,
-          address,
-          category
-        ),
-        items:purchase_order_items (
-          id,
-          purchase_order_id,
-          item_id,
-          quantity,
-          price,
-          item:items (
+  async getPurchaseOrders(forceRefresh = false) {
+    return queryCache.fetchWithCache<PurchaseOrder[]>(
+      'purchase_orders:all',
+      async () => {
+        const { data, error } = await supabase
+          .from('purchase_orders')
+          .select(`
             id,
-            name,
-            unit,
-            current_stock
-          )
-        )
-      `)
-      .order('created_at', { ascending: false });
+            po_number,
+            supplier_id,
+            status,
+            total_amount,
+            created_at,
+            user_id,
+            supplier:suppliers (
+              id,
+              name,
+              contact_person,
+              phone,
+              address,
+              category
+            ),
+            items:purchase_order_items (
+              id,
+              purchase_order_id,
+              item_id,
+              quantity,
+              price,
+              item:items (
+                id,
+                name,
+                unit,
+                current_stock
+              )
+            )
+          `)
+          .order('created_at', { ascending: false });
 
-    if (error) throw error;
-    return (data || []) as unknown as PurchaseOrder[];
+        if (error) throw error;
+        return (data || []) as unknown as PurchaseOrder[];
+      },
+      30000,
+      forceRefresh
+    );
   },
 
   /**
@@ -86,6 +95,7 @@ export const purchaseOrderService = {
 
     if (itemsErr) throw itemsErr;
 
+    queryCache.invalidate('purchase_orders');
     return poId;
   },
 
@@ -137,6 +147,9 @@ export const purchaseOrderService = {
         }
       }
     }
+
+    queryCache.invalidate('purchase_orders');
+    inventoryService.invalidateCache();
   },
 
   /**
@@ -148,5 +161,6 @@ export const purchaseOrderService = {
     // Delete PO
     const { error } = await supabase.from('purchase_orders').delete().eq('id', id);
     if (error) throw error;
+    queryCache.invalidate('purchase_orders');
   }
 };

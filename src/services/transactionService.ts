@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Transaction } from '../types';
+import { inventoryService } from './inventoryService';
 
 export interface CreateTransactionParams {
   itemId: string;
@@ -109,13 +110,9 @@ export const transactionService = {
         }
       );
 
-      if (!rpcError) return rpcData;
-
-      // If function doesn't exist, log and proceed to fallback
-      if (rpcError.code === 'PGRST202' || rpcError.message?.includes('function')) {
-        console.warn('[TRANSACTION SERVICE] RPC create_transaction_and_update_stock not found, using client fallback');
-      } else {
-        throw new Error(rpcError.message || 'Gagal membuat transaksi');
+      if (rpcData) {
+        inventoryService.invalidateCache();
+        return rpcData;
       }
     } catch (e: any) {
       if (e.message && !e.message.includes('function') && e.code !== 'PGRST202') {
@@ -160,6 +157,7 @@ export const transactionService = {
 
     if (stockErr) throw stockErr;
 
+    inventoryService.invalidateCache();
     return { id: transId, new_stock: newStock };
   },
 
@@ -175,7 +173,10 @@ export const transactionService = {
         }
       );
 
-      if (!rpcError) return rpcData;
+      if (!rpcError) {
+        inventoryService.invalidateCache();
+        return rpcData;
+      }
 
       if (rpcError.code === 'PGRST202' || rpcError.message?.includes('function')) {
         console.warn('[TRANSACTION SERVICE] RPC delete_transaction_and_revert_stock not found, using client fallback');
@@ -212,5 +213,7 @@ export const transactionService = {
         .update({ current_stock: Math.max(0, revertedStock) })
         .eq('id', item.id);
     }
+
+    inventoryService.invalidateCache();
   }
 };

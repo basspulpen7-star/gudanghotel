@@ -24,6 +24,7 @@ import {
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { inventoryService } from '../services/inventoryService';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -94,17 +95,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
 
   const fetchNotifications = async () => {
     try {
-      const { data: items, error: itemsError } = await supabase.from('items').select('id, name, unit, min_stock, current_stock');
-      if (itemsError) throw itemsError;
-
-      const lowStockItems = items?.filter(item => (item.current_stock ?? 0) <= (item.min_stock ?? 0))
-        .map(item => ({
-          id: item.id,
-          title: 'Stok Rendah',
-          message: `${item.name} sisa sedikit (${item.unit})`,
-          type: 'warning'
-        })) || [];
-
+      const lowStockItems = await inventoryService.getLowStockNotifications();
       setNotifications(lowStockItems);
     } catch (error: any) {
       console.warn('Notice fetching notifications:', error?.message || error);
