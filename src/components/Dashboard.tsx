@@ -12,7 +12,6 @@ import {
   Layers 
 } from 'lucide-react';
 import { inventoryService } from '../services/inventoryService';
-import { transactionService } from '../services/transactionService';
 import { Item, Transaction } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '../lib/utils';
@@ -49,15 +48,10 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
 
     setLoading(true);
     try {
-      const [kpiData, lowStockData, txData] = await Promise.all([
-        inventoryService.getDashboardKPIs(),
-        inventoryService.getLowStockItems(5),
-        transactionService.getTransactions({ page: 1, limit: 5 })
-      ]);
-
-      setKpis(kpiData);
-      setLowStockItems(lowStockData);
-      setRecentTransactions(txData.data);
+      const summary = await inventoryService.getDashboardSummary(5, 5);
+      setKpis(summary.kpis);
+      setLowStockItems(summary.lowStockItems);
+      setRecentTransactions(summary.recentTransactions);
     } catch (error: any) {
       console.warn('[DASHBOARD FETCH NOTICE]:', error?.message || error);
     } finally {

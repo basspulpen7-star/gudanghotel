@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { Item } from '../types';
+import { Item, Transaction } from '../types';
 
 export interface GetItemsOptions {
   department?: string;
@@ -10,6 +10,65 @@ export interface GetItemsOptions {
 }
 
 export const inventoryService = {
+  /**
+   * Consolidated RPC for dashboard KPI, low stock items, and recent transactions in 1 round trip
+   * Includes automatic fallback if RPC is not yet created in Supabase.
+   */
+  async getDashboardSummary(lowStockLimit = 5, recentTxLimit = 5) {
+    try {
+      const { data, error } = await supabase.rpc('get_dashboard_summary', {
+        p_low_stock_limit: lowStockLimit,
+        p_recent_tx_limit: recentTxLimit
+      });
+
+      if (!error && data && data.kpis) {
+        return data as {
+          kpis: { totalItems: number; lowStockCount: number; todayInQty: number; todayOutQty: number };
+          lowStockItems: Partial<Item>[];
+          recentTransactions: Transaction[];
+        };
+      }
+      
+      if (error) {
+        console.warn('[RPC NOTICE] get_dashboard_summary fallback activated:', error.message);
+      }
+    } catch (err) {
+      console.warn('[RPC ERROR] Falling back to standard queries:', err);
+    }
+
+    // Fallback: Query directly in case migration is not yet applied
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayIso = todayStart.toISOString();
+
+    const [itemsRes, todayInRes, todayOutRes, txRes] = await Promise.all([
+      supabase.from('items').select('id, name, department, unit, current_stock, min_stock'),
+      supabase.from('transactions').select('quantity').eq('type', 'IN').gte('created_at', todayIso),
+      supabase.from('transactions').select('quantity').eq('type', 'OUT').gte('created_at', todayIso),
+      supabase.from('transactions').select('id, item_id, type, quantity, department, notes, created_at, user_id, items(id, name, unit)').order('created_at', { ascending: false }).limit(recentTxLimit)
+    ]);
+
+    const allItems = (itemsRes.data || []) as Item[];
+    const lowStockItems = allItems
+      .filter(item => Number(item.current_stock) <= Number(item.min_stock))
+      .sort((a, b) => Number(a.current_stock) - Number(b.current_stock))
+      .slice(0, lowStockLimit);
+
+    const todayInQty = (todayInRes.data || []).reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+    const todayOutQty = (todayOutRes.data || []).reduce((sum, t) => sum + (Number(t.quantity) || 0), 0);
+
+    return {
+      kpis: {
+        totalItems: allItems.length,
+        lowStockCount: allItems.filter(i => Number(i.current_stock) <= Number(i.min_stock)).length,
+        todayInQty,
+        todayOutQty
+      },
+      lowStockItems,
+      recentTransactions: (txRes.data || []) as Transaction[]
+    };
+  },
+
   /**
    * Fetch paginated items with required columns only
    */
@@ -62,52 +121,6 @@ export const inventoryService = {
       total: count || 0,
       page,
       totalPages: Math.ceil((count || 0) / (limit || 1))
-    };
-  },
-
-  /**
-   * Get low stock items for urgent attention (max 5 for dashboard)
-   */
-  async getLowStockItems(limit = 5) {
-    const { data, error } = await supabase
-      .from('items')
-      .select('id, name, department, unit, current_stock, min_stock')
-      .order('current_stock', { ascending: true });
-
-    if (error) throw error;
-
-    const lowStock = (data || []).filter(item => item.current_stock <= item.min_stock).slice(0, limit);
-    return lowStock;
-  },
-
-  /**
-   * Get quick KPI counts without loading full datasets
-   */
-  async getDashboardKPIs() {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayIso = todayStart.toISOString();
-
-    // Run parallel queries with count only
-    const [totalItemsRes, lowStockRes, todayInRes, todayOutRes] = await Promise.all([
-      supabase.from('items').select('id, current_stock, min_stock'),
-      supabase.from('items').select('id', { count: 'exact', head: true }),
-      supabase.from('transactions').select('quantity').eq('type', 'IN').gte('created_at', todayIso),
-      supabase.from('transactions').select('quantity').eq('type', 'OUT').gte('created_at', todayIso)
-    ]);
-
-    const items = totalItemsRes.data || [];
-    const lowStockCount = items.filter(i => i.current_stock <= i.min_stock).length;
-    const totalItemsCount = items.length;
-
-    const todayInQty = (todayInRes.data || []).reduce((sum, t) => sum + (t.quantity || 0), 0);
-    const todayOutQty = (todayOutRes.data || []).reduce((sum, t) => sum + (t.quantity || 0), 0);
-
-    return {
-      totalItems: totalItemsCount,
-      lowStockCount,
-      todayInQty,
-      todayOutQty
     };
   },
 
