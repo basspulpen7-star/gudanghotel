@@ -9,6 +9,28 @@ const LOCAL_STORAGE_KEY = 'gudang_alia_hk_requests';
 // Short-term memory cache for occupancy query results (60 seconds TTL)
 const CACHE_TTL_MS = 60000;
 
+// Helper function to generate standard RFC4122 v4 UUID
+export const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // fallback below
+    }
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
+// Helper function to validate UUID format
+export const isValidUUID = (str?: string | null): boolean => {
+  if (!str || typeof str !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(str.trim());
+};
+
 // Helper function to ensure YYYY-MM-DD date string without timezone shifting
 export const formatDateForDB = (dateInput: any): string => {
   if (!dateInput) return '';
@@ -46,6 +68,7 @@ export const requestService = {
       'requests:all',
       async () => {
         try {
+          // Attempt 1: Fetch with nested request_items join
           const { data, error } = await warehouseSupabase
             .from('requests')
             .select(`
@@ -54,7 +77,6 @@ export const requestService = {
               department,
               requester_name,
               user_id,
-              request_type,
               status,
               occupancy_count,
               breakfast_pax,
@@ -73,15 +95,112 @@ export const requestService = {
             .order('created_at', { ascending: false });
 
           if (error) {
-            console.warn('[REQUEST SERVICE] Supabase query notice, using local cache:', error.message);
+            console.warn('[REQUEST SERVICE] Supabase join query notice, attempting 2-step fetch:', error.message);
+            
+            // Attempt 2: 2-step fetch (requests table then request_items table)
+            const { data: reqData, error: reqErr } = await warehouseSupabase
+              .from('requests')
+              .select('*')
+              .order('created_at', { ascending: false });
+
+            if (reqErr || !reqData) {
+              console.warn('[REQUEST SERVICE] Supabase requests query notice, using local cache:', reqErr?.message);
+              return this.getLocalRequests();
+            }
+
+            // Fetch request_items for all request IDs
+            const reqIds = reqData.map((r: any) => r.id);
+            const itemsByRequestId: { [reqId: string]: any[] } = {};
+            if (reqIds.length > 0) {
+              try {
+                const { data: allItems } = await warehouseSupabase
+                  .from('request_items')
+                  .select('*')
+                  .in('request_id', reqIds);
+
+                if (allItems) {
+                  allItems.forEach((it: any) => {
+                    if (!itemsByRequestId[it.request_id]) {
+                      itemsByRequestId[it.request_id] = [];
+                    }
+                    itemsByRequestId[it.request_id].push(it);
+                  });
+                }
+              } catch (itemsFetchErr: any) {
+                console.warn('[REQUEST SERVICE] Fetch items separately notice:', itemsFetchErr?.message);
+              }
+            }
+
+            const formatted: HKRequest[] = reqData.map((r: any) => {
+              const rawItems = itemsByRequestId[r.id] || [];
+              const validItems: HKRequestItem[] = rawItems
+                .filter((it: any) => {
+                  const qty = Number(it.quantity ?? it.quantity_requested ?? 0);
+                  return Number.isFinite(qty) && qty > 0;
+                })
+                .map((it: any) => ({
+                  id: it.id,
+                  request_id: it.request_id || r.id,
+                  item_id: it.item_id || undefined,
+                  item_name: it.item_name || it.name || 'Barang',
+                  quantity: Number(it.quantity ?? it.quantity_requested ?? 0),
+                  unit: it.unit || 'pcs',
+                  notes: it.notes || ''
+                }));
+
+              return {
+                id: r.id,
+                request_number: r.request_number || r.req_number || `REQ-${String(r.id).slice(0, 4).toUpperCase()}`,
+                department: r.department || 'Housekeeping',
+                requester_name: r.requester_name || r.requested_by || 'Housekeeping Staff',
+                user_id: r.user_id,
+                request_type: r.request_type || (r.notes?.includes('[MANUAL]') ? 'manual' : (r.notes?.includes('[OCCUPANCY]') ? 'occupancy' : undefined)),
+                status: (r.status || 'MENUNGGU').toUpperCase(),
+                occupancy_count: r.occupancy_count || r.rooms_occupied || 0,
+                breakfast_pax: r.breakfast_pax || 0,
+                notes: r.notes || '',
+                created_at: r.created_at || new Date().toISOString(),
+                items: validItems
+              };
+            }).filter((r: HKRequest) => r.items && r.items.length > 0);
+
+            if (formatted.length > 0) {
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(formatted));
+              return formatted;
+            }
             return this.getLocalRequests();
           }
 
           if (data && data.length > 0) {
+            // Check if any requests returned without items (sometimes nested join needs separate query)
+            const missingItemReqIds = data.filter((r: any) => !r.request_items || r.request_items.length === 0).map((r: any) => r.id);
+            const extraItemsByReqId: { [reqId: string]: any[] } = {};
+            if (missingItemReqIds.length > 0) {
+              try {
+                const { data: extraItems } = await warehouseSupabase
+                  .from('request_items')
+                  .select('*')
+                  .in('request_id', missingItemReqIds);
+                if (extraItems) {
+                  extraItems.forEach((it: any) => {
+                    if (!extraItemsByReqId[it.request_id]) {
+                      extraItemsByReqId[it.request_id] = [];
+                    }
+                    extraItemsByReqId[it.request_id].push(it);
+                  });
+                }
+              } catch (e) {
+                // ignore
+              }
+            }
+
             // Map database response to standardized HKRequest and strictly filter quantity > 0
             const formatted: HKRequest[] = data
               .map((r: any) => {
-                const rawItems = r.request_items || [];
+                const rawItems = (r.request_items && r.request_items.length > 0)
+                  ? r.request_items
+                  : (extraItemsByReqId[r.id] || []);
+
                 const validItems: HKRequestItem[] = rawItems
                   .filter((it: any) => {
                     const qty = Number(it.quantity ?? it.quantity_requested ?? 0);
@@ -99,7 +218,7 @@ export const requestService = {
 
                 return {
                   id: r.id,
-                  request_number: r.request_number || r.req_number || `REQ-${r.id.slice(0, 4).toUpperCase()}`,
+                  request_number: r.request_number || r.req_number || `REQ-${String(r.id).slice(0, 4).toUpperCase()}`,
                   department: r.department || 'Housekeeping',
                   requester_name: r.requester_name || r.requested_by || 'Housekeeping Staff',
                   user_id: r.user_id,
@@ -112,7 +231,7 @@ export const requestService = {
                   items: validItems
                 };
               })
-              // Legacy request filter: Exclude requests that have 0 valid items
+              // Exclude requests that have 0 valid items
               .filter((r: HKRequest) => r.items && r.items.length > 0);
 
             // Cache locally for offline/fallback
@@ -127,7 +246,7 @@ export const requestService = {
           return this.getLocalRequests();
         }
       },
-      30000,
+      15000,
       forceRefresh
     );
   },
@@ -266,12 +385,14 @@ export const requestService = {
     const randSuffix = Math.floor(100 + Math.random() * 900);
     const reqNumber = `REQ-HK-${todayStr}-${randSuffix}`;
 
-    const newRequestId = crypto.randomUUID ? crypto.randomUUID() : `req-${Date.now()}-${Math.random()}`;
+    const newRequestId = generateUUID();
 
-    let userId: string | undefined = undefined;
+    let userId: string | null = null;
     try {
       const { data: { user } } = await warehouseSupabase.auth.getUser();
-      userId = user?.id;
+      if (user?.id && isValidUUID(user.id)) {
+        userId = user.id;
+      }
     } catch (e) {
       // ignore
     }
@@ -285,21 +406,21 @@ export const requestService = {
       id: newRequestId,
       request_number: reqNumber,
       department: req.department || 'Housekeeping',
-      requester_name: req.requester_name,
-      user_id: userId,
+      requester_name: req.requester_name || 'Housekeeping Staff',
+      user_id: userId || undefined,
       request_type: reqType,
       status: 'MENUNGGU',
-      occupancy_count: req.occupancy_count,
-      breakfast_pax: req.breakfast_pax,
+      occupancy_count: req.occupancy_count || 0,
+      breakfast_pax: req.breakfast_pax || 0,
       notes: finalNotes,
       created_at: new Date().toISOString(),
       items: validItems.map(it => ({
-        id: crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random()}`,
+        id: generateUUID(),
         request_id: newRequestId,
-        item_id: it.item_id || undefined,
+        item_id: (it.item_id && isValidUUID(it.item_id)) ? it.item_id : undefined,
         item_name: it.item_name,
         quantity: Number(it.quantity),
-        unit: it.unit,
+        unit: it.unit || 'pcs',
         notes: it.notes || ''
       }))
     };
@@ -310,8 +431,7 @@ export const requestService = {
         request_number: newRequest.request_number,
         department: newRequest.department,
         requester_name: newRequest.requester_name,
-        user_id: newRequest.user_id,
-        request_type: reqType,
+        user_id: userId,
         status: newRequest.status,
         occupancy_count: newRequest.occupancy_count,
         breakfast_pax: newRequest.breakfast_pax,
@@ -319,35 +439,76 @@ export const requestService = {
         created_at: newRequest.created_at
       };
 
-      // Insert header
-      const { error: headerErr } = await warehouseSupabase
+      // Try inserting header (First attempt: full payload with user_id)
+      let { error: headerErr } = await warehouseSupabase
         .from('requests')
         .insert([insertPayload]);
 
       if (headerErr) {
-        console.warn('[REQUEST SERVICE] Header insert notice, retrying without request_type:', headerErr.message);
-        delete insertPayload.request_type;
-        await warehouseSupabase.from('requests').insert([insertPayload]);
+        console.warn('[REQUEST SERVICE] Full header insert notice, retrying with user_id=null:', headerErr.message);
+        // Attempt 2: retry with user_id = null (handles case where user_id is not in auth.users)
+        const payloadNoUser = {
+          ...insertPayload,
+          user_id: null
+        };
+        const { error: noUserErr } = await warehouseSupabase
+          .from('requests')
+          .insert([payloadNoUser]);
+
+        if (noUserErr) {
+          console.warn('[REQUEST SERVICE] Header insert without user_id notice, retrying minimal payload:', noUserErr.message);
+          // Attempt 3: minimal standard payload
+          const minimalPayload = {
+            id: newRequest.id,
+            request_number: newRequest.request_number,
+            department: newRequest.department,
+            requester_name: newRequest.requester_name,
+            status: newRequest.status,
+            notes: newRequest.notes,
+            created_at: newRequest.created_at
+          };
+          const { error: minHeaderErr } = await warehouseSupabase
+            .from('requests')
+            .insert([minimalPayload]);
+          if (minHeaderErr) {
+            console.error('[REQUEST SERVICE ERROR] Minimal header insert also failed:', minHeaderErr.message);
+          }
+        }
       }
 
-      // Insert items with item_id if available (ONLY VALID ITEMS > 0)
+      // Insert items with valid UUID (ONLY VALID ITEMS > 0)
       if (newRequest.items && newRequest.items.length > 0) {
         const itemsToInsert = newRequest.items.map(it => ({
           id: it.id,
           request_id: newRequest.id,
-          item_id: it.item_id || null,
+          item_id: (it.item_id && isValidUUID(it.item_id)) ? it.item_id : null,
           item_name: it.item_name,
           quantity: it.quantity,
-          unit: it.unit,
-          notes: it.notes
+          unit: it.unit || 'pcs',
+          notes: it.notes || ''
         }));
 
-        const { error: itemsErr } = await warehouseSupabase
+        let { error: itemsErr } = await warehouseSupabase
           .from('request_items')
           .insert(itemsToInsert);
 
         if (itemsErr) {
-          console.warn('[REQUEST SERVICE] Items insert notice:', itemsErr.message);
+          console.warn('[REQUEST SERVICE] Items insert notice, retrying without item_id foreign key:', itemsErr.message);
+          const fallbackItems = itemsToInsert.map(it => ({
+            id: it.id,
+            request_id: it.request_id,
+            item_id: null,
+            item_name: it.item_name,
+            quantity: it.quantity,
+            unit: it.unit,
+            notes: it.notes
+          }));
+          const { error: retryErr } = await warehouseSupabase
+            .from('request_items')
+            .insert(fallbackItems);
+          if (retryErr) {
+            console.error('[REQUEST SERVICE] Items fallback insert failed:', retryErr.message);
+          }
         }
       }
     } catch (err: any) {
@@ -356,10 +517,11 @@ export const requestService = {
 
     // Cache locally
     const existing = this.getLocalRequests();
-    const updated = [newRequest, ...existing];
+    const updated = [newRequest, ...existing.filter(r => r.id !== newRequest.id)];
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updated));
 
     queryCache.invalidate('requests');
+    queryCache.invalidate('requests:all');
     return newRequest;
   },
 

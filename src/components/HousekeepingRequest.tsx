@@ -100,11 +100,18 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
     const initData = async () => {
       await Promise.all([
         loadMasterItems(),
-        loadRequests(),
+        loadRequests(true),
         fetchOccupancy(selectedDate)
       ]);
     };
     initData();
+
+    // Auto-poll requests for Logistik every 15s to catch new HK submissions in real-time
+    const intervalId = setInterval(() => {
+      loadRequests(true);
+    }, 15000);
+
+    return () => clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
@@ -159,9 +166,9 @@ export function HousekeepingRequest({ globalSearch = '' }: HousekeepingRequestPr
     }
   };
 
-  const loadRequests = async () => {
+  const loadRequests = async (forceRefresh = true) => {
     try {
-      const data = await requestService.getRequests();
+      const data = await requestService.getRequests(forceRefresh);
       setRequests(data);
       await checkTodayOrder(selectedDate);
     } catch (e: any) {

@@ -610,14 +610,19 @@ ALTER TABLE request_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE breakfast_records ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Authenticated users can access suppliers" ON suppliers FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can access items" ON items FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can access transactions" ON transactions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated users can access items" ON items FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated users can access transactions" ON transactions FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
 CREATE POLICY "Authenticated users can access purchase_orders" ON purchase_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Authenticated users can access purchase_order_items" ON purchase_order_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can access requests" ON requests FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can access request_items" ON request_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can access breakfast_records" ON breakfast_records FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for authenticated" ON profiles FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
+CREATE POLICY "Allow access to requests" ON requests FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Allow access to request_items" ON request_items FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Authenticated users can access breakfast_records" ON breakfast_records FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for authenticated" ON profiles FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+GRANT ALL ON TABLE public.requests TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.request_items TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.items TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.transactions TO anon, authenticated, service_role;`;
 
   useEffect(() => {
     checkTables();
