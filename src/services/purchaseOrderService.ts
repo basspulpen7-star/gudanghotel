@@ -143,12 +143,33 @@ export const purchaseOrderService = {
   /**
    * Create Purchase Order
    */
-  async createPurchaseOrder(params: {
-    supplierId: string;
-    items: Array<{ itemId: string; quantity: number; price: number }>;
-    userId: string;
-  }) {
-    const { supplierId, items, userId } = params;
+  async createPurchaseOrder(
+    supplierIdOrParams: string | { supplierId: string; items: Array<{ itemId?: string; item_id?: string; quantity: number; price: number }>; userId?: string },
+    itemsArray?: Array<{ itemId?: string; item_id?: string; quantity: number; price: number }>,
+    userIdParam?: string
+  ) {
+    let supplierId = '';
+    let items: Array<{ itemId: string; quantity: number; price: number }> = [];
+    let userId: string | undefined = '';
+
+    if (typeof supplierIdOrParams === 'object') {
+      supplierId = supplierIdOrParams.supplierId;
+      items = (supplierIdOrParams.items || []).map(it => ({
+        itemId: it.itemId || it.item_id || '',
+        quantity: it.quantity,
+        price: it.price
+      }));
+      userId = supplierIdOrParams.userId;
+    } else {
+      supplierId = supplierIdOrParams;
+      items = (itemsArray || []).map(it => ({
+        itemId: it.itemId || it.item_id || '',
+        quantity: it.quantity,
+        price: it.price
+      }));
+      userId = userIdParam;
+    }
+
     const poId = crypto.randomUUID();
     const poNumber = `PO-${Date.now().toString().slice(-6)}`;
     const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
@@ -162,7 +183,7 @@ export const purchaseOrderService = {
         supplier_id: supplierId,
         status: 'pending',
         total_amount: totalAmount,
-        user_id: userId
+        user_id: userId || null
       }]);
 
     if (poErr) throw poErr;
@@ -184,6 +205,81 @@ export const purchaseOrderService = {
 
     queryCache.invalidate('purchase_orders');
     return poId;
+  },
+
+  /**
+   * Update Purchase Order
+   */
+  async updatePurchaseOrder(
+    poId: string,
+    supplierId: string,
+    items: Array<{ itemId?: string; item_id?: string; quantity: number; price: number }>
+  ) {
+    const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+
+    const { error: updateErr } = await supabase
+      .from('purchase_orders')
+      .update({
+        supplier_id: supplierId,
+        total_amount: totalAmount
+      })
+      .eq('id', poId);
+
+    if (updateErr) throw updateErr;
+
+    // Delete existing items and re-insert
+    await supabase.from('purchase_order_items').delete().eq('purchase_order_id', poId);
+
+    const poItems = items.map(item => ({
+      id: crypto.randomUUID(),
+      purchase_order_id: poId,
+      item_id: item.itemId || item.item_id || '',
+      quantity: item.quantity,
+      price: item.price
+    }));
+
+    const { error: itemsErr } = await supabase
+      .from('purchase_order_items')
+      .insert(poItems);
+
+    if (itemsErr) throw itemsErr;
+
+    queryCache.invalidate('purchase_orders');
+  },
+
+  /**
+   * Update status of Purchase Order
+   */
+  async updateStatus(id: string, newStatus: 'pending' | 'completed' | 'cancelled') {
+    if (newStatus === 'completed') {
+      const { data: po } = await supabase
+        .from('purchase_orders')
+        .select(`
+          *,
+          items:purchase_order_items (
+            id,
+            purchase_order_id,
+            item_id,
+            quantity,
+            price
+          )
+        `)
+        .eq('id', id)
+        .single();
+
+      if (po) {
+        await this.completePurchaseOrder(po as unknown as PurchaseOrder);
+        return;
+      }
+    }
+
+    const { error } = await supabase
+      .from('purchase_orders')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (error) throw error;
+    queryCache.invalidate('purchase_orders');
   },
 
   /**

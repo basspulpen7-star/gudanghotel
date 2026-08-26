@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { Transaction, Item } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   FileText, 
   Download, 
@@ -66,6 +67,9 @@ export const isRestoDepartment = (deptName?: string | null): boolean => {
 };
 
 export function RestoReports() {
+  const { role, profile } = useAuth();
+  const isStaffGudang = role === 'staff' || role === 'logistik' || (profile?.role && ['staff', 'logistik'].includes(profile.role));
+
   const [reportType, setReportType] = useState<ReportType>('monthly');
   const [activeTab, setActiveTab] = useState<RestoCategory>('stock');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -282,30 +286,30 @@ export function RestoReports() {
     else if (reportType === 'monthly') periodStr = format(currentDate, 'MMMM yyyy');
     else periodStr = `${format(new Date(startDate), 'dd/MM/yyyy')} - ${format(new Date(endDate), 'dd/MM/yyyy')}`;
 
-    let categoryTitle = 'Rekap Stok & Mutasi Restoran';
+    let categoryTitle = 'Laporan Stok & Mutasi Barang Resto';
     if (activeTab === 'incoming') categoryTitle = 'Barang Masuk Restoran';
     else if (activeTab === 'outgoing') categoryTitle = 'Pemakaian & Pengeluaran Restoran';
     else if (activeTab === 'critical') categoryTitle = 'Daftar Bahan Restoran Menipis / Kritis';
 
     // Header Branding
-    doc.setFillColor(230, 92, 0); // Hotel Alia Orange
+    doc.setFillColor(200, 155, 60); // Gold tone
     doc.rect(0, 0, 210, 14, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text('HOTEL ALIA MATRAMAN - DEPARTEMEN RESTORAN & F&B', 14, 9);
+    doc.text('HOTEL ALIA MATRAMAN - LAPORAN BARANG RESTORAN', 14, 9);
 
     doc.setTextColor(33, 33, 33);
-    doc.setFontSize(16);
-    doc.text(`LAPORAN ${categoryTitle.toUpperCase()}`, 14, 26);
+    doc.setFontSize(15);
+    doc.text(categoryTitle.toUpperCase(), 14, 26);
 
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 100, 100);
     doc.text(`Periode: ${periodStr}  |  Dicetak: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, 33);
-    doc.text(`Total Bahan Resto: ${items.length} Item  |  Total Masuk: ${totalRestoIn}  |  Total Pemakaian: ${totalRestoOut}`, 14, 39);
+    doc.text(`Total Barang Resto: ${items.length} Item  |  Total Masuk: ${totalRestoIn}  |  Total Keluar: ${totalRestoOut}`, 14, 39);
 
-    if (activeTab === 'stock' || activeTab === 'critical') {
+    if (activeTab === 'stock' || activeTab === 'critical' || isStaffGudang) {
       const targetItems = activeTab === 'critical' ? criticalItems : filteredItems;
       const tableData = targetItems.map((item, idx) => {
         const stats = itemStats[item.id] || { initial: 0, in: 0, out: 0, final: 0 };
@@ -328,9 +332,9 @@ export function RestoReports() {
         head: [['No', 'Nama Barang', 'Dept', 'Awal', 'Masuk', 'Keluar', 'Akhir', 'Satuan', 'Status']],
         body: tableData,
         theme: 'striped',
-        headStyles: { fillColor: [230, 92, 0], textColor: [255, 255, 255], fontStyle: 'bold' },
+        headStyles: { fillColor: [42, 48, 58], textColor: [255, 255, 255], fontStyle: 'bold' },
         styles: { fontSize: 8.5, cellPadding: 2.5 },
-        alternateRowStyles: { fillColor: [255, 248, 240] }
+        alternateRowStyles: { fillColor: [245, 246, 248] }
       });
     } else {
       const tableData = displayedTransactions.map((tx, idx) => [
@@ -349,9 +353,9 @@ export function RestoReports() {
         head: [['No', 'Waktu', 'Nama Barang', 'Dept', 'Tipe', 'Jumlah', 'Satuan', 'Keterangan']],
         body: tableData,
         theme: 'striped',
-        headStyles: { fillColor: [230, 92, 0], textColor: [255, 255, 255], fontStyle: 'bold' },
+        headStyles: { fillColor: [42, 48, 58], textColor: [255, 255, 255], fontStyle: 'bold' },
         styles: { fontSize: 8.5, cellPadding: 2.5 },
-        alternateRowStyles: { fillColor: [255, 248, 240] }
+        alternateRowStyles: { fillColor: [245, 246, 248] }
       });
     }
 
@@ -361,20 +365,20 @@ export function RestoReports() {
       doc.setFontSize(9);
       doc.setTextColor(60, 60, 60);
       doc.text('Disiapkan Oleh,', 25, finalY + 20);
-      doc.text('Supervisor Restoran / Chef', 25, finalY + 40);
+      doc.text('Petugas Gudang / Resto', 25, finalY + 40);
       
       doc.text('Disetujui Oleh,', 140, finalY + 20);
       doc.text('Kepala Gudang / Logistik', 140, finalY + 40);
     }
 
-    doc.save(`Laporan_Resto_${activeTab}_${format(currentDate, 'yyyyMMdd')}.pdf`);
+    doc.save(`Laporan_Barang_Resto_${format(currentDate, 'yyyyMMdd')}.pdf`);
   };
 
   // CSV Export
   const exportToCSV = () => {
     let csvContent = 'data:text/csv;charset=utf-8,';
     
-    if (activeTab === 'stock' || activeTab === 'critical') {
+    if (activeTab === 'stock' || activeTab === 'critical' || isStaffGudang) {
       const targetItems = activeTab === 'critical' ? criticalItems : filteredItems;
       csvContent += 'No,Nama Barang,Dept,Awal,Masuk,Keluar,Akhir,Satuan,Status\n';
       targetItems.forEach((item, idx) => {
@@ -413,7 +417,7 @@ export function RestoReports() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Laporan_Resto_${activeTab}_${format(currentDate, 'yyyyMMdd')}.csv`);
+    link.setAttribute('download', `Laporan_Barang_Resto_${format(currentDate, 'yyyyMMdd')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -421,26 +425,25 @@ export function RestoReports() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
-      {/* Header Banner - Resto Dedicated */}
-      <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 rounded-2xl p-4 sm:p-6 text-white shadow-md relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 transform skew-x-12 pointer-events-none" />
+      {/* Header Banner */}
+      <div className="bg-[#252B34] rounded-2xl p-4 sm:p-6 text-[#F1F3F5] border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shadow-inner text-white shrink-0">
+            <div className="w-12 h-12 rounded-2xl bg-[#C89B3C]/15 border border-[#C89B3C]/30 flex items-center justify-center text-[#E0B85A] shrink-0">
               <UtensilsCrossed className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-md bg-white/25 text-[10px] font-black tracking-wider uppercase text-amber-100">
+                <span className="px-2.5 py-0.5 rounded-md bg-[#C89B3C]/20 text-[10px] font-black tracking-wider uppercase text-[#E0B85A] border border-[#C89B3C]/30">
                   DEPARTEMEN RESTORAN
                 </span>
-                <span className="text-xs text-amber-100/90 font-medium">Hotel Alia Matraman</span>
+                <span className="text-xs text-[#8E99A6] font-medium">Hotel Alia Matraman</span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white mt-0.5">
-                Laporan Inventaris & Pemakaian Resto
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-[#F1F3F5] mt-1">
+                Laporan Barang Resto
               </h1>
-              <p className="text-xs sm:text-sm text-amber-100 mt-1 max-w-xl font-medium">
-                Rekapitulasi terpisah khusus stok bahan makanan, minuman, pasokan masuk, dan konsumsi dapur restoran.
+              <p className="text-xs sm:text-sm text-[#8E99A6] mt-0.5 max-w-xl font-medium">
+                Rekapitulasi stok barang resto: nama barang, departemen, saldo awal, barang masuk, barang keluar, dan saldo akhir.
               </p>
             </div>
           </div>
@@ -449,20 +452,20 @@ export function RestoReports() {
           <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
             <button
               onClick={exportToCSV}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-white/15 hover:bg-white/25 active:bg-white/30 text-white rounded-xl text-xs font-bold transition-all backdrop-blur-md border border-white/20"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-[#20252D] hover:bg-[#2A303A] text-[#D8DEE6] rounded-xl text-xs font-bold transition-all border border-[#3A424D] cursor-pointer"
               title="Download CSV"
             >
-              <FileSpreadsheet className="w-4 h-4" />
+              <FileSpreadsheet className="w-4 h-4 text-[#8E99A6]" />
               <span>CSV</span>
             </button>
 
             <button
               onClick={exportToPDF}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-white text-orange-700 hover:bg-amber-50 active:bg-amber-100 rounded-xl text-xs font-black transition-all shadow-md"
-              title="Download PDF Resmi"
+              className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-[#E6B85C] to-[#C89B3C] hover:brightness-110 text-[#171A1F] rounded-xl text-xs font-black transition-all shadow-sm cursor-pointer"
+              title="Download PDF"
             >
-              <Download className="w-4 h-4" />
-              <span>Unduh PDF Resto</span>
+              <Download className="w-4 h-4 stroke-[2.5]" />
+              <span>Unduh PDF</span>
             </button>
           </div>
         </div>
@@ -471,67 +474,67 @@ export function RestoReports() {
       {/* KPI Cards Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         {/* KPI 1: Total Resto Items */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-sm">
+        <div className="bg-[#252B34] p-4 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Item Restoran</span>
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-xl">
+            <span className="text-xs font-bold text-[#8E99A6] uppercase tracking-wider">Item Resto</span>
+            <div className="p-2 bg-[#C89B3C]/15 text-[#E0B85A] rounded-xl">
               <ChefHat className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-gray-900">{items.length}</span>
-            <span className="text-xs text-gray-500 font-semibold">Bahan/Barang</span>
+            <span className="text-2xl font-black text-[#F1F3F5]">{items.length}</span>
+            <span className="text-xs text-[#8E99A6] font-semibold">Bahan/Barang</span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-1 font-medium">Terdaftar di master resto</p>
+          <p className="text-[11px] text-[#6F7985] mt-1 font-medium">Terdaftar di departemen Resto</p>
         </div>
 
         {/* KPI 2: Pasokan Masuk Resto */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-sm">
+        <div className="bg-[#252B34] p-4 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Bahan Masuk</span>
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+            <span className="text-xs font-bold text-[#8E99A6] uppercase tracking-wider">Barang Masuk</span>
+            <div className="p-2 bg-[#55B685]/15 text-[#55B685] rounded-xl">
               <ArrowDownCircle className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-emerald-600">+{totalRestoIn}</span>
-            <span className="text-xs text-gray-500 font-semibold">Qty</span>
+            <span className="text-2xl font-black text-[#55B685]">+{totalRestoIn}</span>
+            <span className="text-xs text-[#8E99A6] font-semibold">Qty</span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-1 font-medium">Total pasokan periode ini</p>
+          <p className="text-[11px] text-[#6F7985] mt-1 font-medium">Total pasokan masuk periode ini</p>
         </div>
 
-        {/* KPI 3: Pemakaian Dapur */}
-        <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-sm">
+        {/* KPI 3: Pemakaian Resto */}
+        <div className="bg-[#252B34] p-4 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Pemakaian Resto</span>
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+            <span className="text-xs font-bold text-[#8E99A6] uppercase tracking-wider">Barang Keluar</span>
+            <div className="p-2 bg-[#C89B3C]/15 text-[#E0B85A] rounded-xl">
               <ArrowUpCircle className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-blue-600">-{totalRestoOut}</span>
-            <span className="text-xs text-gray-500 font-semibold">Qty</span>
+            <span className="text-2xl font-black text-[#E0B85A]">-{totalRestoOut}</span>
+            <span className="text-xs text-[#8E99A6] font-semibold">Qty</span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-1 font-medium">Konsumsi masak & operasional</p>
+          <p className="text-[11px] text-[#6F7985] mt-1 font-medium">Total pengambilan / pemakaian</p>
         </div>
 
         {/* KPI 4: Stok Kritis */}
         <div className={cn(
-          "p-4 rounded-2xl border shadow-sm transition-colors",
+          "p-4 rounded-2xl border shadow-[0_4px_20px_rgba(0,0,0,0.18)] transition-colors",
           totalCriticalCount > 0 
-            ? "bg-red-50/50 border-red-200" 
-            : "bg-white border-gray-200/90"
+            ? "bg-[#252B34] border-[#EB5757]/40" 
+            : "bg-[#252B34] border-[#343B46]"
         )}>
           <div className="flex items-center justify-between">
             <span className={cn(
               "text-xs font-bold uppercase tracking-wider",
-              totalCriticalCount > 0 ? "text-red-700" : "text-gray-500"
+              totalCriticalCount > 0 ? "text-[#F87171]" : "text-[#8E99A6]"
             )}>
               Stok Kritis / Menipis
             </span>
             <div className={cn(
               "p-2 rounded-xl",
-              totalCriticalCount > 0 ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-400"
+              totalCriticalCount > 0 ? "bg-[#EB5757]/20 text-[#F87171]" : "bg-[#20252D] text-[#8E99A6]"
             )}>
               <AlertTriangle className="w-4 h-4" />
             </div>
@@ -539,83 +542,92 @@ export function RestoReports() {
           <div className="mt-2 flex items-baseline gap-2">
             <span className={cn(
               "text-2xl font-black",
-              totalCriticalCount > 0 ? "text-red-600" : "text-gray-900"
+              totalCriticalCount > 0 ? "text-[#F87171]" : "text-[#F1F3F5]"
             )}>
               {totalCriticalCount}
             </span>
-            <span className="text-xs text-gray-500 font-semibold">Item</span>
+            <span className="text-xs text-[#8E99A6] font-semibold">Item</span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-1 font-medium">Perlu segera restock/belanja</p>
+          <p className="text-[11px] text-[#6F7985] mt-1 font-medium">Perlu segera restock</p>
         </div>
       </div>
 
       {/* Control Bar: Mode Tabs & Date Period Selector */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-sm space-y-4">
-        {/* Top row: Tab Categories */}
+      <div className="bg-[#252B34] p-4 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] space-y-4">
+        {/* Top row: Tab Categories (Staff Gudang focuses on Stock Report) */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-gray-100/90 rounded-xl w-full sm:w-auto">
-            <button
-              onClick={() => setActiveTab('stock')}
-              className={cn(
-                "flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
-                activeTab === 'stock'
-                  ? "bg-white text-gray-900 shadow-sm font-extrabold"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
-              )}
-            >
-              <Package className="w-3.5 h-3.5 text-amber-600" />
-              <span>Stok & Mutasi</span>
-            </button>
+          {!isStaffGudang ? (
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#20252D] rounded-xl w-full sm:w-auto border border-[#3A424D]">
+              <button
+                onClick={() => setActiveTab('stock')}
+                className={cn(
+                  "flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                  activeTab === 'stock'
+                    ? "bg-[#2A303A] text-[#F1F3F5] shadow-xs font-extrabold border border-[#3A424D]"
+                    : "text-[#8E99A6] hover:text-[#F1F3F5] hover:bg-[#2A303A]/50"
+                )}
+              >
+                <Package className="w-3.5 h-3.5 text-[#E0B85A]" />
+                <span>Stok & Mutasi</span>
+              </button>
 
-            <button
-              onClick={() => setActiveTab('incoming')}
-              className={cn(
-                "flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
-                activeTab === 'incoming'
-                  ? "bg-white text-emerald-700 shadow-sm font-extrabold"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
-              )}
-            >
-              <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Bahan Masuk</span>
-            </button>
+              <button
+                onClick={() => setActiveTab('incoming')}
+                className={cn(
+                  "flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                  activeTab === 'incoming'
+                    ? "bg-[#2A303A] text-[#55B685] shadow-xs font-extrabold border border-[#3A424D]"
+                    : "text-[#8E99A6] hover:text-[#F1F3F5] hover:bg-[#2A303A]/50"
+                )}
+              >
+                <ArrowDownCircle className="w-3.5 h-3.5 text-[#55B685]" />
+                <span>Bahan Masuk</span>
+              </button>
 
-            <button
-              onClick={() => setActiveTab('outgoing')}
-              className={cn(
-                "flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
-                activeTab === 'outgoing'
-                  ? "bg-white text-blue-700 shadow-sm font-extrabold"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-200/60"
-              )}
-            >
-              <ArrowUpCircle className="w-3.5 h-3.5 text-blue-600" />
-              <span>Pemakaian Dapur</span>
-            </button>
+              <button
+                onClick={() => setActiveTab('outgoing')}
+                className={cn(
+                  "flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                  activeTab === 'outgoing'
+                    ? "bg-[#2A303A] text-[#E0B85A] shadow-xs font-extrabold border border-[#3A424D]"
+                    : "text-[#8E99A6] hover:text-[#F1F3F5] hover:bg-[#2A303A]/50"
+                )}
+              >
+                <ArrowUpCircle className="w-3.5 h-3.5 text-[#E0B85A]" />
+                <span>Pemakaian Resto</span>
+              </button>
 
-            <button
-              onClick={() => setActiveTab('critical')}
-              className={cn(
-                "flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5",
-                activeTab === 'critical'
-                  ? "bg-red-600 text-white shadow-sm font-extrabold"
-                  : "text-gray-600 hover:text-red-600 hover:bg-red-50"
-              )}
-            >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Kritis ({totalCriticalCount})</span>
-            </button>
-          </div>
+              <button
+                onClick={() => setActiveTab('critical')}
+                className={cn(
+                  "flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                  activeTab === 'critical'
+                    ? "bg-[#EB5757] text-[#171A1F] shadow-xs font-extrabold"
+                    : "text-[#8E99A6] hover:text-[#F87171] hover:bg-[#EB5757]/10"
+                )}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Kritis ({totalCriticalCount})</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1.5 bg-[#C89B3C]/15 text-[#E0B85A] text-xs font-bold rounded-xl border border-[#C89B3C]/30 flex items-center gap-2">
+                <Package className="w-4 h-4 text-[#E0B85A]" />
+                <span>Laporan Khusus Barang Resto (Staff Gudang)</span>
+              </span>
+            </div>
+          )}
 
           {/* Period Type Buttons (Daily / Monthly / Custom) */}
-          <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-full sm:w-auto justify-center">
+          <div className="flex items-center gap-1 bg-[#20252D] p-1 rounded-xl w-full sm:w-auto justify-center border border-[#3A424D]">
             <button
               onClick={() => setReportType('daily')}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
                 reportType === 'daily'
-                  ? "bg-white text-amber-700 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "bg-[#2A303A] text-[#E0B85A] shadow-xs border border-[#3A424D]"
+                  : "text-[#8E99A6] hover:text-[#F1F3F5]"
               )}
             >
               Harian
@@ -623,10 +635,10 @@ export function RestoReports() {
             <button
               onClick={() => setReportType('monthly')}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
                 reportType === 'monthly'
-                  ? "bg-white text-amber-700 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "bg-[#2A303A] text-[#E0B85A] shadow-xs border border-[#3A424D]"
+                  : "text-[#8E99A6] hover:text-[#F1F3F5]"
               )}
             >
               Bulanan
@@ -634,10 +646,10 @@ export function RestoReports() {
             <button
               onClick={() => setReportType('custom')}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all",
+                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer",
                 reportType === 'custom'
-                  ? "bg-white text-amber-700 shadow-sm"
-                  : "text-gray-600 hover:text-gray-900"
+                  ? "bg-[#2A303A] text-[#E0B85A] shadow-xs border border-[#3A424D]"
+                  : "text-[#8E99A6] hover:text-[#F1F3F5]"
               )}
             >
               Rentang
@@ -646,19 +658,19 @@ export function RestoReports() {
         </div>
 
         {/* Bottom row: Period Navigator & Search Input */}
-        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-3 border-t border-gray-100">
+        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-3 border-t border-[#343B46]">
           {/* Period Nav */}
           {reportType !== 'custom' ? (
             <div className="flex items-center justify-between sm:justify-start gap-2">
               <button
                 onClick={prevPeriod}
-                className="p-2 hover:bg-gray-100 rounded-xl border border-gray-200 text-gray-700 transition-colors"
+                className="p-2 hover:bg-[#2A303A] rounded-xl border border-[#3A424D] text-[#8E99A6] hover:text-[#F1F3F5] transition-colors cursor-pointer"
                 title="Periode Sebelumnya"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs font-bold text-amber-900">
-                <CalendarIcon className="w-3.5 h-3.5 text-amber-600" />
+              <div className="flex items-center gap-2 px-3.5 py-1.5 bg-[#20252D] border border-[#3A424D] rounded-xl text-xs font-bold text-[#E0B85A]">
+                <CalendarIcon className="w-3.5 h-3.5 text-[#E0B85A]" />
                 <span>
                   {reportType === 'daily'
                     ? format(currentDate, 'dd MMMM yyyy')
@@ -667,7 +679,7 @@ export function RestoReports() {
               </div>
               <button
                 onClick={nextPeriod}
-                className="p-2 hover:bg-gray-100 rounded-xl border border-gray-200 text-gray-700 transition-colors"
+                className="p-2 hover:bg-[#2A303A] rounded-xl border border-[#3A424D] text-[#8E99A6] hover:text-[#F1F3F5] transition-colors cursor-pointer"
                 title="Periode Berikutnya"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -679,60 +691,62 @@ export function RestoReports() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:border-amber-500"
+                className="px-3 py-1.5 bg-[#20252D] border border-[#3A424D] rounded-xl text-xs font-medium text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C]"
               />
-              <span className="text-xs text-gray-400 font-bold">s/d</span>
+              <span className="text-xs text-[#8E99A6] font-bold">s/d</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:border-amber-500"
+                className="px-3 py-1.5 bg-[#20252D] border border-[#3A424D] rounded-xl text-xs font-medium text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C]"
               />
             </div>
           )}
 
           {/* Search box */}
           <div className="relative min-w-[220px]">
-            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-[#8E99A6] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Cari bahan resto..."
+              placeholder="Cari nama barang resto..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white transition-all"
+              className="w-full pl-9 pr-3 py-2 bg-[#20252D] border border-[#3A424D] rounded-xl text-xs font-medium text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C] transition-all"
             />
           </div>
         </div>
       </div>
 
       {/* Chart Section: Top Resto Items Activity */}
-      {chartData.length > 0 && (activeTab === 'stock' || activeTab === 'outgoing') && (
-        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-200/90 shadow-sm">
+      {chartData.length > 0 && (activeTab === 'stock' || isStaffGudang) && (
+        <div className="bg-[#252B34] p-4 sm:p-6 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                <span>Aktivitas Bahan Restoran Paling Aktif</span>
+              <h3 className="text-sm font-black text-[#F1F3F5] flex items-center gap-2">
+                <span>Aktivitas Barang Resto Teratas</span>
               </h3>
-              <p className="text-xs text-gray-500 mt-0.5 font-medium">Perbandingan pasokan masuk vs pemakaian dapur pada periode ini</p>
+              <p className="text-xs text-[#8E99A6] mt-0.5 font-medium">Perbandingan pasokan masuk vs pemakaian resto pada periode ini</p>
             </div>
           </div>
           <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#343B46" />
                 <XAxis 
                   dataKey="name" 
-                  tick={{ fontSize: 11, fill: '#6B7280' }} 
+                  tick={{ fontSize: 11, fill: '#8E99A6' }} 
                   interval={0}
                   angle={-15}
                   textAnchor="end"
                 />
-                <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#8E99A6' }} />
                 <Tooltip 
                   contentStyle={{ 
                     borderRadius: '12px', 
-                    border: '1px solid #E5E7EB', 
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    border: '1px solid #3A424D', 
+                    backgroundColor: '#20252D',
+                    color: '#F1F3F5',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
                     fontSize: '12px' 
                   }}
                   formatter={(value: any, name: any) => [
@@ -748,12 +762,12 @@ export function RestoReports() {
                 />
                 <Legend 
                   verticalAlign="top" 
-                  align="right"
+                  align="right" 
                   wrapperStyle={{ paddingBottom: '10px', fontSize: '12px' }}
                   formatter={(value) => (value === 'in' ? 'Bahan Masuk' : 'Pemakaian Resto')}
                 />
-                <Bar dataKey="in" name="in" fill="#10B981" radius={[4, 4, 0, 0]} barSize={16} />
-                <Bar dataKey="out" name="out" fill="#3B82F6" radius={[4, 4, 0, 0]} barSize={16} />
+                <Bar dataKey="in" name="in" fill="#55B685" radius={[4, 4, 0, 0]} barSize={16} />
+                <Bar dataKey="out" name="out" fill="#E0B85A" radius={[4, 4, 0, 0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -761,108 +775,108 @@ export function RestoReports() {
       )}
 
       {/* Main Table View */}
-      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+      <div className="bg-[#252B34] rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] overflow-hidden">
+        <div className="p-4 border-b border-[#343B46] flex items-center justify-between bg-[#20252D]">
           <div>
-            <h2 className="text-sm font-black text-gray-900 tracking-tight flex items-center gap-2">
+            <h2 className="text-sm font-black text-[#F1F3F5] tracking-tight flex items-center gap-2">
               <span>
-                {activeTab === 'stock' && 'Rincian Stok & Mutasi Restoran'}
-                {activeTab === 'incoming' && 'Riwayat Bahan Masuk Restoran'}
-                {activeTab === 'outgoing' && 'Riwayat Pemakaian & Pengeluaran Restoran'}
-                {activeTab === 'critical' && 'Daftar Bahan Kritis / Menipis'}
+                {(activeTab === 'stock' || isStaffGudang) && 'Rincian Stok Barang Resto (Awal, Masuk, Keluar, Akhir)'}
+                {!isStaffGudang && activeTab === 'incoming' && 'Riwayat Bahan Masuk Restoran'}
+                {!isStaffGudang && activeTab === 'outgoing' && 'Riwayat Pemakaian & Pengeluaran Restoran'}
+                {!isStaffGudang && activeTab === 'critical' && 'Daftar Bahan Kritis / Menipis'}
               </span>
             </h2>
-            <p className="text-[11px] text-gray-500 font-medium">
-              {activeTab === 'stock' && `Menampilkan ${filteredItems.length} item bahan restoran`}
-              {activeTab === 'critical' && `Menampilkan ${criticalItems.length} item berstatus stok kritis`}
-              {(activeTab === 'incoming' || activeTab === 'outgoing') && `Menampilkan ${displayedTransactions.length} baris riwayat`}
+            <p className="text-[11px] text-[#8E99A6] font-medium">
+              {(activeTab === 'stock' || isStaffGudang) && `Menampilkan ${filteredItems.length} item bahan/barang resto`}
+              {!isStaffGudang && activeTab === 'critical' && `Menampilkan ${criticalItems.length} item berstatus stok kritis`}
+              {!isStaffGudang && (activeTab === 'incoming' || activeTab === 'outgoing') && `Menampilkan ${displayedTransactions.length} baris riwayat`}
             </p>
           </div>
           <button
             onClick={fetchData}
-            className="p-2 hover:bg-gray-200/60 rounded-xl text-gray-600 transition-colors"
+            className="p-2 hover:bg-[#2A303A] rounded-xl text-[#8E99A6] hover:text-[#F1F3F5] transition-colors cursor-pointer"
             title="Refresh Data"
           >
-            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin text-amber-600")} />
+            <RefreshCw className={cn("w-4 h-4", loading && "animate-spin text-[#E0B85A]")} />
           </button>
         </div>
 
         <div className="overflow-x-auto">
-          {activeTab === 'stock' || activeTab === 'critical' ? (
+          {activeTab === 'stock' || activeTab === 'critical' || isStaffGudang ? (
             <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-600 border-b border-gray-200 font-extrabold uppercase tracking-wider text-[10px]">
+              <thead className="bg-[#20252D] text-[#8E99A6] border-b border-[#343B46] font-extrabold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-3 py-3 text-center w-12">No</th>
                   <th className="px-4 py-3">Nama Barang</th>
                   <th className="px-3 py-3 text-center">Dept</th>
                   <th className="px-4 py-3 text-center">Awal</th>
-                  <th className="px-4 py-3 text-center text-emerald-600">Masuk</th>
-                  <th className="px-4 py-3 text-center text-blue-600">Keluar</th>
+                  <th className="px-4 py-3 text-center text-[#55B685]">Masuk</th>
+                  <th className="px-4 py-3 text-center text-[#E0B85A]">Keluar</th>
                   <th className="px-4 py-3 text-center">Akhir</th>
                   <th className="px-3 py-3 text-center">Satuan</th>
                   <th className="px-3 py-3 text-center">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#343B46]">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500 font-medium">
+                    <td colSpan={9} className="px-6 py-12 text-center text-[#8E99A6] font-medium">
                       Memuat data inventaris restoran...
                     </td>
                   </tr>
-                ) : (activeTab === 'critical' ? criticalItems : filteredItems).length === 0 ? (
+                ) : (activeTab === 'critical' && !isStaffGudang ? criticalItems : filteredItems).length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center text-gray-500 font-medium">
+                    <td colSpan={9} className="px-6 py-12 text-center text-[#8E99A6] font-medium">
                       {activeTab === 'critical' 
-                        ? '🎉 Semua stok bahan restoran dalam kondisi aman.' 
+                        ? 'Semua stok bahan restoran dalam kondisi aman.' 
                         : 'Tidak ada bahan restoran yang cocok dengan pencarian.'}
                     </td>
                   </tr>
                 ) : (
-                  (activeTab === 'critical' ? criticalItems : filteredItems).map((item, idx) => {
+                  (activeTab === 'critical' && !isStaffGudang ? criticalItems : filteredItems).map((item, idx) => {
                     const stats = itemStats[item.id] || { initial: 0, in: 0, out: 0, final: 0 };
                     const isZero = stats.final <= 0;
                     const isLow = stats.final <= (item.min_stock || 5);
 
                     return (
-                      <tr key={item.id} className="hover:bg-amber-50/20 transition-colors">
-                        <td className="px-3 py-3 text-center text-gray-400 font-medium font-mono text-[11px]">
+                      <tr key={item.id} className="hover:bg-[#2A303A]/70 transition-colors">
+                        <td className="px-3 py-3 text-center text-[#6F7985] font-medium font-mono text-[11px]">
                           {idx + 1}
                         </td>
-                        <td className="px-4 py-3 font-bold text-gray-900">
+                        <td className="px-4 py-3 font-bold text-[#F1F3F5]">
                           {item.name}
                         </td>
                         <td className="px-3 py-3 text-center">
-                          <span className="px-2 py-0.5 bg-amber-50 text-amber-800 text-[10px] font-bold rounded-md border border-amber-200/60 uppercase">
+                          <span className="px-2 py-0.5 bg-[#C89B3C]/15 text-[#E0B85A] text-[10px] font-bold rounded-md border border-[#C89B3C]/30 uppercase">
                             {item.department || 'Resto'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-center text-gray-600 font-semibold font-mono">
+                        <td className="px-4 py-3 text-center text-[#D8DEE6] font-semibold font-mono">
                           {stats.initial}
                         </td>
-                        <td className="px-4 py-3 text-center font-bold text-emerald-600 font-mono">
+                        <td className="px-4 py-3 text-center font-bold text-[#55B685] font-mono">
                           {stats.in > 0 ? `+${stats.in}` : '-'}
                         </td>
-                        <td className="px-4 py-3 text-center font-bold text-blue-600 font-mono">
+                        <td className="px-4 py-3 text-center font-bold text-[#E0B85A] font-mono">
                           {stats.out > 0 ? `-${stats.out}` : '-'}
                         </td>
-                        <td className="px-4 py-3 text-center font-black text-gray-900 font-mono text-sm">
+                        <td className="px-4 py-3 text-center font-black text-[#F1F3F5] font-mono text-sm">
                           {stats.final}
                         </td>
-                        <td className="px-3 py-3 text-center text-gray-500 font-medium">
+                        <td className="px-3 py-3 text-center text-[#8E99A6] font-medium">
                           {item.unit || 'pcs'}
                         </td>
                         <td className="px-3 py-3 text-center">
                           {isZero ? (
-                            <span className="px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-black rounded-lg uppercase">
+                            <span className="px-2 py-0.5 bg-[#EB5757]/15 text-[#EB5757] border border-[#EB5757]/30 text-[10px] font-black rounded-lg uppercase">
                               HABIS
                             </span>
                           ) : isLow ? (
-                            <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-black rounded-lg uppercase">
+                            <span className="px-2 py-0.5 bg-[#C89B3C]/15 text-[#E0B85A] border border-[#C89B3C]/30 text-[10px] font-black rounded-lg uppercase">
                               MENIPIS
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-black rounded-lg uppercase">
+                            <span className="px-2 py-0.5 bg-[#55B685]/15 text-[#55B685] border border-[#55B685]/30 text-[10px] font-black rounded-lg uppercase">
                               AMAN
                             </span>
                           )}
@@ -875,7 +889,7 @@ export function RestoReports() {
             </table>
           ) : (
             <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-600 border-b border-gray-200 font-extrabold uppercase tracking-wider text-[10px]">
+              <thead className="bg-[#20252D] text-[#8E99A6] border-b border-[#343B46] font-extrabold uppercase tracking-wider text-[10px]">
                 <tr>
                   <th className="px-3 py-3 text-center w-12">No</th>
                   <th className="px-4 py-3">Waktu</th>
@@ -886,33 +900,33 @@ export function RestoReports() {
                   <th className="px-4 py-3">Keterangan / Catatan</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#343B46]">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500 font-medium">
+                    <td colSpan={7} className="px-6 py-12 text-center text-[#8E99A6] font-medium">
                       Memuat riwayat transaksi resto...
                     </td>
                   </tr>
                 ) : displayedTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500 font-medium">
+                    <td colSpan={7} className="px-6 py-12 text-center text-[#8E99A6] font-medium">
                       Tidak ada transaksi resto pada periode ini.
                     </td>
                   </tr>
                 ) : (
                   displayedTransactions.map((tx, idx) => (
-                    <tr key={tx.id} className="hover:bg-amber-50/20 transition-colors">
-                      <td className="px-3 py-3 text-center text-gray-400 font-medium font-mono text-[11px]">
+                    <tr key={tx.id} className="hover:bg-[#2A303A]/70 transition-colors">
+                      <td className="px-3 py-3 text-center text-[#6F7985] font-medium font-mono text-[11px]">
                         {idx + 1}
                       </td>
-                      <td className="px-4 py-3 text-gray-500 font-mono text-[11px]">
+                      <td className="px-4 py-3 text-[#8E99A6] font-mono text-[11px]">
                         {format(new Date(tx.created_at), 'dd/MM/yyyy HH:mm')}
                       </td>
-                      <td className="px-4 py-3 font-bold text-gray-900">
+                      <td className="px-4 py-3 font-bold text-[#F1F3F5]">
                         {tx.items?.name || '-'}
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-800 text-[10px] font-bold rounded-md border border-amber-200/60 uppercase">
+                        <span className="px-2 py-0.5 bg-[#C89B3C]/15 text-[#E0B85A] text-[10px] font-bold rounded-md border border-[#C89B3C]/30 uppercase">
                           {tx.department || 'Resto'}
                         </span>
                       </td>
@@ -920,16 +934,16 @@ export function RestoReports() {
                         <span className={cn(
                           "px-2 py-0.5 rounded-lg text-[10px] font-black uppercase",
                           tx.type === 'IN'
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            : "bg-blue-50 text-blue-700 border border-blue-200"
+                            ? "bg-[#55B685]/15 text-[#55B685] border border-[#55B685]/30"
+                            : "bg-[#C89B3C]/15 text-[#E0B85A] border border-[#C89B3C]/30"
                         )}>
                           {tx.type === 'IN' ? 'MASUK' : 'KELUAR'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center font-black text-gray-900 font-mono text-sm">
-                        {tx.quantity} <span className="text-[11px] font-normal text-gray-500">{tx.items?.unit || 'pcs'}</span>
+                      <td className="px-4 py-3 text-center font-black text-[#F1F3F5] font-mono text-sm">
+                        {tx.quantity} <span className="text-[11px] font-normal text-[#8E99A6]">{tx.items?.unit || 'pcs'}</span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 max-w-xs truncate font-medium">
+                      <td className="px-4 py-3 text-[#D8DEE6] max-w-xs truncate font-medium">
                         {tx.notes || '-'}
                       </td>
                     </tr>

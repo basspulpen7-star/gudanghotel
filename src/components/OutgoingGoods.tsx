@@ -211,22 +211,22 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl border border-gray-200/90 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#252B34] p-4 md:p-6 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
         <div>
-          <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Barang Keluar</h2>
-          <p className="text-xs md:text-sm text-gray-500 mt-0.5 font-medium">Catat distribusi barang ke departemen / operasional</p>
+          <h2 className="text-xl md:text-2xl font-black text-[#F1F3F5] tracking-tight">Barang Keluar</h2>
+          <p className="text-xs md:text-sm text-[#8E99A6] mt-0.5 font-medium">Catat distribusi barang ke departemen / operasional</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <button 
             onClick={() => fetchData(true)}
-            className="flex-1 md:flex-none bg-gray-100 text-gray-700 hover:text-gray-900 px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-200 transition-all flex items-center justify-center gap-2 text-xs font-bold min-h-[44px]"
+            className="flex-1 md:flex-none bg-[#2A303A] text-[#D8DEE6] hover:text-[#F1F3F5] px-4 py-2.5 rounded-xl border border-[#3A424D] hover:bg-[#343D49] transition-all flex items-center justify-center gap-2 text-xs font-bold min-h-[44px] cursor-pointer shadow-xs"
           >
-            <Activity className="w-4 h-4 text-amber-600" />
+            <Activity className="w-4 h-4 text-[#C89B3C]" />
             <span>Refresh</span>
           </button>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="flex-1 md:flex-none bg-[#E65C00] hover:bg-[#CF5300] text-white px-5 py-2.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm shadow-orange-500/20 text-xs sm:text-sm min-h-[44px]"
+            className="flex-1 md:flex-none bg-gradient-to-r from-[#E6B85C] to-[#C89B3C] hover:brightness-110 text-[#171A1F] px-5 py-2.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm text-xs sm:text-sm min-h-[44px] cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>Catat Barang Keluar</span>
@@ -234,96 +234,103 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden">
-        <div className="p-4 md:p-5 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50/80">
+      <div className="bg-[#252B34] rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] overflow-hidden">
+        <div className="p-4 md:p-5 border-b border-[#343B46] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#20252D]">
           <div className="flex items-center gap-2">
-            <h3 className="font-black text-gray-900 flex items-center gap-2 text-sm md:text-base">
-              <ArrowUpCircle className="w-5 h-5 text-amber-600" />
+            <h3 className="font-black text-[#F1F3F5] flex items-center gap-2 text-sm md:text-base">
+              <ArrowUpCircle className="w-5 h-5 text-[#E0B85A]" />
               Riwayat Distribusi
             </h3>
-            <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">
+            <span className="text-xs bg-[#C89B3C]/15 text-[#E0B85A] border border-[#C89B3C]/30 px-2.5 py-0.5 rounded-full font-bold">
               {totalCount} Total
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <div className="relative flex-1 md:flex-none">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E99A6]" />
               <input 
                 type="text" 
                 placeholder="Cari distribusi..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full md:w-60 pl-9 pr-3 py-2 text-xs bg-white border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-500 transition-colors" 
+                className="w-full md:w-60 pl-9 pr-3 py-2 text-xs bg-[#252B34] border border-[#3A424D] rounded-xl text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C] transition-colors" 
               />
             </div>
             <div className="flex items-center gap-2">
               <select 
                 value={selectedMonth}
                 onChange={(e) => { setSelectedMonth(parseInt(e.target.value)); setPage(1); }}
-                className="bg-white border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:border-amber-500"
+                className="bg-[#252B34] border border-[#3A424D] text-[#F1F3F5] text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:border-[#C89B3C] cursor-pointer"
               >
                 {months.map((month, index) => (
-                  <option key={index} value={index}>{month}</option>
+                  <option key={index} value={index} className="bg-[#252B34] text-[#F1F3F5]">{month}</option>
                 ))}
               </select>
               <select 
                 value={selectedYear}
                 onChange={(e) => { setSelectedYear(parseInt(e.target.value)); setPage(1); }}
-                className="bg-white border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:border-amber-500"
+                className="bg-[#252B34] border border-[#3A424D] text-[#F1F3F5] text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:border-[#C89B3C] cursor-pointer"
               >
                 {years.map((year) => (
-                  <option key={year} value={year}>{year}</option>
+                  <option key={year} value={year} className="bg-[#252B34] text-[#F1F3F5]">{year}</option>
                 ))}
               </select>
             </div>
           </div>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[600px] text-xs">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[600px] text-xs md:text-sm">
             <thead>
-              <tr className="bg-gray-50 text-gray-500 text-[10px] font-extrabold uppercase tracking-wider border-b border-gray-200">
-                <th className="px-5 py-3.5">Tanggal</th>
-                <th className="px-5 py-3.5">Nama Barang</th>
-                <th className="px-5 py-3.5">Departemen</th>
-                <th className="px-5 py-3.5">Jumlah</th>
-                <th className="px-5 py-3.5">Satuan</th>
-                <th className="px-5 py-3.5">Tujuan / Catatan</th>
-                <th className="px-5 py-3.5 text-right">Aksi</th>
+              <tr className="bg-[#20252D] text-[#8E99A6] text-[11px] font-bold uppercase tracking-wider border-b border-[#343B46]">
+                <th className="px-5 py-3">Tanggal</th>
+                <th className="px-5 py-3">Nama Barang</th>
+                <th className="px-5 py-3">Departemen</th>
+                <th className="px-5 py-3">Jumlah</th>
+                <th className="px-5 py-3">Satuan</th>
+                <th className="px-5 py-3">Tujuan / Catatan</th>
+                <th className="px-5 py-3 text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[#2C333E]">
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">Memuat data...</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-[#8E99A6] font-medium">
+                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-[#C89B3C] border-t-transparent mb-2" />
+                  <p className="text-xs">Memuat data...</p>
+                </td></tr>
               ) : transactions.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">Belum ada transaksi keluar.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-[#8E99A6] font-medium">
+                  <Package className="w-10 h-10 mx-auto mb-2 text-[#6F7985]" />
+                  <p className="text-xs">Belum ada transaksi keluar untuk filter ini.</p>
+                </td></tr>
               ) : transactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-amber-50/30 transition-colors group">
-                  <td className="px-5 py-3.5 text-gray-600 font-mono text-xs">
+                <tr key={tx.id} className="hover:bg-[#2A303A]/70 transition-colors group">
+                  <td className="px-5 py-3.5 text-[#8E99A6] font-mono text-xs">
                     {format(new Date(tx.created_at), 'dd MMM yyyy HH:mm')}
                   </td>
-                  <td className="px-5 py-3.5 font-bold text-gray-900 text-sm">{tx.items?.name || 'Barang Dihapus'}</td>
+                  <td className="px-5 py-3.5 font-bold text-[#F1F3F5] text-sm">{tx.items?.name || 'Barang Dihapus'}</td>
                   <td className="px-5 py-3.5">
-                    <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 rounded-md text-[10px] font-bold uppercase border border-amber-500/20">
+                    <span className="px-2.5 py-1 bg-[#20252D] text-[#D8DEE6] rounded-lg text-xs font-semibold border border-[#3A424D]">
                       {tx.department || 'General'}
                     </span>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className="text-amber-700 font-black text-sm">-{tx.quantity}</span>
+                    <span className="text-[#E0B85A] font-black text-sm">-{tx.quantity}</span>
                   </td>
-                  <td className="px-5 py-3.5 text-gray-600 font-medium">{tx.items?.unit}</td>
-                  <td className="px-5 py-3.5 text-gray-500 italic">{tx.notes || '-'}</td>
+                  <td className="px-5 py-3.5 text-[#8E99A6] font-medium">{tx.items?.unit}</td>
+                  <td className="px-5 py-3.5 text-[#8E99A6] italic">{tx.notes || '-'}</td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       <button 
                         onClick={() => handleEdit(tx)}
-                        className="p-1.5 hover:bg-amber-50 text-amber-600 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-[#C89B3C]/15 text-[#E0B85A] rounded-lg transition-colors cursor-pointer"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button 
                         onClick={() => setTransactionToDelete(tx)}
-                        className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-[#EB5757]/15 text-[#EB5757] rounded-lg transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -335,17 +342,90 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
           </table>
         </div>
 
+        {/* Mobile Cards View (Tampilan Khusus HP - Tanpa Perlu Geser) */}
+        <div className="block md:hidden divide-y divide-[#2C333E]">
+          {loading ? (
+            <div className="py-12 text-center text-[#8E99A6]">
+              <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-[#C89B3C] border-t-transparent mb-2" />
+              <p className="text-xs font-medium">Memuat data...</p>
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="py-12 text-center text-[#8E99A6] px-4 space-y-2">
+              <Package className="w-10 h-10 mx-auto text-[#6F7985]" />
+              <p className="text-xs font-medium">Belum ada transaksi keluar untuk filter ini.</p>
+            </div>
+          ) : (
+            transactions.map((tx) => (
+              <div key={tx.id} className="p-3.5 space-y-2.5 hover:bg-[#2A303A]/50 transition-colors">
+                {/* Header Card: Nama & Jumlah Keluar Langsung Terlihat */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-bold text-[#F1F3F5] leading-tight">
+                      {tx.items?.name || 'Barang Dihapus'}
+                    </h3>
+                    <div className="flex items-center gap-1.5 mt-1 text-[10px] text-[#8E99A6] flex-wrap">
+                      <span className="px-2 py-0.5 bg-[#20252D] text-[#D8DEE6] rounded-md font-semibold border border-[#3A424D]">
+                        {tx.department || 'General'}
+                      </span>
+                      <span>•</span>
+                      <span>{format(new Date(tx.created_at), 'dd MMM yyyy, HH:mm')}</span>
+                    </div>
+                  </div>
+
+                  {/* Highlight Jumlah Keluar */}
+                  <div className="shrink-0 text-right">
+                    <span className="px-2.5 py-1 bg-[#C89B3C]/15 border border-[#C89B3C]/30 text-[#E0B85A] rounded-xl text-xs font-black inline-flex items-center gap-1">
+                      -{tx.quantity} <span className="text-[10px] font-bold text-[#8E99A6]">{tx.items?.unit || 'pcs'}</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tujuan / Catatan */}
+                {tx.notes && (
+                  <p className="text-xs text-[#8E99A6] italic bg-[#20252D] p-2 rounded-xl border border-[#2C333E] break-words">
+                    <span className="not-italic font-semibold text-[#6F7985]">Tujuan / Catatan: </span>
+                    {tx.notes}
+                  </p>
+                )}
+
+                {/* Footer Card: Aksi */}
+                <div className="flex items-center justify-between pt-1 border-t border-[#343B46] text-xs">
+                  <span className="text-[10px] text-[#6F7985] font-mono">
+                    ID: #{tx.id.slice(0, 8)}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => handleEdit(tx)}
+                      className="p-1.5 bg-[#2A303A] rounded-lg text-[#E0B85A] border border-[#3A424D] active:scale-95 hover:bg-[#C89B3C]/15 cursor-pointer"
+                      title="Edit Transaksi"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button 
+                      onClick={() => setTransactionToDelete(tx)}
+                      className="p-1.5 bg-[#2A303A] rounded-lg text-[#EB5757] border border-[#3A424D] active:scale-95 hover:bg-[#EB5757]/15 cursor-pointer"
+                      title="Hapus Transaksi"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
         {/* Server-Side Pagination Bar */}
         {totalPages > 1 && (
-          <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
-            <span className="text-xs text-gray-500 font-medium">
-              Halaman <span className="font-bold text-gray-800">{page}</span> dari <span className="font-bold text-gray-800">{totalPages}</span> ({totalCount} transaksi)
+          <div className="p-4 border-t border-[#343B46] bg-[#20252D] flex items-center justify-between">
+            <span className="text-xs text-[#8E99A6] font-medium">
+              Halaman <span className="font-bold text-[#F1F3F5]">{page}</span> dari <span className="font-bold text-[#F1F3F5]">{totalPages}</span> ({totalCount} transaksi)
             </span>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-bold hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all"
+                className="px-3 py-1.5 rounded-lg border border-[#3A424D] bg-[#2A303A] text-[#D8DEE6] text-xs font-bold hover:bg-[#343D49] hover:text-[#F1F3F5] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all cursor-pointer"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
                 Sebelumnya
@@ -353,7 +433,7 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-bold hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all"
+                className="px-3 py-1.5 rounded-lg border border-[#3A424D] bg-[#2A303A] text-[#D8DEE6] text-xs font-bold hover:bg-[#343D49] hover:text-[#F1F3F5] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all cursor-pointer"
               >
                 Selanjutnya
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -365,24 +445,24 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-gray-200 shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
-            <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-gray-50 flex-shrink-0">
-              <h3 className="text-base font-black text-gray-900">{editingTransaction ? 'Edit Barang Keluar' : 'Catat Barang Keluar'}</h3>
-              <button onClick={() => { setIsModalOpen(false); setEditingTransaction(null); resetForm(); }} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
+          <div className="bg-[#252B34] w-full max-w-md rounded-2xl border border-[#343B46] shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
+            <div className="p-5 border-b border-[#343B46] flex justify-between items-center bg-[#20252D] flex-shrink-0">
+              <h3 className="text-base font-black text-[#F1F3F5]">{editingTransaction ? 'Edit Barang Keluar' : 'Catat Barang Keluar'}</h3>
+              <button onClick={() => { setIsModalOpen(false); setEditingTransaction(null); resetForm(); }} className="text-[#8E99A6] hover:text-[#F1F3F5] p-1 cursor-pointer">✕</button>
             </div>
             <form id="outgoing-form" onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-grow">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Pilih Barang</label>
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Pilih Barang</label>
                 <select 
                   value={selectedItemId} 
                   onChange={(e) => setSelectedItemId(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                  className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C] min-h-[44px]"
                   required
                 >
-                  <option value="">-- Pilih Barang --</option>
+                  <option value="" className="bg-[#252B34] text-[#F1F3F5]">-- Pilih Barang --</option>
                   {items.map(item => (
-                    <option key={item.id} value={item.id} disabled={item.current_stock === 0}>
+                    <option key={item.id} value={item.id} disabled={item.current_stock === 0} className="bg-[#252B34] text-[#F1F3F5]">
                       {item.name} ({item.current_stock} {item.unit} tersedia)
                     </option>
                   ))}
@@ -390,25 +470,25 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
               </div>
               
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Departemen</label>
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Departemen</label>
                 <select 
                   value={department} 
                   onChange={(e) => setDepartment(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                  className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C] min-h-[44px]"
                   required
                 >
                   {departments.map(dept => (
-                    <option key={dept} value={dept}>{dept}</option>
+                    <option key={dept} value={dept} className="bg-[#252B34] text-[#F1F3F5]">{dept}</option>
                   ))}
                 </select>
               </div>
 
               {selectedItem && (
-                <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200 flex items-center gap-3">
-                  <Package className="w-5 h-5 text-amber-600" />
+                <div className="p-3 bg-[#20252D] rounded-xl border border-[#3A424D] flex items-center gap-3">
+                  <Package className="w-5 h-5 text-[#E0B85A]" />
                   <div>
-                    <p className="text-[10px] text-gray-500 font-extrabold uppercase">Stok Tersedia</p>
-                    <p className="font-black text-gray-900 text-sm">
+                    <p className="text-[10px] text-[#8E99A6] font-extrabold uppercase">Stok Tersedia</p>
+                    <p className="font-black text-[#F1F3F5] text-sm">
                       {selectedItem.current_stock + (editingTransaction?.quantity || 0)} {selectedItem.unit}
                     </p>
                   </div>
@@ -416,41 +496,45 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
               )}
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Jumlah Keluar</label>
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Jumlah Keluar</label>
                 <input 
                   type="number" 
-                  value={quantity || ''} 
-                  onChange={(e) => setQuantity(Number(e.target.value))} 
+                  value={quantity === 0 ? '' : quantity} 
+                  placeholder="0"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setQuantity(val === '' ? 0 : Number(val));
+                  }} 
                   onFocus={(e) => e.target.select()}
                   onClick={(e) => (e.target as HTMLInputElement).select()}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]" 
+                  className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C] min-h-[44px]" 
                   min="1"
                   max={selectedItem ? selectedItem.current_stock + (editingTransaction?.quantity || 0) : undefined}
                   required 
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Tujuan / Catatan</label>
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Tujuan / Catatan</label>
                 <textarea 
                   value={notes} 
                   onChange={(e) => setNotes(e.target.value)} 
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white h-24 resize-none"
+                  className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C] h-24 resize-none"
                   placeholder="Contoh: Lantai 4 - Housekeeping"
                 />
               </div>
               
               {selectedItem && quantity > (selectedItem.current_stock + (editingTransaction?.quantity || 0)) && (
-                <div className="flex items-center gap-2 text-red-600 text-xs font-medium">
+                <div className="flex items-center gap-2 text-[#EB5757] text-xs font-medium">
                   <AlertCircle className="w-4 h-4" />
                   <span>Jumlah melebihi stok yang tersedia!</span>
                 </div>
               )}
             </form>
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row gap-2.5 flex-shrink-0">
+            <div className="p-4 border-t border-[#343B46] bg-[#20252D] flex flex-col sm:flex-row gap-2.5 flex-shrink-0">
               <button 
                 type="button" 
                 onClick={() => { setIsModalOpen(false); setEditingTransaction(null); resetForm(); }}
-                className="flex-1 bg-white border border-gray-200 py-2.5 rounded-xl font-bold text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all min-h-[44px]"
+                className="flex-1 bg-[#2A303A] border border-[#3A424D] py-2.5 rounded-xl font-bold text-xs text-[#D8DEE6] hover:text-[#F1F3F5] hover:bg-[#343D49] transition-all min-h-[44px] cursor-pointer"
               >
                 Batal
               </button>
@@ -458,11 +542,11 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
                 type="submit"
                 form="outgoing-form"
                 disabled={isSubmitting || !selectedItem || quantity <= 0 || quantity > (selectedItem.current_stock + (editingTransaction?.quantity || 0))}
-                className="flex-1 bg-[#E65C00] hover:bg-[#CF5300] py-2.5 rounded-xl font-extrabold text-xs text-white transition-all shadow-sm shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
+                className="flex-1 bg-gradient-to-r from-[#E6B85C] to-[#C89B3C] hover:brightness-110 py-2.5 rounded-xl font-extrabold text-xs text-[#171A1F] transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px] cursor-pointer"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-[#171A1F]/30 border-t-[#171A1F] rounded-full animate-spin" />
                     <span>Menyimpan...</span>
                   </>
                 ) : (
@@ -475,25 +559,25 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
       )}
       {/* Delete Confirmation Modal */}
       {transactionToDelete && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-[110] p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl border border-gray-200 shadow-2xl p-6 space-y-4 animate-in zoom-in duration-200 text-center">
-            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto border border-red-100">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-[110] p-4">
+          <div className="bg-[#252B34] w-full max-w-sm rounded-2xl border border-[#343B46] shadow-2xl p-6 space-y-4 animate-in zoom-in duration-200 text-center">
+            <div className="w-12 h-12 bg-[#EB5757]/15 text-[#EB5757] rounded-2xl flex items-center justify-center mx-auto border border-[#EB5757]/30">
               <Trash2 className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-base font-black text-gray-900">Hapus Transaksi?</h3>
-              <p className="text-xs text-gray-500 mt-1 font-medium">Stok barang akan ditambah kembali sesuai jumlah transaksi ini.</p>
+              <h3 className="text-base font-black text-[#F1F3F5]">Hapus Transaksi?</h3>
+              <p className="text-xs text-[#8E99A6] mt-1 font-medium">Stok barang akan ditambah kembali sesuai jumlah transaksi ini.</p>
             </div>
             <div className="flex gap-2 pt-2">
               <button 
                 onClick={() => setTransactionToDelete(null)}
-                className="flex-1 bg-gray-100 border border-gray-200 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900"
+                className="flex-1 bg-[#2A303A] border border-[#3A424D] py-2.5 rounded-xl text-xs font-bold text-[#D8DEE6] hover:text-[#F1F3F5] cursor-pointer"
               >
                 Batal
               </button>
               <button 
                 onClick={handleDelete}
-                className="flex-1 bg-red-600 hover:bg-red-700 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm"
+                className="flex-1 bg-[#EB5757] hover:bg-[#D94545] py-2.5 rounded-xl text-xs font-bold text-white shadow-sm cursor-pointer"
               >
                 Hapus
               </button>

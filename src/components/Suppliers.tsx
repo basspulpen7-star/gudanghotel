@@ -55,7 +55,6 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
       if (data) setSuppliers(data);
     } catch (error: any) {
       console.error('Error fetching suppliers:', error);
-      alert('Gagal mengambil data supplier: ' + (error.message || 'Error tidak diketahui'));
     } finally {
       setLoading(false);
     }
@@ -99,17 +98,7 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
       fetchSuppliers(true);
     } catch (error: any) {
       console.error('Error saving supplier:', error);
-      let errorMessage = 'Gagal menyimpan data supplier: ' + (error.message || 'Error tidak diketahui');
-      
-      if (error.message?.includes('column "category" does not exist')) {
-        errorMessage = 'Gagal menyimpan: Kolom "category" belum ada di tabel "suppliers" di Supabase. Silakan tambahkan kolom tersebut.';
-      } else if (error.message?.includes('column "user_id" does not exist')) {
-        errorMessage = 'Gagal menyimpan: Kolom "user_id" belum ada di tabel "suppliers" di Supabase. Silakan tambahkan kolom tersebut.';
-      } else if (error.message?.includes('relation "suppliers" does not exist')) {
-        errorMessage = 'Gagal menyimpan: Tabel "suppliers" belum ada di database Supabase Anda.';
-      }
-      
-      alert(errorMessage);
+      alert('Gagal menyimpan data supplier: ' + (error.message || 'Error tidak diketahui'));
     } finally {
       setIsSubmitting(false);
     }
@@ -154,36 +143,36 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl border border-gray-200/90 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#252B34] p-4 md:p-6 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
         <div>
-          <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Data Supplier</h2>
-          <p className="text-xs md:text-sm text-gray-500 mt-0.5 font-medium">Kelola daftar vendor dan supplier mitra hotel</p>
+          <h2 className="text-xl md:text-2xl font-black text-[#F1F3F5] tracking-tight">Data Supplier</h2>
+          <p className="text-xs md:text-sm text-[#8E99A6] mt-0.5 font-medium">Kelola daftar vendor dan supplier mitra Hotel Alia</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
           <button 
             onClick={fetchSuppliers}
-            className="flex-1 md:flex-none bg-gray-100 text-gray-700 hover:text-gray-900 px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-200 transition-all flex items-center justify-center gap-2 text-xs font-bold min-h-[44px]"
+            className="flex-1 md:flex-none bg-[#20252D] text-[#D8DEE6] hover:text-[#F1F3F5] px-4 py-2.5 rounded-xl border border-[#3A424D] hover:bg-[#2A303A] transition-all flex items-center justify-center gap-2 text-xs font-bold min-h-[44px] cursor-pointer"
           >
-            <Activity className="w-4 h-4 text-amber-600" />
+            <Activity className="w-4 h-4 text-[#E0B85A]" />
             <span>Refresh</span>
           </button>
           <button 
             onClick={() => { resetForm(); setEditingSupplier(null); setIsModalOpen(true); }}
-            className="flex-1 md:flex-none bg-[#E65C00] hover:bg-[#CF5300] text-white px-5 py-2.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm shadow-orange-500/20 text-xs sm:text-sm min-h-[44px]"
+            className="flex-1 md:flex-none bg-gradient-to-r from-[#E6B85C] to-[#C89B3C] hover:brightness-110 text-[#171A1F] px-5 py-2.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm text-xs sm:text-sm min-h-[44px] cursor-pointer"
           >
-            <Plus className="w-4 h-4 stroke-[3]" />
+            <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>Tambah Supplier</span>
           </button>
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-2xl border border-gray-200/90 shadow-sm">
+      <div className="bg-[#252B34] p-4 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E99A6]" />
           <input 
             type="text" 
-            placeholder="Cari supplier atau kontak..." 
-            className="w-full pl-9 pr-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-500 focus:bg-white transition-all"
+            placeholder="Cari supplier, PIC, atau kategori..." 
+            className="w-full pl-10 pr-3 py-2 text-xs bg-[#20252D] border border-[#3A424D] rounded-xl text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C] transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -192,41 +181,41 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         {loading ? (
-          <div className="col-span-full text-center py-12 text-gray-500 font-medium text-xs">Memuat data...</div>
+          <div className="col-span-full text-center py-12 text-[#8E99A6] font-medium text-xs">Memuat data...</div>
         ) : filteredSuppliers.length === 0 ? (
-          <div className="col-span-full bg-white p-12 rounded-2xl border border-gray-200/90 text-center shadow-sm">
-            <p className="text-xs text-gray-500 font-medium">Tidak ada data supplier yang ditemukan.</p>
+          <div className="col-span-full bg-[#252B34] p-12 rounded-2xl border border-[#343B46] text-center shadow-sm">
+            <p className="text-xs text-[#8E99A6] font-medium">Tidak ada data supplier yang ditemukan.</p>
           </div>
         ) : filteredSuppliers.map((supplier) => (
-          <div key={supplier.id} className="bg-white p-5 rounded-2xl border border-gray-200/90 shadow-sm hover:border-amber-500/50 transition-all group">
+          <div key={supplier.id} className="bg-[#252B34] p-5 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] hover:border-[#C89B3C]/50 transition-all group">
             <div className="flex justify-between items-start mb-3.5">
               <div>
-                <h3 className="text-base font-black text-gray-900">{supplier.name}</h3>
-                <span className="inline-block px-2 py-0.5 bg-amber-500/10 text-amber-700 rounded-md text-[10px] font-bold uppercase border border-amber-500/20 mt-1">
+                <h3 className="text-base font-black text-[#F1F3F5]">{supplier.name}</h3>
+                <span className="inline-block px-2 py-0.5 bg-[#C89B3C]/15 text-[#E0B85A] rounded-md text-[10px] font-bold uppercase border border-[#C89B3C]/30 mt-1">
                   {supplier.category || 'General Vendor'}
                 </span>
               </div>
               <div className="flex gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => handleEdit(supplier)} className="p-1.5 hover:bg-amber-50 text-amber-600 rounded-lg transition-colors">
+                <button onClick={() => handleEdit(supplier)} className="p-1.5 hover:bg-[#20252D] text-[#E0B85A] rounded-lg transition-colors cursor-pointer">
                   <Edit2 className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(supplier.id)} className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors">
+                <button onClick={() => handleDelete(supplier.id)} className="p-1.5 hover:bg-[#EB5757]/20 text-[#EB5757] rounded-lg transition-colors cursor-pointer">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
             
-            <div className="space-y-2 pt-2 border-t border-gray-100">
-              <div className="flex items-center gap-2.5 text-xs text-gray-700">
-                <User className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+            <div className="space-y-2 pt-2 border-t border-[#343B46]">
+              <div className="flex items-center gap-2.5 text-xs text-[#D8DEE6]">
+                <User className="w-3.5 h-3.5 text-[#E0B85A] flex-shrink-0" />
                 <span className="font-semibold">{supplier.contact_person || '-'}</span>
               </div>
-              <div className="flex items-center gap-2.5 text-xs text-gray-700">
-                <Phone className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                <span className="font-mono text-gray-600">{supplier.phone || '-'}</span>
+              <div className="flex items-center gap-2.5 text-xs text-[#D8DEE6]">
+                <Phone className="w-3.5 h-3.5 text-[#E0B85A] flex-shrink-0" />
+                <span className="font-mono text-[#8E99A6]">{supplier.phone || '-'}</span>
               </div>
-              <div className="flex items-center gap-2.5 text-xs text-gray-500">
-                <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <div className="flex items-center gap-2.5 text-xs text-[#8E99A6]">
+                <MapPin className="w-3.5 h-3.5 text-[#8E99A6] flex-shrink-0" />
                 <span className="line-clamp-1">{supplier.address || '-'}</span>
               </div>
             </div>
@@ -236,54 +225,54 @@ export function Suppliers({ globalSearch = '' }: SuppliersProps) {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-md rounded-2xl border border-gray-200 shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
-            <div className="p-5 border-b border-gray-200 flex justify-between items-center bg-gray-50 flex-shrink-0">
-              <h3 className="text-base font-black text-gray-900">{editingSupplier ? 'Edit Supplier' : 'Tambah Supplier Baru'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1">✕</button>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-start sm:items-center justify-center z-[100] p-4 overflow-y-auto">
+          <div className="bg-[#252B34] w-full max-w-md rounded-2xl border border-[#343B46] shadow-2xl animate-in zoom-in duration-200 overflow-hidden flex flex-col mt-4 sm:mt-0 max-h-[90vh]">
+            <div className="p-5 border-b border-[#343B46] flex justify-between items-center bg-[#20252D] flex-shrink-0">
+              <h3 className="text-base font-black text-[#F1F3F5]">{editingSupplier ? 'Edit Supplier' : 'Tambah Supplier Baru'}</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-[#8E99A6] hover:text-[#F1F3F5] p-1 cursor-pointer">✕</button>
             </div>
             
-            <form id="supplier-form" onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-grow">
+            <form id="supplier-form" onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-grow text-xs">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Nama Perusahaan / Vendor</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]" required />
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Nama Perusahaan / Vendor</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C] min-h-[44px]" required />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Nama Kontak / PIC</label>
-                <input type="text" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]" required />
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Nama Kontak / PIC</label>
+                <input type="text" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C] min-h-[44px]" required />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Nomor Telepon</label>
-                <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]" required />
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Nomor Telepon</label>
+                <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C] min-h-[44px]" required />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Alamat</label>
-                <textarea value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white h-20 resize-none" required />
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Alamat</label>
+                <textarea value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C] h-20 resize-none" required />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Keterangan Barang / Kategori</label>
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Keterangan Barang / Kategori</label>
                 <input 
                   type="text" 
                   value={category} 
                   onChange={(e) => setCategory(e.target.value)} 
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]" 
+                  className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C] min-h-[44px]" 
                   placeholder="Contoh: Sayuran, Alat Tulis, Linen, dll"
                   required 
                 />
               </div>
             </form>
 
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row gap-2.5 flex-shrink-0">
-              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 bg-white border border-gray-200 py-2.5 rounded-xl font-bold text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all min-h-[44px]">Batal</button>
+            <div className="p-4 border-t border-[#343B46] bg-[#20252D] flex flex-col sm:flex-row gap-2.5 flex-shrink-0">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 bg-[#252B34] border border-[#3A424D] py-2.5 rounded-xl font-bold text-xs text-[#D8DEE6] hover:bg-[#2A303A] transition-all min-h-[44px] cursor-pointer">Batal</button>
               <button 
                 type="submit" 
                 form="supplier-form"
                 disabled={isSubmitting}
-                className="flex-1 bg-[#E65C00] hover:bg-[#CF5300] py-2.5 rounded-xl font-extrabold text-xs text-white transition-all shadow-sm shadow-orange-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]"
+                className="flex-1 bg-gradient-to-r from-[#E6B85C] to-[#C89B3C] hover:brightness-110 py-2.5 rounded-xl font-extrabold text-xs text-[#171A1F] transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px] cursor-pointer"
               >
                 {isSubmitting ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-[#171A1F]/30 border-t-[#171A1F] rounded-full animate-spin" />
                     <span>Menyimpan...</span>
                   </>
                 ) : (

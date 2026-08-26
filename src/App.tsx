@@ -74,17 +74,17 @@ function MainApp() {
   // Loading Screen while verifying session
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F8FA] flex flex-col items-center justify-center p-4 font-sans">
+      <div className="min-h-screen bg-[#171A1F] flex flex-col items-center justify-center p-4 font-sans text-[#F1F3F5]">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#E65C00] flex items-center justify-center shadow-lg shadow-orange-500/20 animate-pulse">
-            <Hotel className="w-6 h-6 text-white" />
+          <div className="w-14 h-14 rounded-2xl bg-[#C89B3C]/15 border border-[#C89B3C]/30 flex items-center justify-center shadow-lg shadow-black/30 animate-pulse">
+            <Hotel className="w-7 h-7 text-[#E0B85A]" />
           </div>
           <div className="text-center space-y-1.5">
-            <h2 className="text-gray-900 font-black text-base tracking-tight">Hotel Alia Matraman</h2>
-            <p className="text-gray-500 text-xs font-medium">Memuat data...</p>
+            <h2 className="text-[#F1F3F5] font-black text-base tracking-tight">Hotel Alia Matraman</h2>
+            <p className="text-[#8E99A6] text-xs font-medium">Memuat data...</p>
             <button
               onClick={() => window.location.reload()}
-              className="text-xs text-amber-700 font-bold hover:underline pt-2 block mx-auto"
+              className="text-xs text-[#E0B85A] font-bold hover:underline pt-2 block mx-auto cursor-pointer"
             >
               Muat ulang jika terlalu lama?
             </button>
@@ -136,13 +136,13 @@ function MainApp() {
       case 'user_management':
         if (!isAdmin) {
           return (
-            <div className="p-8 text-center bg-white rounded-2xl border border-gray-200/90 shadow-sm space-y-3 font-sans">
-              <ShieldAlert className="w-12 h-12 text-red-500 mx-auto" />
-              <h3 className="text-lg font-black text-gray-900">Akses Ditolak</h3>
-              <p className="text-xs text-gray-500 font-medium">Halaman ini hanya dapat diakses oleh Administrator.</p>
+            <div className="p-8 text-center bg-[#252B34] rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] space-y-3 font-sans max-w-lg mx-auto mt-8">
+              <ShieldAlert className="w-12 h-12 text-rose-400 mx-auto" />
+              <h3 className="text-lg font-black text-[#F1F3F5]">Akses Ditolak</h3>
+              <p className="text-xs text-[#8E99A6] font-medium">Halaman Manajemen Pengguna hanya dapat diakses oleh Administrator.</p>
               <button 
                 onClick={() => setCurrentView('dashboard')}
-                className="mt-2 px-5 py-2.5 bg-[#E65C00] hover:bg-[#CF5300] text-white rounded-xl text-xs font-extrabold shadow-sm transition-all"
+                className="mt-2 px-5 py-2.5 bg-gradient-to-r from-[#E6B85C] to-[#C89B3C] text-[#171A1F] hover:brightness-110 rounded-xl text-xs font-black shadow-xs transition-all cursor-pointer"
               >
                 Kembali ke Dashboard
               </button>
@@ -153,13 +153,13 @@ function MainApp() {
       case 'database_setup':
         if (!isAdmin) {
           return (
-            <div className="p-8 text-center bg-white rounded-2xl border border-gray-200/90 shadow-sm space-y-3 font-sans">
-              <ShieldAlert className="w-12 h-12 text-red-500 mx-auto" />
-              <h3 className="text-lg font-black text-gray-900">Akses Ditolak</h3>
-              <p className="text-xs text-gray-500 font-medium">Halaman ini hanya dapat diakses oleh Administrator.</p>
+            <div className="p-8 text-center bg-[#252B34] rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] space-y-3 font-sans max-w-lg mx-auto mt-8">
+              <ShieldAlert className="w-12 h-12 text-rose-400 mx-auto" />
+              <h3 className="text-lg font-black text-[#F1F3F5]">Akses Ditolak</h3>
+              <p className="text-xs text-[#8E99A6] font-medium">Halaman Database Setup hanya dapat diakses oleh Administrator.</p>
               <button 
                 onClick={() => setCurrentView('dashboard')}
-                className="mt-2 px-5 py-2.5 bg-[#E65C00] hover:bg-[#CF5300] text-white rounded-xl text-xs font-extrabold shadow-sm transition-all"
+                className="mt-2 px-5 py-2.5 bg-gradient-to-r from-[#E6B85C] to-[#C89B3C] text-[#171A1F] hover:brightness-110 rounded-xl text-xs font-black shadow-xs transition-all cursor-pointer"
               >
                 Kembali ke Dashboard
               </button>

@@ -249,20 +249,20 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   const getStockBadge = (current: number, min: number) => {
     if (current <= 0) {
       return (
-        <span className="px-2 py-0.5 bg-red-50 text-red-600 border border-red-200 text-[10px] font-black rounded-lg uppercase">
+        <span className="px-2.5 py-0.5 bg-[#EB5757]/15 text-[#EB5757] border border-[#EB5757]/30 text-[10px] font-black rounded-lg uppercase tracking-wider">
           HABIS
         </span>
       );
     }
     if (current <= min) {
       return (
-        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-black rounded-lg uppercase">
+        <span className="px-2.5 py-0.5 bg-[#E5A138]/15 text-[#E5A138] border border-[#E5A138]/30 text-[10px] font-black rounded-lg uppercase tracking-wider">
           MENIPIS
         </span>
       );
     }
     return (
-      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black rounded-lg uppercase">
+      <span className="px-2.5 py-0.5 bg-[#55B685]/15 text-[#55B685] border border-[#55B685]/30 text-[10px] font-black rounded-lg uppercase tracking-wider">
         AMAN
       </span>
     );
@@ -271,24 +271,24 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
       {/* Header & Main Actions */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl border border-gray-200/90 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#252B34] p-4 md:p-6 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Stok Barang (Inventory)</h1>
-          <p className="text-xs md:text-sm text-gray-500 mt-0.5 font-medium">Daftar lengkap ketersediaan item inventaris hotel</p>
+          <h1 className="text-xl md:text-2xl font-black text-[#F1F3F5] tracking-tight">Stok Barang (Inventory)</h1>
+          <p className="text-xs md:text-sm text-[#8E99A6] mt-0.5 font-medium">Daftar lengkap ketersediaan item inventaris hotel</p>
         </div>
 
         <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full md:w-auto">
           <button
             onClick={fetchItemsData}
-            className="bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 p-2.5 rounded-xl border border-gray-200 transition-all flex items-center justify-center min-h-[44px]"
+            className="bg-[#2A303A] hover:bg-[#343D49] text-[#D8DEE6] hover:text-[#F1F3F5] p-2.5 rounded-xl border border-[#3A424D] transition-all flex items-center justify-center min-h-[44px] cursor-pointer shadow-xs"
             title="Refresh Data"
           >
-            <Activity className={cn("w-5 h-5", loading && "animate-spin text-amber-600")} />
+            <Activity className={cn("w-5 h-5", loading && "animate-spin text-[#C89B3C]")} />
           </button>
 
           <button
             onClick={() => openAdjustmentModal()}
-            className="flex-1 md:flex-none bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold py-2.5 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border border-blue-200 min-h-[44px]"
+            className="flex-1 md:flex-none bg-[#6D9EEB]/10 hover:bg-[#6D9EEB]/20 text-[#6D9EEB] font-extrabold py-2.5 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border border-[#6D9EEB]/30 min-h-[44px] cursor-pointer"
             title="Koreksi Stok Fisik"
           >
             <SlidersHorizontal className="w-4 h-4" />
@@ -297,7 +297,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
 
           <button
             onClick={openAddItemModal}
-            className="flex-1 md:flex-none bg-[#E65C00] hover:bg-[#CF5300] text-white font-extrabold py-2.5 px-5 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-sm shadow-orange-500/20 min-h-[44px]"
+            className="flex-1 md:flex-none bg-gradient-to-r from-[#E6B85C] to-[#C89B3C] hover:brightness-110 text-[#171A1F] font-extrabold py-2.5 px-5 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-sm min-h-[44px] cursor-pointer"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>Tambah Barang</span>
@@ -306,21 +306,21 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
       </div>
 
       {/* Search & Department Filters */}
-      <div className="bg-white p-3 md:p-4 rounded-2xl border border-gray-200/90 shadow-sm space-y-3">
+      <div className="bg-[#252B34] p-3 md:p-4 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] space-y-3">
         {/* Search Bar */}
         <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#8E99A6]" />
           <input
             type="text"
             placeholder="Cari barang / departemen..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-9 pr-3 py-2 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[40px] transition-colors"
+            className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl pl-9 pr-3 py-2 text-xs text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C] focus:bg-[#20252D] min-h-[40px] transition-colors"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8E99A6] hover:text-[#F1F3F5]"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -329,18 +329,18 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
 
         {/* Department Chips */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
-          <span className="text-gray-500 text-[10px] font-extrabold uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
-            <Filter className="w-3 h-3" /> Dept:
+          <span className="text-[#8E99A6] text-[10px] font-extrabold uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+            <Filter className="w-3 h-3 text-[#C89B3C]" /> Dept:
           </span>
           {['Semua', ...departments].map((dept) => (
             <button
               key={dept}
               onClick={() => { setSelectedDept(dept); setPage(1); }}
               className={cn(
-                "px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all border shrink-0",
+                "px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all border shrink-0 cursor-pointer",
                 selectedDept === dept
-                  ? "bg-amber-500/10 border-amber-500 text-amber-700"
-                  : "bg-gray-100 border-gray-200 text-gray-600 hover:text-gray-900"
+                  ? "bg-[#C89B3C]/15 border-[#C89B3C] text-[#E0B85A]"
+                  : "bg-[#20252D] border-[#3A424D] text-[#8E99A6] hover:text-[#D8DEE6] hover:border-[#4A5462]"
               )}
             >
               {dept}
@@ -350,18 +350,18 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
       </div>
 
       {/* Main Stock Display */}
-      <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden">
+      <div className="bg-[#252B34] rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] overflow-hidden">
         {loading ? (
-          <div className="py-12 text-center text-xs text-gray-500 animate-pulse font-medium">Memuat daftar barang...</div>
+          <div className="py-12 text-center text-xs text-[#8E99A6] animate-pulse font-medium">Memuat daftar barang...</div>
         ) : items.length === 0 ? (
-          <div className="py-12 text-center text-xs text-gray-500 font-medium">Tidak ada barang ditemukan.</div>
+          <div className="py-12 text-center text-xs text-[#8E99A6] font-medium">Tidak ada barang ditemukan.</div>
         ) : (
           <>
             {/* Desktop Table View */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-gray-50/80 text-gray-500 uppercase text-[10px] font-extrabold border-b border-gray-200">
+                  <tr className="bg-[#20252D] text-[#8E99A6] uppercase text-[10px] font-extrabold border-b border-[#343B46]">
                     <th className="p-4">Nama Barang</th>
                     <th className="p-4">Departemen</th>
                     <th className="p-4 text-center">Status</th>
@@ -372,37 +372,37 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                     <th className="p-4 text-center">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-[#2C333E]">
                   {items.map((item) => (
-                    <tr key={item.id} className="hover:bg-amber-50/30 transition-colors">
-                      <td className="p-4 font-bold text-gray-900 text-sm">{item.name}</td>
-                      <td className="p-4 text-gray-600 font-medium">{item.department || 'General'}</td>
+                    <tr key={item.id} className="hover:bg-[#2A303A]/70 transition-colors">
+                      <td className="p-4 font-bold text-[#F1F3F5] text-sm">{item.name}</td>
+                      <td className="p-4 text-[#8E99A6] font-medium">{item.department || 'General'}</td>
                       <td className="p-4 text-center">
                         {getStockBadge(item.current_stock, item.min_stock)}
                       </td>
-                      <td className="p-4 text-right text-gray-500 font-semibold">{item.initial_stock ?? 0}</td>
-                      <td className="p-4 text-right font-black text-sm text-gray-900">{item.current_stock}</td>
-                      <td className="p-4 text-right text-gray-500 font-medium">{item.min_stock}</td>
-                      <td className="p-4 text-center text-gray-600 font-medium">{item.unit || 'pcs'}</td>
+                      <td className="p-4 text-right text-[#8E99A6] font-semibold">{item.initial_stock ?? 0}</td>
+                      <td className="p-4 text-right font-black text-sm text-[#F1F3F5]">{item.current_stock}</td>
+                      <td className="p-4 text-right text-[#6F7985] font-medium">{item.min_stock}</td>
+                      <td className="p-4 text-center text-[#8E99A6] font-medium">{item.unit || 'pcs'}</td>
                       <td className="p-4 text-center">
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => openAdjustmentModal(item)}
-                            className="p-1.5 hover:bg-blue-50 text-blue-600 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-[#6D9EEB]/15 text-[#6D9EEB] rounded-lg transition-colors cursor-pointer"
                             title="Koreksi Stok"
                           >
                             <SlidersHorizontal className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => openEditItemModal(item)}
-                            className="p-1.5 hover:bg-amber-50 text-amber-600 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-[#C89B3C]/15 text-[#E0B85A] rounded-lg transition-colors cursor-pointer"
                             title="Edit Barang"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setItemToDelete(item.id)}
-                            className="p-1.5 hover:bg-red-50 text-red-600 rounded-lg transition-colors"
+                            className="p-1.5 hover:bg-[#EB5757]/15 text-[#EB5757] rounded-lg transition-colors cursor-pointer"
                             title="Hapus Barang"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -416,48 +416,48 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
             </div>
 
             {/* Mobile Cards View */}
-            <div className="block md:hidden divide-y divide-gray-100">
+            <div className="block md:hidden divide-y divide-[#2C333E]">
               {items.map((item) => (
-                <div key={item.id} className="p-3.5 space-y-2 hover:bg-amber-50/20 transition-colors">
+                <div key={item.id} className="p-3.5 space-y-2 hover:bg-[#2A303A]/50 transition-colors">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900 leading-tight">{item.name}</h3>
-                      <p className="text-[10px] text-gray-500 mt-0.5 font-medium">{item.department || 'General'}</p>
+                      <h3 className="text-sm font-bold text-[#F1F3F5] leading-tight">{item.name}</h3>
+                      <p className="text-[10px] text-[#8E99A6] mt-0.5 font-medium">{item.department || 'General'}</p>
                     </div>
                     <div>{getStockBadge(item.current_stock, item.min_stock)}</div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-1 border-t border-gray-100 text-xs">
+                  <div className="flex items-center justify-between pt-1 border-t border-[#343B46] text-xs">
                     <div className="flex items-center gap-3">
                       <div>
-                        <span className="text-[9px] text-gray-400 font-extrabold uppercase block">Stok Saat Ini</span>
-                        <span className="font-black text-gray-900 text-sm">
-                          {item.current_stock} <span className="text-xs font-normal text-gray-500">{item.unit}</span>
+                        <span className="text-[9px] text-[#6F7985] font-extrabold uppercase block">Stok Saat Ini</span>
+                        <span className="font-black text-[#F1F3F5] text-sm">
+                          {item.current_stock} <span className="text-xs font-normal text-[#8E99A6]">{item.unit}</span>
                         </span>
                       </div>
-                      <div className="border-l border-gray-200 pl-3">
-                        <span className="text-[9px] text-gray-400 font-extrabold uppercase block">Batas Min.</span>
-                        <span className="font-semibold text-gray-600 text-xs">{item.min_stock} {item.unit}</span>
+                      <div className="border-l border-[#3A424D] pl-3">
+                        <span className="text-[9px] text-[#6F7985] font-extrabold uppercase block">Batas Min.</span>
+                        <span className="font-semibold text-[#8E99A6] text-xs">{item.min_stock} {item.unit}</span>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => openAdjustmentModal(item)}
-                        className="p-2 bg-blue-50 rounded-xl text-blue-600 border border-blue-200 active:scale-95"
+                        className="p-2 bg-[#6D9EEB]/10 rounded-xl text-[#6D9EEB] border border-[#6D9EEB]/30 active:scale-95 cursor-pointer"
                         title="Koreksi Stok"
                       >
                         <SlidersHorizontal className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => openEditItemModal(item)}
-                        className="p-2 bg-gray-50 rounded-xl text-amber-600 border border-gray-200 active:scale-95 hover:bg-amber-50"
+                        className="p-2 bg-[#2A303A] rounded-xl text-[#E0B85A] border border-[#3A424D] active:scale-95 hover:bg-[#C89B3C]/15 cursor-pointer"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => setItemToDelete(item.id)}
-                        className="p-2 bg-gray-50 rounded-xl text-red-600 border border-gray-200 active:scale-95 hover:bg-red-50"
+                        className="p-2 bg-[#2A303A] rounded-xl text-[#EB5757] border border-[#3A424D] active:scale-95 hover:bg-[#EB5757]/15 cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -468,21 +468,21 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
             </div>
 
             {/* Pagination */}
-            <div className="p-3 md:p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs text-gray-600 font-medium">
+            <div className="p-3 md:p-4 border-t border-[#343B46] bg-[#20252D] flex items-center justify-between text-xs text-[#8E99A6] font-medium">
               <span>Total {totalItemsCount} SKU</span>
               <div className="flex items-center gap-2">
                 <button
                   disabled={page <= 1}
                   onClick={() => setPage(p => Math.max(1, p - 1))}
-                  className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                  className="p-1.5 rounded-lg border border-[#3A424D] bg-[#2A303A] hover:bg-[#343D49] text-[#D8DEE6] disabled:opacity-40 disabled:cursor-not-allowed shadow-xs cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
-                <span className="font-bold text-gray-900">Hal {page} / {totalPages || 1}</span>
+                <span className="font-bold text-[#F1F3F5]">Hal {page} / {totalPages || 1}</span>
                 <button
                   disabled={page >= totalPages}
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  className="p-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs"
+                  className="p-1.5 rounded-lg border border-[#3A424D] bg-[#2A303A] hover:bg-[#343D49] text-[#D8DEE6] disabled:opacity-40 disabled:cursor-not-allowed shadow-xs cursor-pointer"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -494,14 +494,14 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
 
       {/* Add / Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-[#252B34] w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#343B46] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
             {/* Modal Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-              <h3 className="text-base font-black text-gray-900 tracking-tight">
+            <div className="p-4 border-b border-[#343B46] flex items-center justify-between bg-[#20252D]">
+              <h3 className="text-base font-black text-[#F1F3F5] tracking-tight">
                 {editingItem ? 'Edit Data Barang' : 'Tambah Barang Baru'}
               </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-2">
+              <button onClick={() => setIsModalOpen(false)} className="text-[#8E99A6] hover:text-[#F1F3F5] p-2 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -509,21 +509,21 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
             {/* Modal Form */}
             <form id="item-form" onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
               {formError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 font-medium">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <div className="p-3 bg-[#EB5757]/15 border border-[#EB5757]/30 text-[#EB5757] rounded-xl text-xs flex items-center gap-2 font-medium">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-[#EB5757]" />
                   <span>{formError}</span>
                 </div>
               )}
 
               {/* 1. Nama Barang */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Nama Barang *</label>
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Nama Barang *</label>
                 <input
                   type="text"
                   placeholder="Contoh: Handuk Mandi Standard"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                  className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C] min-h-[44px]"
                   required
                 />
               </div>
@@ -531,37 +531,37 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
               {/* 2. Departemen & 3. Satuan */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Departemen *</label>
+                  <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Departemen *</label>
                   <select
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                    className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C] min-h-[44px]"
                     required
                   >
                     {departments.map((d) => (
-                      <option key={d} value={d}>{d}</option>
+                      <option key={d} value={d} className="bg-[#252B34] text-[#F1F3F5]">{d}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Satuan *</label>
+                  <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Satuan *</label>
                   <input
                     type="text"
                     placeholder="pcs, unit, kg"
                     value={unit}
                     onChange={(e) => setUnit(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                    className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C] min-h-[44px]"
                     required
                   />
                 </div>
               </div>
 
               {/* 4. Stok Awal & 5. Minimum Stok Alert */}
-              <div className="space-y-4 pt-1 border-t border-gray-100">
+              <div className="space-y-4 pt-1 border-t border-[#343B46]">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-0.5">Stok Awal *</label>
-                  <p className="text-[11px] text-gray-500 mb-1.5 font-medium">Jumlah barang yang tersedia saat barang pertama kali dicatat.</p>
+                  <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-0.5">Stok Awal *</label>
+                  <p className="text-[11px] text-[#8E99A6] mb-1.5 font-medium">Jumlah barang yang tersedia saat barang pertama kali dicatat.</p>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -576,21 +576,21 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                     className={cn(
                       "w-full border rounded-xl p-3 text-sm font-bold min-h-[44px] transition-colors",
                       editingItem && editingItemHasTx
-                        ? "bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed"
-                        : "bg-gray-50 border-gray-200 text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white"
+                        ? "bg-[#1D2128] text-[#6F7985] border-[#2C333E] cursor-not-allowed"
+                        : "bg-[#20252D] border-[#3A424D] text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C]"
                     )}
                     required
                   />
                   {editingItem && editingItemHasTx && (
-                    <p className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200 mt-2 font-medium">
+                    <p className="text-[11px] text-[#E0B85A] bg-[#C89B3C]/10 p-2.5 rounded-lg border border-[#C89B3C]/30 mt-2 font-medium">
                       🔒 <strong>Stok Awal terkunci:</strong> Barang ini sudah memiliki riwayat transaksi. Stok saat ini berjalan otomatis melalui Barang Masuk/Keluar atau fitur Koreksi Stok.
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-0.5">Minimum Stok Alert *</label>
-                  <p className="text-[11px] text-gray-500 mb-1.5 font-medium">Batas minimum stok sebelum muncul peringatan status MENIPIS.</p>
+                  <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-0.5">Minimum Stok Alert *</label>
+                  <p className="text-[11px] text-[#8E99A6] mb-1.5 font-medium">Batas minimum stok sebelum muncul peringatan status MENIPIS.</p>
                   <input
                     type="number"
                     inputMode="numeric"
@@ -601,7 +601,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                       const val = e.target.value;
                       setMinStock(val === '' ? '' : parseInt(val, 10));
                     }}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                    className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C] min-h-[44px]"
                     required
                   />
                 </div>
@@ -609,11 +609,11 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
             </form>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center gap-3">
+            <div className="p-4 border-t border-[#343B46] bg-[#20252D] flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="flex-1 bg-white border border-gray-200 py-3 rounded-xl font-bold text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all min-h-[44px]"
+                className="flex-1 bg-[#2A303A] border border-[#3A424D] py-3 rounded-xl font-bold text-xs text-[#D8DEE6] hover:text-[#F1F3F5] hover:bg-[#343D49] transition-all min-h-[44px] cursor-pointer"
               >
                 Batal
               </button>
@@ -621,7 +621,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                 type="submit"
                 form="item-form"
                 disabled={isSubmitting}
-                className="flex-1 bg-[#E65C00] hover:bg-[#CF5300] font-extrabold text-xs text-white py-3 rounded-xl transition-all shadow-sm shadow-orange-500/20 min-h-[44px]"
+                className="flex-1 bg-gradient-to-r from-[#E6B85C] to-[#C89B3C] hover:brightness-110 font-extrabold text-xs text-[#171A1F] py-3 rounded-xl transition-all shadow-sm min-h-[44px] cursor-pointer"
               >
                 {isSubmitting ? 'Menyimpan...' : editingItem ? 'Simpan Perubahan' : 'Tambah Barang'}
               </button>
@@ -632,20 +632,20 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
 
       {/* Koreksi Stok (Stock Adjustment) Modal */}
       {isAdjustmentModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-[#252B34] w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl border border-[#343B46] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom duration-300">
             {/* Modal Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+            <div className="p-4 border-b border-[#343B46] flex items-center justify-between bg-[#20252D]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#6D9EEB]/15 border border-[#6D9EEB]/30 flex items-center justify-center text-[#6D9EEB]">
                   <SlidersHorizontal className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-gray-900 tracking-tight">Koreksi Stok Fisik</h3>
-                  <p className="text-[11px] text-gray-500 font-medium">Sesuaikan stok sistem dengan hasil perhitungan fisik (Stock Opname)</p>
+                  <h3 className="text-base font-black text-[#F1F3F5] tracking-tight">Koreksi Stok Fisik</h3>
+                  <p className="text-[11px] text-[#8E99A6] font-medium">Sesuaikan stok sistem dengan hasil perhitungan fisik (Stock Opname)</p>
                 </div>
               </div>
-              <button onClick={() => setIsAdjustmentModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-2">
+              <button onClick={() => setIsAdjustmentModalOpen(false)} className="text-[#8E99A6] hover:text-[#F1F3F5] p-2 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -653,22 +653,22 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
             {/* Modal Form */}
             <form id="adjustment-form" onSubmit={handleAdjustmentSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto">
               {adjustmentError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2 font-medium">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <div className="p-3 bg-[#EB5757]/15 border border-[#EB5757]/30 text-[#EB5757] rounded-xl text-xs flex items-center gap-2 font-medium">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-[#EB5757]" />
                   <span>{adjustmentError}</span>
                 </div>
               )}
 
               {adjustmentSuccess && (
-                <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2 font-bold">
-                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                <div className="p-3 bg-[#55B685]/15 border border-[#55B685]/30 text-[#55B685] rounded-xl text-xs flex items-center gap-2 font-bold">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-[#55B685]" />
                   <span>{adjustmentSuccess}</span>
                 </div>
               )}
 
               {/* Pilih Barang */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Pilih Barang *</label>
+                <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Pilih Barang *</label>
                 <select
                   value={adjustmentItem?.id || ''}
                   onChange={(e) => {
@@ -678,11 +678,11 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                       setPhysicalStockInput(found.current_stock);
                     }
                   }}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                  className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] focus:outline-none focus:border-[#C89B3C] min-h-[44px]"
                   required
                 >
                   {items.map(i => (
-                    <option key={i.id} value={i.id}>
+                    <option key={i.id} value={i.id} className="bg-[#252B34] text-[#F1F3F5]">
                       {i.name} ({i.department}) — Stok Sistem: {i.current_stock} {i.unit}
                     </option>
                   ))}
@@ -691,32 +691,32 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
 
               {adjustmentItem && (
                 <>
-                  <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 space-y-2">
+                  <div className="p-3.5 bg-[#20252D] rounded-xl border border-[#343B46] space-y-2">
                     <div className="flex justify-between items-center text-xs">
-                      <span className="text-gray-500 font-bold uppercase">Stok Saat Ini (Sistem):</span>
-                      <span className="font-black text-gray-900 text-sm">
+                      <span className="text-[#8E99A6] font-bold uppercase">Stok Saat Ini (Sistem):</span>
+                      <span className="font-black text-[#F1F3F5] text-sm">
                         {adjustmentItem.current_stock} {adjustmentItem.unit}
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center text-xs border-t border-gray-200/80 pt-2">
-                      <span className="text-gray-500 font-bold uppercase">Selisih Koreksi:</span>
+                    <div className="flex justify-between items-center text-xs border-t border-[#343B46] pt-2">
+                      <span className="text-[#8E99A6] font-bold uppercase">Selisih Koreksi:</span>
                       {(() => {
                         const parsedP = typeof physicalStockInput === 'number' ? physicalStockInput : parseInt(String(physicalStockInput || '0'), 10);
                         const numP = isNaN(parsedP) ? 0 : Math.max(0, parsedP);
                         const diff = numP - adjustmentItem.current_stock;
                         if (diff > 0) {
-                          return <span className="font-black text-emerald-600 text-xs">+{diff} {adjustmentItem.unit} (Penambahan)</span>;
+                          return <span className="font-black text-[#55B685] text-xs">+{diff} {adjustmentItem.unit} (Penambahan)</span>;
                         } else if (diff < 0) {
-                          return <span className="font-black text-red-600 text-xs">{diff} {adjustmentItem.unit} (Pengurangan)</span>;
+                          return <span className="font-black text-[#EB5757] text-xs">{diff} {adjustmentItem.unit} (Pengurangan)</span>;
                         }
-                        return <span className="font-bold text-gray-500 text-xs">0 {adjustmentItem.unit} (Sesuai)</span>;
+                        return <span className="font-bold text-[#8E99A6] text-xs">0 {adjustmentItem.unit} (Sesuai)</span>;
                       })()}
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Stok Fisik Hasil Cek (Jumlah Nyata) *</label>
+                    <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Stok Fisik Hasil Cek (Jumlah Nyata) *</label>
                     <input
                       type="number"
                       inputMode="numeric"
@@ -727,19 +727,19 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                         const val = e.target.value;
                         setPhysicalStockInput(val === '' ? '' : parseInt(val, 10));
                       }}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm font-black text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                      className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm font-black text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C] min-h-[44px]"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Catatan / Alasan Koreksi</label>
+                    <label className="block text-xs font-bold text-[#D8DEE6] uppercase mb-1">Catatan / Alasan Koreksi</label>
                     <input
                       type="text"
                       placeholder="Contoh: Hasil Stock Opname, Barang Rusak, Hilang"
                       value={adjustmentNotes}
                       onChange={(e) => setAdjustmentNotes(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]"
+                      className="w-full bg-[#20252D] border border-[#3A424D] rounded-xl p-3 text-sm text-[#F1F3F5] placeholder:text-[#6F7985] focus:outline-none focus:border-[#C89B3C] min-h-[44px]"
                     />
                   </div>
                 </>
@@ -747,11 +747,11 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
             </form>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center gap-3">
+            <div className="p-4 border-t border-[#343B46] bg-[#20252D] flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setIsAdjustmentModalOpen(false)}
-                className="flex-1 bg-white border border-gray-200 py-3 rounded-xl font-bold text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all min-h-[44px]"
+                className="flex-1 bg-[#2A303A] border border-[#3A424D] py-3 rounded-xl font-bold text-xs text-[#D8DEE6] hover:text-[#F1F3F5] hover:bg-[#343D49] transition-all min-h-[44px] cursor-pointer"
               >
                 Batal
               </button>
@@ -759,7 +759,7 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
                 type="submit"
                 form="adjustment-form"
                 disabled={isSubmittingAdjustment}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 font-extrabold text-xs text-white py-3 rounded-xl transition-all shadow-sm min-h-[44px]"
+                className="flex-1 bg-[#6D9EEB] hover:bg-[#5B8CD9] font-extrabold text-xs text-[#171A1F] py-3 rounded-xl transition-all shadow-sm min-h-[44px] cursor-pointer"
               >
                 {isSubmittingAdjustment ? 'Proses Koreksi...' : 'Simpan Koreksi Stok'}
               </button>
@@ -770,23 +770,23 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
 
       {/* Delete Confirmation Modal */}
       {itemToDelete && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-2xl border border-gray-200 p-6 text-center space-y-4 shadow-2xl">
-            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto border border-red-100">
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-xs z-[110] flex items-center justify-center p-4">
+          <div className="bg-[#252B34] w-full max-w-sm rounded-2xl border border-[#343B46] p-6 text-center space-y-4 shadow-2xl">
+            <div className="w-12 h-12 bg-[#EB5757]/15 text-[#EB5757] rounded-2xl flex items-center justify-center mx-auto border border-[#EB5757]/30">
               <Trash2 className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-black text-gray-900">Hapus Barang dari Inventaris?</h3>
-            <p className="text-xs text-gray-500 font-medium">Tindakan ini tidak dapat dibatalkan.</p>
+            <h3 className="text-base font-black text-[#F1F3F5]">Hapus Barang dari Inventaris?</h3>
+            <p className="text-xs text-[#8E99A6] font-medium">Tindakan ini tidak dapat dibatalkan.</p>
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setItemToDelete(null)}
-                className="flex-1 bg-gray-100 border border-gray-200 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:text-gray-900"
+                className="flex-1 bg-[#2A303A] border border-[#3A424D] py-2.5 rounded-xl text-xs font-bold text-[#D8DEE6] hover:text-[#F1F3F5] cursor-pointer"
               >
                 Batal
               </button>
               <button
                 onClick={handleDelete}
-                className="flex-1 bg-red-600 hover:bg-red-700 py-2.5 rounded-xl text-xs font-bold text-white shadow-sm"
+                className="flex-1 bg-[#EB5757] hover:bg-[#D94545] py-2.5 rounded-xl text-xs font-bold text-white shadow-sm cursor-pointer"
               >
                 Hapus
               </button>
