@@ -43,6 +43,22 @@ import autoTable from 'jspdf-autotable';
 type ReportType = 'daily' | 'monthly' | 'custom';
 type ReportCategory = 'stock' | 'incoming' | 'outgoing';
 
+// Helper to determine if an item/department belongs to Resto
+const isRestoDepartment = (deptName?: string | null): boolean => {
+  if (!deptName) return false;
+  const d = deptName.toLowerCase().trim();
+  return (
+    d.includes('resto') ||
+    d.includes('restoran') ||
+    d.includes('f&b') ||
+    d.includes('food') ||
+    d.includes('kitchen') ||
+    d.includes('dapur') ||
+    d.includes('bar') ||
+    d.includes('beverage')
+  );
+};
+
 interface ReportsProps {
   onNavigateToResto?: () => void;
 }
@@ -103,6 +119,11 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
         const stats: Record<string, { initial: number; in: number; out: number; final: number }> = {};
 
         data.forEach((row: any) => {
+          // EXCLUDE RESTO ITEMS
+          if (isRestoDepartment(row.department)) {
+            return;
+          }
+
           mappedItems.push({
             id: row.item_id,
             name: row.item_name,
@@ -144,8 +165,9 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
       if (transError) throw transError;
 
       const stats: Record<string, { initial: number; in: number; out: number; final: number }> = {};
+      const filteredItemsData = (itemsData || []).filter(item => !isRestoDepartment(item.department));
 
-      itemsData?.forEach(item => {
+      filteredItemsData.forEach(item => {
         let beforeIn = 0;
         let beforeOut = 0;
         let currentIn = 0;
@@ -175,7 +197,7 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
         };
       });
 
-      setItems(itemsData || []);
+      setItems(filteredItemsData);
       setItemStats(stats as any);
     } catch (error: any) {
       console.error('Error fetching stock data:', error);
@@ -192,13 +214,17 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
     try {
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, item_id, type, quantity, notes, created_at, items(id, name, unit)')
+        .select('id, item_id, type, quantity, notes, created_at, items(id, name, unit, department)')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      if (data) setTransactions(data);
+      if (data) {
+        // Filter out transactions of resto items
+        const filteredTrans = data.filter((tx: any) => !isRestoDepartment(tx.items?.department));
+        setTransactions(filteredTrans);
+      }
     } catch (error: any) {
       console.error('Error fetching transactions:', error);
     } finally {
