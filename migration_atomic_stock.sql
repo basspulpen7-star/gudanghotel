@@ -8,6 +8,9 @@
 -- 1. FUNCTION: create_transaction_and_update_stock
 -- Atomically locks the item row, checks stock availability,
 -- inserts a transaction, updates current_stock, and returns transaction result.
+DROP FUNCTION IF EXISTS public.create_transaction_and_update_stock(UUID, TEXT, INT, TEXT, TEXT, UUID);
+DROP FUNCTION IF EXISTS public.create_transaction_and_update_stock;
+
 CREATE OR REPLACE FUNCTION public.create_transaction_and_update_stock(
   p_item_id UUID,
   p_type TEXT,

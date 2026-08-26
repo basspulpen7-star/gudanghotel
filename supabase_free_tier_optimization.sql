@@ -54,6 +54,9 @@ CREATE INDEX IF NOT EXISTS idx_po_items_po_id
 -- 1. RPC: get_dashboard_summary()
 -- Konsolidasi seluruh data Dashboard dalam 1 query tunggal
 -- --------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.get_dashboard_summary(INT, INT);
+DROP FUNCTION IF EXISTS public.get_dashboard_summary();
+
 CREATE OR REPLACE FUNCTION public.get_dashboard_summary(
   p_low_stock_limit INT DEFAULT 5, 
   p_recent_tx_limit INT DEFAULT 5
@@ -111,6 +114,10 @@ GRANT EXECUTE ON FUNCTION public.get_dashboard_summary(INT, INT) TO anon, authen
 -- Atomic Fulfillment Housekeeping: Update Status + Potong Stok + Catat Transaksi OUT
 -- Menghilangkan 20+ round-trip sequential requests menjadi 1 atomic request
 -- --------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.complete_hk_request(TEXT, JSONB, UUID);
+DROP FUNCTION IF EXISTS public.complete_hk_request(TEXT, JSONB);
+DROP FUNCTION IF EXISTS public.complete_hk_request(UUID, JSONB, UUID);
+
 CREATE OR REPLACE FUNCTION public.complete_hk_request(
   p_request_id TEXT,
   p_items_json JSONB,
@@ -211,6 +218,9 @@ GRANT EXECUTE ON FUNCTION public.complete_hk_request(TEXT, JSONB, UUID) TO anon,
 -- Atomic PO Completion: Update PO Status + Tambah Stok + Catat Transaksi IN
 -- Menghilangkan 15+ round-trip sequential requests menjadi 1 atomic request
 -- --------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.complete_purchase_order(UUID, UUID);
+DROP FUNCTION IF EXISTS public.complete_purchase_order(UUID);
+
 CREATE OR REPLACE FUNCTION public.complete_purchase_order(
   p_po_id UUID,
   p_user_id UUID DEFAULT NULL
@@ -296,6 +306,10 @@ GRANT EXECUTE ON FUNCTION public.complete_purchase_order(UUID, UUID) TO anon, au
 -- 4. RPC: create_transaction_and_update_stock()
 -- Atomic Single Transaction: IN/OUT + Update Stok
 -- --------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.create_transaction_and_update_stock(UUID, TEXT, INT, TEXT, TEXT, UUID);
+DROP FUNCTION IF EXISTS public.create_transaction_and_update_stock(UUID, TEXT, INT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.create_transaction_and_update_stock;
+
 CREATE OR REPLACE FUNCTION public.create_transaction_and_update_stock(
   p_item_id UUID,
   p_type TEXT,
@@ -379,6 +393,9 @@ GRANT EXECUTE ON FUNCTION public.create_transaction_and_update_stock(UUID, TEXT,
 -- 5. RPC: get_stock_report()
 -- Agregasi Stok Awal, Masuk, Keluar, dan Akhir di Database (Hemat Bandwidth)
 -- --------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.get_stock_report(TIMESTAMPTZ, TIMESTAMPTZ);
+DROP FUNCTION IF EXISTS public.get_stock_report;
+
 CREATE OR REPLACE FUNCTION public.get_stock_report(
   p_start TIMESTAMPTZ,
   p_end TIMESTAMPTZ
@@ -442,6 +459,8 @@ GRANT EXECUTE ON FUNCTION public.get_stock_report(TIMESTAMPTZ, TIMESTAMPTZ) TO a
 -- 1. View: Daily Transaction Aggregates (view_daily_transaction_summary)
 -- Mengurangi jutaan raw scan baris untuk grafik dashboard bulanan
 -- --------------------------------------------------------------------
+DROP VIEW IF EXISTS public.view_daily_transaction_summary CASCADE;
+
 CREATE OR REPLACE VIEW public.view_daily_transaction_summary AS
 SELECT 
   date_trunc('day', created_at)::date AS tx_date,
@@ -460,6 +479,8 @@ GRANT SELECT ON public.view_daily_transaction_summary TO anon, authenticated, se
 -- 2. View: Low Stock Alerts (view_stock_alerts)
 -- Filter instan untuk notifikasi restock
 -- --------------------------------------------------------------------
+DROP VIEW IF EXISTS public.view_stock_alerts CASCADE;
+
 CREATE OR REPLACE VIEW public.view_stock_alerts AS
 SELECT 
   id,
@@ -484,6 +505,8 @@ GRANT SELECT ON public.view_stock_alerts TO anon, authenticated, service_role;
 -- 3. RPC: get_database_storage_stats()
 -- Memonitor konsumsi kuota penyimpanan Supabase (Free Tier 500 MB limit)
 -- --------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.get_database_storage_stats();
+
 CREATE OR REPLACE FUNCTION public.get_database_storage_stats()
 RETURNS JSON
 LANGUAGE plpgsql
@@ -528,6 +551,8 @@ GRANT EXECUTE ON FUNCTION public.get_database_storage_stats() TO anon, authentic
 -- 1. RPC: get_table_health_analysis()
 -- Menganalisis dead tuples, rasio scan index vs sequential scan, dan bloat
 -- --------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.get_table_health_analysis();
+
 CREATE OR REPLACE FUNCTION public.get_table_health_analysis()
 RETURNS JSON
 LANGUAGE sql
@@ -568,6 +593,8 @@ GRANT EXECUTE ON FUNCTION public.get_table_health_analysis() TO anon, authentica
 -- 2. RPC: preview_or_prune_old_transactions()
 -- Safe maintenance utility: Dry run atau pembersihan arsip transaksi lawas
 -- --------------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.preview_or_prune_old_transactions(INT, BOOLEAN);
+
 CREATE OR REPLACE FUNCTION public.preview_or_prune_old_transactions(
   p_days_to_keep INT DEFAULT 365,
   p_execute_delete BOOLEAN DEFAULT FALSE

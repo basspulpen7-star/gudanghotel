@@ -49,8 +49,28 @@ export function Reports() {
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [items, setItems] = useState<Item[]>([]);
-  const [itemStats, setItemStats] = useState<Record<string, { in: number, out: number }>>({});
+  const [itemStats, setItemStats] = useState<Record<string, { initial: number; in: number; out: number; final: number }>>({});
   const [loading, setLoading] = useState(true);
+
+  const getLocalStart = (type: ReportType, currDate: Date, sDateStr: string) => {
+    if (type === 'daily') return startOfDay(currDate);
+    if (type === 'monthly') return startOfMonth(currDate);
+    const parts = sDateStr.split('-');
+    if (parts.length === 3) {
+      return startOfDay(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
+    }
+    return startOfDay(new Date(sDateStr));
+  };
+
+  const getLocalEnd = (type: ReportType, currDate: Date, eDateStr: string) => {
+    if (type === 'daily') return endOfDay(currDate);
+    if (type === 'monthly') return endOfMonth(currDate);
+    const parts = eDateStr.split('-');
+    if (parts.length === 3) {
+      return endOfDay(new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
+    }
+    return endOfDay(new Date(eDateStr));
+  };
 
   useEffect(() => {
     if (reportCategory === 'stock') {
@@ -62,18 +82,8 @@ export function Reports() {
 
   const fetchStockData = async () => {
     setLoading(true);
-    let start, end;
-
-    if (reportType === 'daily') {
-      start = startOfDay(currentDate);
-      end = endOfDay(currentDate);
-    } else if (reportType === 'monthly') {
-      start = startOfMonth(currentDate);
-      end = endOfMonth(currentDate);
-    } else {
-      start = startOfDay(new Date(startDate));
-      end = endOfDay(new Date(endDate));
-    }
+    const start = getLocalStart(reportType, currentDate, startDate);
+    const end = getLocalEnd(reportType, currentDate, endDate);
 
     try {
       // Try RPC get_stock_report first for fast DB-side calculation
@@ -82,7 +92,7 @@ export function Reports() {
         p_end: end.toISOString()
       });
 
-      if (!error && data) {
+      if (!error && data && Array.isArray(data)) {
         const mappedItems: Item[] = [];
         const stats: Record<string, { initial: number; in: number; out: number; final: number }> = {};
 
@@ -107,12 +117,12 @@ export function Reports() {
         return;
       }
 
-      // If RPC is missing or failed, log and use client-side calculation fallback
+      // If RPC is missing or failed, use client-side calculation fallback
       if (error) {
-        console.warn('[REPORTS] RPC get_stock_report not available on Supabase, using client-side fallback:', error.message);
+        console.warn('[REPORTS] RPC get_stock_report not available, using client-side fallback:', error.message);
       }
 
-      // Client-side Fallback: Only fetch required fields to save bandwidth
+      // Client-side Fallback: Fetch required fields
       const { data: itemsData, error: itemsError } = await supabase
         .from('items')
         .select('id, name, department, unit, initial_stock, created_at')
@@ -139,30 +149,17 @@ export function Reports() {
           if (tx.item_id === item.id) {
             const txDate = new Date(tx.created_at);
             if (txDate < start) {
-              if (tx.type === 'IN') beforeIn += tx.quantity;
-              if (tx.type === 'OUT') beforeOut += tx.quantity;
+              if (tx.type === 'IN') beforeIn += (Number(tx.quantity) || 0);
+              if (tx.type === 'OUT') beforeOut += (Number(tx.quantity) || 0);
             } else if (txDate >= start && txDate <= end) {
-              if (tx.type === 'IN') currentIn += tx.quantity;
-              if (tx.type === 'OUT') currentOut += tx.quantity;
+              if (tx.type === 'IN') currentIn += (Number(tx.quantity) || 0);
+              if (tx.type === 'OUT') currentOut += (Number(tx.quantity) || 0);
             }
           }
         });
 
-        const itemCreatedAt = new Date(item.created_at);
-        const itemCreatedMonth = startOfMonth(itemCreatedAt);
-
-        let initialForPeriod = 0;
-        let finalForPeriod = 0;
-
-        if (start >= itemCreatedMonth) {
-          initialForPeriod = (item.initial_stock || 0) + beforeIn - beforeOut;
-          finalForPeriod = initialForPeriod + currentIn - currentOut;
-        } else {
-          initialForPeriod = 0;
-          currentIn = 0;
-          currentOut = 0;
-          finalForPeriod = 0;
-        }
+        const initialForPeriod = (Number(item.initial_stock) || 0) + beforeIn - beforeOut;
+        const finalForPeriod = initialForPeriod + currentIn - currentOut;
 
         stats[item.id] = {
           initial: initialForPeriod,
@@ -184,34 +181,16 @@ export function Reports() {
 
   const fetchTransactions = async () => {
     setLoading(true);
-    let start, end;
-
-    if (reportType === 'daily') {
-      start = startOfDay(currentDate);
-      end = endOfDay(currentDate);
-    } else if (reportType === 'monthly') {
-      start = startOfMonth(currentDate);
-      end = endOfMonth(currentDate);
-    } else {
-      start = startOfDay(new Date(startDate));
-      end = endOfDay(new Date(endDate));
-    }
+    const start = getLocalStart(reportType, currentDate, startDate);
+    const end = getLocalEnd(reportType, currentDate, endDate);
 
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('transactions')
         .select('id, item_id, type, quantity, notes, created_at, items(id, name, unit)')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString())
         .order('created_at', { ascending: false });
-
-      if (reportCategory === 'incoming') {
-        query = query.eq('type', 'IN');
-      } else if (reportCategory === 'outgoing') {
-        query = query.eq('type', 'OUT');
-      }
-
-      const { data, error } = await query;
 
       if (error) throw error;
       if (data) setTransactions(data);
@@ -238,6 +217,20 @@ export function Reports() {
       setCurrentDate(prev => subMonths(prev, 1));
     }
   };
+
+  const totalIn = reportCategory === 'stock'
+    ? (Object.values(itemStats) as Array<{ in?: number; out?: number }>).reduce((acc, s) => acc + (s?.in || 0), 0)
+    : transactions.filter(t => t.type === 'IN').reduce((acc, t) => acc + (t.quantity || 0), 0);
+
+  const totalOut = reportCategory === 'stock'
+    ? (Object.values(itemStats) as Array<{ in?: number; out?: number }>).reduce((acc, s) => acc + (s?.out || 0), 0)
+    : transactions.filter(t => t.type === 'OUT').reduce((acc, t) => acc + (t.quantity || 0), 0);
+
+  const displayedTransactions = transactions.filter(tx => {
+    if (reportCategory === 'incoming') return tx.type === 'IN';
+    if (reportCategory === 'outgoing') return tx.type === 'OUT';
+    return true;
+  });
 
   const exportToPDF = () => {
     const doc = new jsPDF();
@@ -280,9 +273,10 @@ export function Reports() {
         headStyles: { fillColor: [59, 130, 246] },
       });
     } else {
-      doc.text(`Total ${reportCategory === 'incoming' ? 'Masuk' : 'Keluar'}: ${reportCategory === 'incoming' ? totalIn : totalOut} items`, 14, 40);
+      const count = reportCategory === 'incoming' ? totalIn : totalOut;
+      doc.text(`Total ${reportCategory === 'incoming' ? 'Masuk' : 'Keluar'}: ${count} items`, 14, 40);
       
-      const tableData = transactions.map(tx => [
+      const tableData = displayedTransactions.map(tx => [
         format(new Date(tx.created_at), 'dd/MM HH:mm'),
         tx.items?.name || '-',
         tx.quantity.toString(),
@@ -301,21 +295,25 @@ export function Reports() {
     doc.save(`Laporan_${categoryStr}_${format(currentDate, 'yyyyMMdd')}.pdf`);
   };
 
-  const totalIn = transactions.filter(t => t.type === 'IN').reduce((acc, t) => acc + t.quantity, 0);
-  const totalOut = transactions.filter(t => t.type === 'OUT').reduce((acc, t) => acc + t.quantity, 0);
-
   // Prepare chart data
-  const chartData = transactions.reduce((acc: any[], t) => {
-    const itemName = t.items?.name || 'Unknown';
-    const existing = acc.find(item => item.name === itemName);
-    if (existing) {
-      if (t.type === 'IN') existing.in += t.quantity;
-      else existing.out += t.quantity;
-    } else {
-      acc.push({ name: itemName, in: t.type === 'IN' ? t.quantity : 0, out: t.type === 'OUT' ? t.quantity : 0 });
-    }
-    return acc;
-  }, []);
+  const chartData = (reportCategory === 'stock'
+    ? items.map(it => ({
+        name: it.name,
+        in: (itemStats[it.id] as any)?.in || 0,
+        out: (itemStats[it.id] as any)?.out || 0
+      }))
+    : transactions.reduce((acc: any[], t) => {
+        const itemName = t.items?.name || 'Unknown';
+        const existing = acc.find(item => item.name === itemName);
+        if (existing) {
+          if (t.type === 'IN') existing.in += t.quantity;
+          else existing.out += t.quantity;
+        } else {
+          acc.push({ name: itemName, in: t.type === 'IN' ? t.quantity : 0, out: t.type === 'OUT' ? t.quantity : 0 });
+        }
+        return acc;
+      }, [])
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
@@ -497,7 +495,7 @@ export function Reports() {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-gray-500 font-medium">Memuat data laporan...</td></tr>
-              ) : (reportCategory === 'stock' ? items : transactions).length === 0 ? (
+              ) : (reportCategory === 'stock' ? items : displayedTransactions).length === 0 ? (
                 <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-gray-500 font-medium">Tidak ada data di periode ini.</td></tr>
               ) : reportCategory === 'stock' ? (
                 items.map((item) => {
@@ -515,7 +513,7 @@ export function Reports() {
                   );
                 })
               ) : (
-                transactions.map((tx) => (
+                displayedTransactions.map((tx) => (
                   <tr key={tx.id} className="hover:bg-amber-50/20 transition-colors">
                     <td className="px-4 py-3 text-gray-500 font-mono text-[11px]">
                       {format(new Date(tx.created_at), 'dd/MM HH:mm')}
