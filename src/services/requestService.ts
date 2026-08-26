@@ -46,6 +46,14 @@ export const formatDateForDB = (dateInput: any): string => {
   return String(dateInput).trim().slice(0, 10);
 };
 
+export interface GetRequestsOptions {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+  forceRefresh?: boolean;
+}
+
 export const requestService = {
   // Test connection to Breakfast Supabase
   async testBreakfastConnection(): Promise<{ connected: boolean; error: string | null }> {
@@ -60,6 +68,125 @@ export const requestService = {
     } catch (e: any) {
       return { connected: false, error: e?.message || 'Connection failed' };
     }
+  },
+
+  /**
+   * Fetch paginated requests with server-side count and pagination
+   * Optimized for Logistik incoming requests view
+   */
+  async getRequestsPaginated(options: GetRequestsOptions = {}) {
+    const {
+      page = 1,
+      limit = 10,
+      status = 'ALL',
+      search
+    } = options;
+
+    let query = warehouseSupabase
+      .from('requests')
+      .select(`
+        id,
+        request_number,
+        department,
+        requester_name,
+        user_id,
+        status,
+        occupancy_count,
+        breakfast_pax,
+        notes,
+        created_at,
+        request_items (
+          id,
+          request_id,
+          item_id,
+          item_name,
+          quantity,
+          unit,
+          notes
+        )
+      `, { count: 'exact' });
+
+    if (status && status !== 'ALL') {
+      query = query.eq('status', status);
+    }
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      query = query.or(`request_number.ilike.%${term}%,requester_name.ilike.%${term}%,notes.ilike.%${term}%`);
+    }
+
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    query = query.order('created_at', { ascending: false }).range(from, to);
+
+    const { data, error, count } = await query;
+
+    if (error) {
+      console.warn('[REQUEST SERVICE] Paginated request query fallback notice:', error.message);
+      // Fallback: use getRequests and slice
+      const all = await this.getRequests();
+      let filtered = all;
+      if (status !== 'ALL') {
+        filtered = filtered.filter(r => r.status === status);
+      }
+      if (search && search.trim()) {
+        const term = search.trim().toLowerCase();
+        filtered = filtered.filter(r => 
+          (r.request_number && r.request_number.toLowerCase().includes(term)) ||
+          (r.requester_name && r.requester_name.toLowerCase().includes(term)) ||
+          (r.notes && r.notes.toLowerCase().includes(term))
+        );
+      }
+      const total = filtered.length;
+      const paginated = filtered.slice(from, to + 1);
+      return {
+        data: paginated,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit)
+      };
+    }
+
+    const formatted: HKRequest[] = (data || []).map((r: any) => {
+      const rawItems = r.request_items || [];
+      const validItems: HKRequestItem[] = rawItems
+        .filter((it: any) => {
+          const qty = Number(it.quantity ?? it.quantity_requested ?? 0);
+          return Number.isFinite(qty) && qty > 0;
+        })
+        .map((it: any) => ({
+          id: it.id,
+          request_id: it.request_id || r.id,
+          item_id: it.item_id || undefined,
+          item_name: it.item_name || it.name || 'Barang',
+          quantity: Number(it.quantity ?? it.quantity_requested ?? 0),
+          unit: it.unit || 'pcs',
+          notes: it.notes || ''
+        }));
+
+      return {
+        id: r.id,
+        request_number: r.request_number || `REQ-${String(r.id).slice(0, 4).toUpperCase()}`,
+        department: r.department || 'Housekeeping',
+        requester_name: r.requester_name || 'Housekeeping Staff',
+        user_id: r.user_id,
+        request_type: (r.notes?.includes('[MANUAL]') ? 'manual' : (r.notes?.includes('[OCCUPANCY]') ? 'occupancy' : undefined)),
+        status: (r.status || 'MENUNGGU').toUpperCase(),
+        occupancy_count: r.occupancy_count || 0,
+        breakfast_pax: r.breakfast_pax || 0,
+        notes: r.notes || '',
+        created_at: r.created_at || new Date().toISOString(),
+        items: validItems
+      };
+    });
+
+    return {
+      data: formatted,
+      total: count || 0,
+      page,
+      totalPages: Math.ceil((count || 0) / limit)
+    };
   },
 
   // Fetch all requests with safe fallback and query cache
@@ -100,7 +227,7 @@ export const requestService = {
             // Attempt 2: 2-step fetch (requests table then request_items table)
             const { data: reqData, error: reqErr } = await warehouseSupabase
               .from('requests')
-              .select('*')
+              .select('id, request_number, department, requester_name, user_id, status, occupancy_count, breakfast_pax, notes, created_at')
               .order('created_at', { ascending: false });
 
             if (reqErr || !reqData) {
@@ -108,14 +235,14 @@ export const requestService = {
               return this.getLocalRequests();
             }
 
-            // Fetch request_items for all request IDs
+            // Fetch request_items for visible request IDs with explicit columns
             const reqIds = reqData.map((r: any) => r.id);
             const itemsByRequestId: { [reqId: string]: any[] } = {};
             if (reqIds.length > 0) {
               try {
                 const { data: allItems } = await warehouseSupabase
                   .from('request_items')
-                  .select('*')
+                  .select('id, request_id, item_id, item_name, quantity, unit, notes')
                   .in('request_id', reqIds);
 
                 if (allItems) {
@@ -179,7 +306,7 @@ export const requestService = {
               try {
                 const { data: extraItems } = await warehouseSupabase
                   .from('request_items')
-                  .select('*')
+                  .select('id, request_id, item_id, item_name, quantity, unit, notes')
                   .in('request_id', missingItemReqIds);
                 if (extraItems) {
                   extraItems.forEach((it: any) => {

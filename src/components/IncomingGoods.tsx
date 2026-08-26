@@ -1,9 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Item, Transaction } from '../types';
-import { ArrowDownCircle, Search, Plus, Calendar as CalendarIcon, Package, Activity, AlertCircle, Edit2, Trash2 } from 'lucide-react';
+import { 
+  ArrowDownCircle, 
+  Search, 
+  Plus, 
+  Calendar as CalendarIcon, 
+  Package, 
+  Activity, 
+  AlertCircle, 
+  Edit2, 
+  Trash2,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { inventoryService } from '../services/inventoryService';
+import { transactionService } from '../services/transactionService';
 import { useAuth } from '../contexts/AuthContext';
 
 interface IncomingGoodsProps {
@@ -19,7 +32,14 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(globalSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(globalSearch);
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 15;
 
   // Month & Year Filter
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -34,10 +54,19 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
 
   // Sync local search with global search
   useEffect(() => {
-    if (globalSearch) {
+    if (globalSearch !== searchTerm) {
       setSearchTerm(globalSearch);
     }
   }, [globalSearch]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Form state
   const [selectedItemId, setSelectedItemId] = useState('');
@@ -47,45 +76,44 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
 
   const departments = ['Housekeeping', 'Resto', 'Tekhnisi', 'Front Office', 'General'];
 
+  // Load dropdown items
   useEffect(() => {
-    fetchData();
+    inventoryService.getCachedItems().then(data => {
+      if (data) setItems(data);
+    });
   }, []);
 
-  const fetchData = async (forceRefresh = false) => {
+  const fetchData = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     try {
-      const itemsData = await inventoryService.getCachedItems(forceRefresh);
-      const { data: transData } = await supabase
-        .from('transactions')
-        .select(`
-          id,
-          item_id,
-          type,
-          quantity,
-          department,
-          notes,
-          created_at,
-          user_id,
-          items:items (
-            id,
-            name,
-            unit,
-            current_stock,
-            min_stock
-          )
-        `)
-        .eq('type', 'IN')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      if (forceRefresh) {
+        inventoryService.invalidateCache();
+        const freshItems = await inventoryService.getCachedItems(true);
+        if (freshItems) setItems(freshItems);
+      }
 
-      if (itemsData) setItems(itemsData);
-      if (transData) setTransactions(transData as any);
+      const result = await transactionService.getTransactions({
+        type: 'IN',
+        search: debouncedSearch,
+        month: selectedMonth,
+        year: selectedYear,
+        page,
+        limit: pageSize
+      });
+
+      setTransactions(result.data);
+      setTotalCount(result.total);
+      setTotalPages(result.totalPages);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching incoming transactions:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [debouncedSearch, selectedMonth, selectedYear, page]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,27 +148,14 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
           if (updateError) throw updateError;
         }
       } else {
-        // 1. Record transaction
-        const { error: transError } = await supabase.from('transactions').insert([{
-          id: crypto.randomUUID(),
-          item_id: selectedItemId,
+        await transactionService.createTransaction({
+          itemId: selectedItemId,
           type: 'IN',
           quantity,
           department,
           notes,
-          user_id: currentUserId
-        }]);
-
-        if (transError) throw transError;
-
-        // 2. Update stock
-        const item = items.find(i => i.id === selectedItemId);
-        if (item) {
-          const { error: updateError } = await supabase.from('items').update({
-            current_stock: item.current_stock + quantity
-          }).eq('id', item.id);
-          if (updateError) throw updateError;
-        }
+          userId: currentUserId
+        });
       }
 
       inventoryService.invalidateCache();
@@ -175,20 +190,7 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
   const handleDelete = async () => {
     if (!transactionToDelete) return;
     try {
-      // 1. Delete transaction
-      const { error: deleteError } = await supabase.from('transactions').delete().eq('id', transactionToDelete.id);
-      if (deleteError) throw deleteError;
-
-      // 2. Revert stock
-      const item = items.find(i => i.id === transactionToDelete.item_id);
-      if (item) {
-        const { error: updateError } = await supabase.from('items').update({
-          current_stock: item.current_stock - transactionToDelete.quantity
-        }).eq('id', item.id);
-        if (updateError) throw updateError;
-      }
-
-      inventoryService.invalidateCache();
+      await transactionService.deleteTransaction(transactionToDelete);
       setTransactionToDelete(null);
       fetchData(true);
     } catch (error: any) {
@@ -196,15 +198,6 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
       alert('Gagal menghapus transaksi: ' + error.message);
     }
   };
-
-  const filteredTransactions = transactions.filter(tx => {
-    const txDate = new Date(tx.created_at);
-    const matchesMonth = txDate.getMonth() === selectedMonth && txDate.getFullYear() === selectedYear;
-    const matchesSearch = tx.items?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         tx.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         tx.notes?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesMonth && matchesSearch;
-  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
@@ -233,10 +226,15 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
 
       <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden">
         <div className="p-4 md:p-5 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50/80">
-          <h3 className="font-black text-gray-900 flex items-center gap-2 text-sm md:text-base">
-            <ArrowDownCircle className="w-5 h-5 text-emerald-600" />
-            Riwayat Penerimaan
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-black text-gray-900 flex items-center gap-2 text-sm md:text-base">
+              <ArrowDownCircle className="w-5 h-5 text-emerald-600" />
+              Riwayat Penerimaan
+            </h3>
+            <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">
+              {totalCount} Total
+            </span>
+          </div>
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <div className="relative flex-1 md:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -251,7 +249,7 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
             <div className="flex items-center gap-2">
               <select 
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                onChange={(e) => { setSelectedMonth(parseInt(e.target.value)); setPage(1); }}
                 className="bg-white border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:border-amber-500"
               >
                 {months.map((month, index) => (
@@ -260,7 +258,7 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
               </select>
               <select 
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                onChange={(e) => { setSelectedYear(parseInt(e.target.value)); setPage(1); }}
                 className="bg-white border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:border-amber-500"
               >
                 {years.map((year) => (
@@ -270,33 +268,45 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
             </div>
           </div>
         </div>
-        
+
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[600px] text-xs">
+          <table className="w-full text-left border-collapse text-xs md:text-sm">
             <thead>
-              <tr className="bg-gray-50 text-gray-500 text-[10px] font-extrabold uppercase tracking-wider border-b border-gray-200">
-                <th className="px-5 py-3.5">Tanggal</th>
-                <th className="px-5 py-3.5">Nama Barang</th>
-                <th className="px-5 py-3.5">Departemen</th>
-                <th className="px-5 py-3.5">Jumlah</th>
-                <th className="px-5 py-3.5">Satuan</th>
-                <th className="px-5 py-3.5">Catatan</th>
-                <th className="px-5 py-3.5 text-right">Aksi</th>
+              <tr className="border-b border-gray-200 bg-gray-100/70 text-gray-600 font-bold uppercase tracking-wider text-[11px]">
+                <th className="px-5 py-3">Tanggal & Waktu</th>
+                <th className="px-5 py-3">Nama Barang</th>
+                <th className="px-5 py-3">Departemen</th>
+                <th className="px-5 py-3">Jumlah</th>
+                <th className="px-5 py-3">Satuan</th>
+                <th className="px-5 py-3">Catatan / Vendor</th>
+                <th className="px-5 py-3 text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">Memuat data...</td></tr>
-              ) : filteredTransactions.length === 0 ? (
-                <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">Belum ada transaksi masuk.</td></tr>
-              ) : filteredTransactions.map((tx) => (
+                <tr>
+                  <td colSpan={7} className="text-center py-12 text-gray-400">
+                    <div className="inline-block animate-spin rounded-full h-6 w-6 border-2 border-amber-500 border-t-transparent mb-2" />
+                    <p className="text-xs font-medium">Memuat riwayat transaksi...</p>
+                  </td>
+                </tr>
+              ) : transactions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="text-center py-12 text-gray-400">
+                    <Package className="w-10 h-10 mx-auto mb-2 text-gray-300" />
+                    <p className="text-xs font-medium">Tidak ada data barang masuk untuk filter ini</p>
+                  </td>
+                </tr>
+              ) : transactions.map((tx) => (
                 <tr key={tx.id} className="hover:bg-amber-50/30 transition-colors group">
-                  <td className="px-5 py-3.5 text-gray-600 font-mono text-xs">
+                  <td className="px-5 py-3.5 whitespace-nowrap text-gray-600 font-medium text-xs">
                     {format(new Date(tx.created_at), 'dd MMM yyyy HH:mm')}
                   </td>
-                  <td className="px-5 py-3.5 font-bold text-gray-900 text-sm">{tx.items?.name}</td>
+                  <td className="px-5 py-3.5 font-bold text-gray-900">
+                    {tx.items?.name || 'Barang Dihapus'}
+                  </td>
                   <td className="px-5 py-3.5">
-                    <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 rounded-md text-[10px] font-bold uppercase border border-amber-500/20">
+                    <span className="px-2.5 py-1 bg-gray-100 text-gray-700 rounded-lg text-xs font-semibold border border-gray-200">
                       {tx.department || 'General'}
                     </span>
                   </td>
@@ -326,6 +336,33 @@ export function IncomingGoods({ globalSearch = '' }: IncomingGoodsProps) {
             </tbody>
           </table>
         </div>
+
+        {/* Server-Side Pagination Bar */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+            <span className="text-xs text-gray-500 font-medium">
+              Halaman <span className="font-bold text-gray-800">{page}</span> dari <span className="font-bold text-gray-800">{totalPages}</span> ({totalCount} transaksi)
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-bold hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                Sebelumnya
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-bold hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all"
+              >
+                Selanjutnya
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal */}

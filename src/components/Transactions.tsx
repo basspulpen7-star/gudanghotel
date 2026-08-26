@@ -71,8 +71,8 @@ export function Transactions({ initialType = 'ALL', globalSearch = '', user }: T
   // Load items for select dropdown
   const loadItems = async () => {
     try {
-      const res = await inventoryService.getItems({ limit: 0 }); // fetch all active items
-      setItems(res.data);
+      const data = await inventoryService.getCachedItems();
+      setItems(data);
     } catch (err) {
       console.error('Error loading items for select:', err);
     }

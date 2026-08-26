@@ -3,9 +3,96 @@ import { PurchaseOrder } from '../types';
 import { queryCache } from '../lib/queryCache';
 import { inventoryService } from './inventoryService';
 
+export interface GetPurchaseOrdersOptions {
+  page?: number;
+  limit?: number;
+  search?: string;
+  month?: number;
+  year?: number;
+  status?: string;
+  forceRefresh?: boolean;
+}
+
 export const purchaseOrderService = {
   /**
-   * Fetch Purchase Orders WITH relational items in ONE query (eliminates N+1)
+   * Fetch paginated Purchase Orders WITH relational items in ONE single query (server-side pagination + count)
+   */
+  async getPurchaseOrdersPaginated(options: GetPurchaseOrdersOptions = {}) {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      month,
+      year,
+      status
+    } = options;
+
+    let query = supabase
+      .from('purchase_orders')
+      .select(`
+        id,
+        po_number,
+        supplier_id,
+        status,
+        total_amount,
+        created_at,
+        user_id,
+        supplier:suppliers (
+          id,
+          name,
+          contact_person,
+          phone,
+          address,
+          category
+        ),
+        items:purchase_order_items (
+          id,
+          purchase_order_id,
+          item_id,
+          quantity,
+          price,
+          item:items (
+            id,
+            name,
+            unit,
+            current_stock
+          )
+        )
+      `, { count: 'exact' });
+
+    if (status && status !== 'ALL') {
+      query = query.eq('status', status);
+    }
+
+    if (month !== undefined && month !== -1 && year !== undefined && year !== -1) {
+      const startDate = new Date(year, month, 1).toISOString();
+      const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
+      query = query.gte('created_at', startDate).lte('created_at', endDate);
+    }
+
+    if (search && search.trim()) {
+      const term = search.trim();
+      query = query.or(`po_number.ilike.%${term}%,id.ilike.%${term}%`);
+    }
+
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    query = query.order('created_at', { ascending: false }).range(from, to);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    return {
+      data: (data || []) as unknown as PurchaseOrder[],
+      total: count || 0,
+      page,
+      totalPages: Math.ceil((count || 0) / limit)
+    };
+  },
+
+  /**
+   * Fetch Purchase Orders WITH relational items (Cached for overview/reports)
    */
   async getPurchaseOrders(forceRefresh = false) {
     return queryCache.fetchWithCache<PurchaseOrder[]>(

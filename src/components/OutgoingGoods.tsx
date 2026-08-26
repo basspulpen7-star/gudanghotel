@@ -1,9 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { Item, Transaction } from '../types';
-import { ArrowUpCircle, Search, Plus, Package, AlertCircle, Activity, Edit2, Trash2 } from 'lucide-react';
+import { 
+  ArrowUpCircle, 
+  Search, 
+  Plus, 
+  Package, 
+  AlertCircle, 
+  Activity, 
+  Edit2, 
+  Trash2,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { inventoryService } from '../services/inventoryService';
+import { transactionService } from '../services/transactionService';
 import { useAuth } from '../contexts/AuthContext';
 
 interface OutgoingGoodsProps {
@@ -19,7 +31,14 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(globalSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(globalSearch);
+
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 15;
 
   // Month & Year Filter
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -34,10 +53,19 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
 
   // Sync local search with global search
   useEffect(() => {
-    if (globalSearch) {
+    if (globalSearch !== searchTerm) {
       setSearchTerm(globalSearch);
     }
   }, [globalSearch]);
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(1);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Form state
   const [selectedItemId, setSelectedItemId] = useState('');
@@ -47,45 +75,44 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
 
   const departments = ['Housekeeping', 'Resto', 'Tekhnisi', 'Front Office', 'General'];
 
+  // Load dropdown items
   useEffect(() => {
-    fetchData();
+    inventoryService.getCachedItems().then(data => {
+      if (data) setItems(data);
+    });
   }, []);
 
-  const fetchData = async (forceRefresh = false) => {
+  const fetchData = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     try {
-      const itemsData = await inventoryService.getCachedItems(forceRefresh);
-      const { data: transData } = await supabase
-        .from('transactions')
-        .select(`
-          id,
-          item_id,
-          type,
-          quantity,
-          department,
-          notes,
-          created_at,
-          user_id,
-          items:items (
-            id,
-            name,
-            unit,
-            current_stock,
-            min_stock
-          )
-        `)
-        .eq('type', 'OUT')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      if (forceRefresh) {
+        inventoryService.invalidateCache();
+        const freshItems = await inventoryService.getCachedItems(true);
+        if (freshItems) setItems(freshItems);
+      }
 
-      if (itemsData) setItems(itemsData);
-      if (transData) setTransactions(transData as any);
+      const result = await transactionService.getTransactions({
+        type: 'OUT',
+        search: debouncedSearch,
+        month: selectedMonth,
+        year: selectedYear,
+        page,
+        limit: pageSize
+      });
+
+      setTransactions(result.data);
+      setTotalCount(result.total);
+      setTotalPages(result.totalPages);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching outgoing transactions:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [debouncedSearch, selectedMonth, selectedYear, page]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,24 +156,14 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
         }).eq('id', item.id);
         if (updateError) throw updateError;
       } else {
-        // 1. Record transaction
-        const { error: transError } = await supabase.from('transactions').insert([{
-          id: crypto.randomUUID(),
-          item_id: selectedItemId,
+        await transactionService.createTransaction({
+          itemId: selectedItemId,
           type: 'OUT',
           quantity,
           department,
           notes,
-          user_id: currentUserId
-        }]);
-
-        if (transError) throw transError;
-
-        // 2. Update stock
-        const { error: updateError } = await supabase.from('items').update({
-          current_stock: item.current_stock - quantity
-        }).eq('id', item.id);
-        if (updateError) throw updateError;
+          userId: currentUserId
+        });
       }
 
       inventoryService.invalidateCache();
@@ -181,20 +198,7 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
   const handleDelete = async () => {
     if (!transactionToDelete) return;
     try {
-      // 1. Delete transaction
-      const { error: deleteError } = await supabase.from('transactions').delete().eq('id', transactionToDelete.id);
-      if (deleteError) throw deleteError;
-
-      // 2. Revert stock
-      const item = items.find(i => i.id === transactionToDelete.item_id);
-      if (item) {
-        const { error: updateError } = await supabase.from('items').update({
-          current_stock: item.current_stock + transactionToDelete.quantity
-        }).eq('id', item.id);
-        if (updateError) throw updateError;
-      }
-
-      inventoryService.invalidateCache();
+      await transactionService.deleteTransaction(transactionToDelete);
       setTransactionToDelete(null);
       fetchData(true);
     } catch (error: any) {
@@ -204,15 +208,6 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
   };
 
   const selectedItem = items.find(i => i.id === selectedItemId);
-
-  const filteredTransactions = transactions.filter(tx => {
-    const txDate = new Date(tx.created_at);
-    const matchesMonth = txDate.getMonth() === selectedMonth && txDate.getFullYear() === selectedYear;
-    const matchesSearch = tx.items?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         tx.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         tx.notes?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesMonth && matchesSearch;
-  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
@@ -241,10 +236,15 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
 
       <div className="bg-white rounded-2xl border border-gray-200/90 shadow-sm overflow-hidden">
         <div className="p-4 md:p-5 border-b border-gray-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50/80">
-          <h3 className="font-black text-gray-900 flex items-center gap-2 text-sm md:text-base">
-            <ArrowUpCircle className="w-5 h-5 text-amber-600" />
-            Riwayat Distribusi
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-black text-gray-900 flex items-center gap-2 text-sm md:text-base">
+              <ArrowUpCircle className="w-5 h-5 text-amber-600" />
+              Riwayat Distribusi
+            </h3>
+            <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">
+              {totalCount} Total
+            </span>
+          </div>
           <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <div className="relative flex-1 md:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -259,7 +259,7 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
             <div className="flex items-center gap-2">
               <select 
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                onChange={(e) => { setSelectedMonth(parseInt(e.target.value)); setPage(1); }}
                 className="bg-white border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:border-amber-500"
               >
                 {months.map((month, index) => (
@@ -268,7 +268,7 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
               </select>
               <select 
                 value={selectedYear}
-                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                onChange={(e) => { setSelectedYear(parseInt(e.target.value)); setPage(1); }}
                 className="bg-white border border-gray-200 text-gray-800 text-xs font-semibold rounded-xl px-3 py-2 outline-none focus:border-amber-500"
               >
                 {years.map((year) => (
@@ -295,14 +295,14 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
             <tbody className="divide-y divide-gray-100">
               {loading ? (
                 <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">Memuat data...</td></tr>
-              ) : filteredTransactions.length === 0 ? (
+              ) : transactions.length === 0 ? (
                 <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">Belum ada transaksi keluar.</td></tr>
-              ) : filteredTransactions.map((tx) => (
+              ) : transactions.map((tx) => (
                 <tr key={tx.id} className="hover:bg-amber-50/30 transition-colors group">
                   <td className="px-5 py-3.5 text-gray-600 font-mono text-xs">
                     {format(new Date(tx.created_at), 'dd MMM yyyy HH:mm')}
                   </td>
-                  <td className="px-5 py-3.5 font-bold text-gray-900 text-sm">{tx.items?.name}</td>
+                  <td className="px-5 py-3.5 font-bold text-gray-900 text-sm">{tx.items?.name || 'Barang Dihapus'}</td>
                   <td className="px-5 py-3.5">
                     <span className="px-2 py-0.5 bg-amber-500/10 text-amber-700 rounded-md text-[10px] font-bold uppercase border border-amber-500/20">
                       {tx.department || 'General'}
@@ -334,6 +334,33 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
             </tbody>
           </table>
         </div>
+
+        {/* Server-Side Pagination Bar */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
+            <span className="text-xs text-gray-500 font-medium">
+              Halaman <span className="font-bold text-gray-800">{page}</span> dari <span className="font-bold text-gray-800">{totalPages}</span> ({totalCount} transaksi)
+            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-bold hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                Sebelumnya
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-bold hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all"
+              >
+                Selanjutnya
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal */}
