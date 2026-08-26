@@ -429,8 +429,8 @@ export function RestoReports() {
       <div className="bg-[#252B34] rounded-2xl p-4 sm:p-6 text-[#F1F3F5] border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-[#C89B3C]/15 border border-[#C89B3C]/30 flex items-center justify-center text-[#E0B85A] shrink-0">
-              <UtensilsCrossed className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-2xl bg-[#1D2128] border border-[#343B46] p-2 flex items-center justify-center shrink-0 shadow-inner">
+              <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
             <div>
               <div className="flex items-center gap-2">

@@ -246,13 +246,18 @@ export function RestoReportView() {
     <div className="space-y-4 max-w-2xl mx-auto pb-16 font-sans animate-in fade-in duration-200">
       
       {/* Header Banner */}
-      <div className="bg-white rounded-2xl p-4 md:p-5 border border-gray-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
-        <div>
-          <span className="text-[10px] font-black text-amber-600 uppercase tracking-wider block">
-            HOTEL ALIA MATRAMAN
-          </span>
-          <h2 className="text-xl font-black text-gray-900 tracking-tight">Laporan Pengambilan Resto</h2>
-          <p className="text-xs text-gray-500 font-medium mt-0.5">Rekapitulasi pengeluaran barang gudang untuk operasional restoran</p>
+      <div className="bg-[#252B34] rounded-2xl p-4 md:p-5 border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#1D2128] border border-[#343B46] p-2 flex items-center justify-center shrink-0 shadow-inner">
+            <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+          </div>
+          <div>
+            <span className="text-[10px] font-black text-[#E0B85A] uppercase tracking-wider block">
+              HOTEL ALIA MATRAMAN
+            </span>
+            <h2 className="text-xl font-black text-[#F1F3F5] tracking-tight">Laporan Pengambilan Resto</h2>
+            <p className="text-xs text-[#8E99A6] font-medium mt-0.5">Rekapitulasi pengeluaran barang gudang untuk operasional restoran</p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

@@ -395,7 +395,10 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
                 )}
 
                 {!isMobileSearchOpen && (
-                  <div className="md:hidden">
+                  <div className="md:hidden flex items-center gap-2">
+                    <div className="w-6 h-6 flex items-center justify-center">
+                      <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                    </div>
                     <h1 className="text-sm font-bold text-[#F1F3F5] truncate max-w-[140px]">Hotel Alia</h1>
                   </div>
                 )}

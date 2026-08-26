@@ -80,14 +80,19 @@ export function Dashboard({ user, profile, onNavigate }: DashboardProps) {
   return (
     <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
       {/* Header & Greeting */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-[#252B34] p-4 md:p-6 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
-        <div>
-          <h1 className="text-xl md:text-2xl font-extrabold text-[#F1F3F5] flex items-center gap-2">
-            <span>{getGreeting()}, {userName}!</span>
-          </h1>
-          <p className="text-xs md:text-sm text-[#8E99A6] mt-1 font-medium">
-            Berikut kondisi gudang Hotel Alia Matraman hari ini.
-          </p>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#252B34] p-4 md:p-6 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#1D2128] border border-[#343B46] p-2 flex items-center justify-center shrink-0 shadow-inner">
+            <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-extrabold text-[#F1F3F5] flex items-center gap-2">
+              <span>{getGreeting()}, {userName}!</span>
+            </h1>
+            <p className="text-xs md:text-sm text-[#8E99A6] mt-0.5 font-medium">
+              Berikut kondisi gudang Hotel Alia Matraman hari ini.
+            </p>
+          </div>
         </div>
         <button 
           onClick={fetchDashboardData}

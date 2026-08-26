@@ -306,9 +306,9 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
       {/* Resto Specialized Report Banner / Shortcut */}
       {onNavigateToResto && (
         <div className="bg-[#252B34] border border-[#C89B3C]/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-[#C89B3C]/15 border border-[#C89B3C]/30 text-[#E0B85A] rounded-xl shrink-0">
-              <UtensilsCrossed className="w-5 h-5" />
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-[#1D2128] border border-[#343B46] p-1.5 flex items-center justify-center shrink-0 shadow-inner">
+              <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
             </div>
             <div>
               <h4 className="text-xs font-black text-[#F1F3F5] uppercase tracking-wider">Laporan Khusus Restoran</h4>
@@ -326,9 +326,14 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
       )}
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#252B34] p-4 md:p-6 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
-        <div>
-          <h2 className="text-xl md:text-2xl font-black text-[#F1F3F5] tracking-tight">Laporan Inventaris</h2>
-          <p className="text-xs md:text-sm text-[#8E99A6] mt-0.5 font-medium">Analisis pergerakan mutasi dan riwayat stok barang hotel</p>
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#1D2128] border border-[#343B46] p-2 flex items-center justify-center shrink-0 shadow-inner">
+            <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+          </div>
+          <div>
+            <h2 className="text-xl md:text-2xl font-black text-[#F1F3F5] tracking-tight">Laporan Inventaris</h2>
+            <p className="text-xs md:text-sm text-[#8E99A6] mt-0.5 font-medium">Analisis pergerakan mutasi dan riwayat stok barang hotel</p>
+          </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
           <div className="flex gap-1.5 bg-[#20252D] p-1 rounded-xl border border-[#3A424D] w-full sm:w-auto">

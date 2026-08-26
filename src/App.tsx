@@ -76,8 +76,8 @@ function MainApp() {
     return (
       <div className="min-h-screen bg-[#171A1F] flex flex-col items-center justify-center p-4 font-sans text-[#F1F3F5]">
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-[#C89B3C]/15 border border-[#C89B3C]/30 flex items-center justify-center shadow-lg shadow-black/30 animate-pulse">
-            <Hotel className="w-7 h-7 text-[#E0B85A]" />
+          <div className="w-16 h-16 rounded-2xl bg-[#1D2128] border border-[#343B46] p-2.5 flex items-center justify-center shadow-lg shadow-black/30 animate-pulse">
+            <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
           </div>
           <div className="text-center space-y-1.5">
             <h2 className="text-[#F1F3F5] font-black text-base tracking-tight">Hotel Alia Matraman</h2>
