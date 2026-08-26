@@ -19,7 +19,10 @@ import {
   Users,
   ShoppingCart,
   Database,
-  Building2
+  Building2,
+  UtensilsCrossed,
+  ShoppingBag,
+  Clock
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
@@ -39,7 +42,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children, currentView, setView, user, profile, searchTerm, setSearchTerm }: LayoutProps) {
-  const { signOut, isAdmin, isHK } = useAuth();
+  const { signOut, isAdmin, isHK, isResto } = useAuth();
   const { isOnline } = useNetworkStatus();
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -48,8 +51,9 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
   const notificationRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
-  // Check if current user is HK
+  // Check if current user is HK or Resto
   const isHKUser = isHK || profile?.role === 'hk' || user?.user_metadata?.role === 'hk';
+  const isRestoUser = isResto || profile?.role === 'resto' || user?.user_metadata?.role === 'resto';
 
   let menuItems: Array<{ id: string; label: string; icon: any }> = [];
 
@@ -57,6 +61,13 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
     // HK only requires Permintaan Barang HK Form
     menuItems = [
       { id: 'housekeeping_request', label: 'Form Permintaan HK', icon: ClipboardList }
+    ];
+  } else if (isRestoUser) {
+    // Resto user navigation
+    menuItems = [
+      { id: 'resto_take', label: 'Ambil Barang Resto', icon: UtensilsCrossed },
+      { id: 'resto_history', label: 'Riwayat Pengambilan', icon: Clock },
+      { id: 'resto_reports', label: 'Laporan Resto', icon: FileText }
     ];
   } else {
     // Default Gudang Alia navigation for Logistik, Staff, and Admin
@@ -69,6 +80,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
       { id: 'purchase_orders', label: 'PO', icon: ShoppingCart },
       { id: 'suppliers', label: 'Supplier', icon: Truck },
       { id: 'reports', label: 'Laporan', icon: FileText },
+      { id: 'resto_reports', label: 'Laporan Resto', icon: UtensilsCrossed },
     ];
 
     if (isAdmin) {
@@ -158,6 +170,100 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
         <main className="flex-1 p-4 md:p-6 max-w-4xl w-full mx-auto pb-16">
           {children}
         </main>
+      </div>
+    );
+  }
+
+  if (isRestoUser) {
+    const restoNavItems = [
+      { id: 'resto_take', label: 'Ambil Barang', icon: ShoppingBag },
+      { id: 'resto_history', label: 'Riwayat', icon: Clock },
+      { id: 'resto_reports', label: 'Laporan', icon: FileText },
+      { id: 'settings', label: 'Profil', icon: User },
+    ];
+
+    return (
+      <div className="min-h-screen bg-[#F7F8FA] text-gray-900 flex flex-col font-sans">
+        {/* Top Header */}
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-200/80 px-4 md:px-8 py-3 flex items-center justify-between no-print shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 flex items-center justify-center">
+              <img src="/alia-logo.png" alt="Hotel Alia Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+            </div>
+            <div>
+              <span className="text-[10px] font-extrabold text-amber-600 tracking-wider uppercase block leading-none">
+                HOTEL ALIA MATRAMAN
+              </span>
+              <h1 className="text-base font-black text-gray-900 leading-tight">
+                Pengambilan Resto
+              </h1>
+            </div>
+          </div>
+
+          {/* Desktop Navigation Tabs */}
+          <nav className="hidden md:flex items-center gap-1 bg-gray-100/80 p-1 rounded-xl border border-gray-200/60">
+            {restoNavItems.map(item => (
+              <button
+                key={item.id}
+                onClick={() => handleSetView(item.id)}
+                className={cn(
+                  "flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all",
+                  currentView === item.id 
+                    ? "bg-white text-gray-900 shadow-xs" 
+                    : "text-gray-600 hover:text-gray-900"
+                )}
+              >
+                <item.icon className={cn("w-3.5 h-3.5", currentView === item.id ? "text-amber-600" : "text-gray-400")} />
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-2.5">
+            {!isOnline && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-800 rounded-lg text-xs font-bold animate-pulse">
+                <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+                Offline
+              </span>
+            )}
+            <span className="text-xs font-bold text-gray-800 hidden sm:inline-block">
+              Resto • {profile?.full_name || user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'resto'}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100 transition-colors"
+              title="Keluar dari Aplikasi"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Keluar</span>
+            </button>
+          </div>
+        </header>
+
+        {/* View Content */}
+        <main className="flex-1 p-3.5 md:p-6 max-w-4xl w-full mx-auto pb-20 md:pb-12">
+          {children}
+        </main>
+
+        {/* Mobile Bottom Navigation Bar */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-gray-200/80 px-2 py-1.5 flex items-center justify-around no-print shadow-lg">
+          {restoNavItems.map(item => {
+            const isActive = currentView === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleSetView(item.id)}
+                className={cn(
+                  "flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all min-w-[64px]",
+                  isActive ? "text-amber-600 font-extrabold" : "text-gray-500 font-semibold hover:text-gray-800"
+                )}
+              >
+                <item.icon className={cn("w-5 h-5 mb-0.5", isActive ? "text-amber-600 stroke-[2.5]" : "text-gray-400")} />
+                <span className="text-[10px] leading-none">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
       </div>
     );
   }

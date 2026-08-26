@@ -32,7 +32,7 @@ export interface Transaction {
   items?: Item;
 }
 
-export type UserRole = 'admin' | 'staff' | 'hk' | 'logistik';
+export type UserRole = 'admin' | 'staff' | 'hk' | 'logistik' | 'resto';
 
 export interface UserProfile {
   id: string;

@@ -23,7 +23,8 @@ import {
   Sparkles,
   Terminal,
   Copy,
-  Check
+  Check,
+  UtensilsCrossed
 } from 'lucide-react';
 
 export function UserManagement() {
@@ -37,7 +38,7 @@ export function UserManagement() {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<'admin' | 'staff' | 'hk' | 'logistik'>('staff');
+  const [role, setRole] = useState<'admin' | 'staff' | 'hk' | 'logistik' | 'resto'>('staff');
   const [password, setPassword] = useState(''); // For new users
   const [showPassword, setShowPassword] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string; isFkError?: boolean } | null>(null);
@@ -236,6 +237,16 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
     setEditingProfile(null);
   };
 
+  const handleQuickPresetResto = () => {
+    resetForm();
+    setFullName('Staff Restoran Alia');
+    setUsername('resto');
+    setEmail('resto@hotelalia.com');
+    setRole('resto');
+    setPassword('resto123');
+    setIsModalOpen(true);
+  };
+
   const handleEdit = (profile: UserProfile) => {
     setEditingProfile(profile);
     setFullName(profile.full_name || '');
@@ -265,15 +276,24 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl border border-gray-200/90 shadow-sm">
         <div>
           <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Manajemen Pengguna</h2>
-          <p className="text-xs md:text-sm text-gray-500 mt-0.5 font-medium">Kelola hak akses administrator, staf gudang, dan staf HK</p>
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5 font-medium">Kelola hak akses administrator, staf gudang, staf HK, dan staf resto</p>
         </div>
-        <button 
-          onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="w-full md:w-auto bg-[#E65C00] hover:bg-[#CF5300] text-white px-5 py-2.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm shadow-orange-500/20 text-xs min-h-[44px]"
-        >
-          <UserPlus className="w-4 h-4 stroke-[3]" />
-          <span>Tambah Pengguna Baru</span>
-        </button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+          <button 
+            onClick={handleQuickPresetResto}
+            className="bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 border border-amber-300 px-4 py-2.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all text-xs min-h-[44px]"
+          >
+            <UtensilsCrossed className="w-4 h-4 text-amber-700" />
+            <span>+ Buat Akun Resto Cepat</span>
+          </button>
+          <button 
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            className="bg-[#E65C00] hover:bg-[#CF5300] text-white px-5 py-2.5 rounded-xl font-extrabold flex items-center justify-center gap-2 transition-all shadow-sm shadow-orange-500/20 text-xs min-h-[44px]"
+          >
+            <UserPlus className="w-4 h-4 stroke-[3]" />
+            <span>Tambah Pengguna Baru</span>
+          </button>
+        </div>
       </div>
 
       {notification && (
@@ -338,9 +358,11 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
                       ? 'bg-purple-50 text-purple-700 border-purple-200' 
                       : profile.role === 'hk'
                       ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : profile.role === 'resto'
+                      ? 'bg-orange-50 text-orange-700 border-orange-200'
                       : 'bg-blue-50 text-blue-700 border-blue-200'
                   }`}>
-                    {profile.role === 'hk' ? 'Housekeeping' : profile.role || 'staff'}
+                    {profile.role === 'hk' ? 'Housekeeping' : profile.role === 'resto' ? 'Restoran' : profile.role || 'staff'}
                   </span>
                 </div>
               </div>
@@ -448,6 +470,7 @@ ALTER TABLE IF EXISTS profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;`;
                   <option value="staff">Staff Gudang</option>
                   <option value="logistik">Logistik</option>
                   <option value="hk">Housekeeping (HK)</option>
+                  <option value="resto">Restoran (Resto)</option>
                   <option value="admin">Administrator</option>
                 </select>
               </div>

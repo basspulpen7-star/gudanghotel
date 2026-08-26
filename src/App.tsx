@@ -7,6 +7,10 @@ import { Suppliers } from './components/Suppliers';
 import { IncomingGoods } from './components/IncomingGoods';
 import { OutgoingGoods } from './components/OutgoingGoods';
 import { Reports } from './components/Reports';
+import { RestoReports } from './components/RestoReports';
+import { RestoTakeGoods } from './components/RestoTakeGoods';
+import { RestoHistory } from './components/RestoHistory';
+import { RestoReportView } from './components/RestoReportView';
 import { PurchaseOrders } from './components/PurchaseOrders';
 import { UserManagement } from './components/UserManagement';
 import { DatabaseSetup } from './components/DatabaseSetup';
@@ -24,15 +28,22 @@ type View =
   | 'outgoing' 
   | 'housekeeping_request'
   | 'reports' 
+  | 'resto_reports'
+  | 'resto_take'
+  | 'resto_history'
   | 'settings' 
   | 'purchase_orders' 
   | 'user_management' 
   | 'database_setup';
 
 function MainApp() {
-  const { session, user, profile, role, isAdmin, isHK, loading, refreshProfile } = useAuth();
+  const { session, user, profile, role, isAdmin, isHK, isResto, loading, refreshProfile } = useAuth();
   const isHKUser = isHK || role === 'hk' || profile?.role === 'hk' || user?.user_metadata?.role === 'hk';
-  const [currentView, setCurrentView] = useState<View>(isHKUser ? 'housekeeping_request' : 'dashboard');
+  const isRestoUser = isResto || role === 'resto' || profile?.role === 'resto' || user?.user_metadata?.role === 'resto';
+  
+  const [currentView, setCurrentView] = useState<View>(
+    isHKUser ? 'housekeeping_request' : isRestoUser ? 'resto_take' : 'dashboard'
+  );
   const [globalSearch, setGlobalSearch] = useState('');
 
   // Safeguard: Role-based view authorization and initial routing
@@ -43,6 +54,13 @@ function MainApp() {
         if (currentView !== 'housekeeping_request') {
           setCurrentView('housekeeping_request');
         }
+      } else if (isRestoUser) {
+        // Resto user is restricted strictly to resto views and settings
+        const allowedRestoViews: View[] = ['resto_take', 'resto_history', 'resto_reports', 'settings'];
+        if (!allowedRestoViews.includes(currentView)) {
+          console.warn(`[ACCESS RESTRICTED] Resto user attempted to access '${currentView}'. Redirecting to resto_take.`);
+          setCurrentView('resto_take');
+        }
       } else if (!isAdmin) {
         // Staff/Logistik cannot access admin-only views
         if (currentView === 'user_management' || currentView === 'database_setup') {
@@ -51,7 +69,7 @@ function MainApp() {
         }
       }
     }
-  }, [isAdmin, isHKUser, role, currentView, session, loading]);
+  }, [isAdmin, isHKUser, isRestoUser, role, currentView, session, loading]);
 
   // Loading Screen while verifying session
   if (loading) {
@@ -96,7 +114,23 @@ function MainApp() {
       case 'housekeeping_request':
         return <HousekeepingRequest globalSearch={globalSearch} />;
       case 'reports':
-        return <Reports />;
+        return <Reports onNavigateToResto={() => setCurrentView('resto_reports')} />;
+      case 'resto_reports':
+        return <RestoReports />;
+      case 'resto_take':
+        return (
+          <RestoTakeGoods 
+            user={user} 
+            profile={profile} 
+            onNavigateToHistory={() => setCurrentView('resto_history')} 
+          />
+        );
+      case 'resto_history':
+        return (
+          <RestoHistory 
+            onNavigateToTakeGoods={() => setCurrentView('resto_take')} 
+          />
+        );
       case 'purchase_orders':
         return <PurchaseOrders />;
       case 'user_management':

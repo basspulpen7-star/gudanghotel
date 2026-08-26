@@ -11,6 +11,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isHK: boolean;
   isLogistik: boolean;
+  isResto: boolean;
   loading: boolean;
   profileLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; user?: User }>;
@@ -34,7 +35,7 @@ export function getFriendlyAuthErrorMessage(error: any): string {
     rawMsg.includes('invalid email or password') ||
     status === 400
   ) {
-    return 'Email atau password salah.';
+    return 'Email/Username atau password salah. Pastikan password sudah benar atau daftarkan akun baru jika belum terdaftar.';
   }
 
   if (
@@ -354,6 +355,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     userRole = 'hk';
   } else if (rawRole === 'logistik') {
     userRole = 'logistik';
+  } else if (rawRole === 'resto' || rawRole === 'restoran') {
+    userRole = 'resto';
   } else if (rawRole === 'staff') {
     userRole = 'staff';
   } else {
@@ -364,6 +367,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAdmin = userRole === 'admin';
   const isHK = userRole === 'hk';
   const isLogistik = userRole === 'logistik';
+  const isResto = userRole === 'resto';
 
   return (
     <AuthContext.Provider
@@ -375,6 +379,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAdmin,
         isHK,
         isLogistik,
+        isResto,
         loading,
         profileLoading,
         signIn,

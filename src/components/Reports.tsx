@@ -12,7 +12,9 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   Package,
-  Inbox
+  Inbox,
+  UtensilsCrossed,
+  ArrowRight
 } from 'lucide-react';
 import { 
   format, 
@@ -41,7 +43,11 @@ import autoTable from 'jspdf-autotable';
 type ReportType = 'daily' | 'monthly' | 'custom';
 type ReportCategory = 'stock' | 'incoming' | 'outgoing';
 
-export function Reports() {
+interface ReportsProps {
+  onNavigateToResto?: () => void;
+}
+
+export function Reports({ onNavigateToResto }: ReportsProps) {
   const [reportType, setReportType] = useState<ReportType>('daily');
   const [reportCategory, setReportCategory] = useState<ReportCategory>('stock');
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -317,6 +323,28 @@ export function Reports() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
+      {/* Resto Specialized Report Banner / Shortcut */}
+      {onNavigateToResto && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/5 border border-amber-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-amber-500 text-white rounded-xl shadow-xs shrink-0">
+              <UtensilsCrossed className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-amber-950 uppercase tracking-wider">Laporan Khusus Restoran</h4>
+              <p className="text-xs text-amber-800/80 font-medium">Lihat laporan stok bahan makanan, minuman, barang masuk, dan pemakaian dapur restoran secara terpisah.</p>
+            </div>
+          </div>
+          <button
+            onClick={onNavigateToResto}
+            className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-xs shrink-0"
+          >
+            <span>Buka Laporan Resto</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 md:p-6 rounded-2xl border border-gray-200/90 shadow-sm">
         <div>
           <h2 className="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Laporan Inventaris</h2>

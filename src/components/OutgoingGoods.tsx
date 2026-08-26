@@ -419,8 +419,10 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Jumlah Keluar</label>
                 <input 
                   type="number" 
-                  value={quantity} 
+                  value={quantity || ''} 
                   onChange={(e) => setQuantity(Number(e.target.value))} 
+                  onFocus={(e) => e.target.select()}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-900 focus:outline-none focus:border-amber-500 focus:bg-white min-h-[44px]" 
                   min="1"
                   max={selectedItem ? selectedItem.current_stock + (editingTransaction?.quantity || 0) : undefined}
