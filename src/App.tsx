@@ -128,7 +128,7 @@ function MainApp() {
       case 'resto_history':
         return (
           <RestoHistory 
-            onNavigateToTakeGoods={() => setCurrentView('resto_take')} 
+            onNavigateToTakeGoods={isRestoUser ? () => setCurrentView('resto_take') : undefined} 
           />
         );
       case 'purchase_orders':

@@ -77,6 +77,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
       { id: 'incoming', label: 'Masuk', icon: ArrowDownCircle },
       { id: 'outgoing', label: 'Keluar', icon: ArrowUpCircle },
       { id: 'housekeeping_request', label: 'Permintaan Masuk HK', icon: ClipboardList },
+      { id: 'resto_history', label: 'Riwayat Ambil Resto', icon: Clock },
       { id: 'purchase_orders', label: 'PO', icon: ShoppingCart },
       { id: 'suppliers', label: 'Supplier', icon: Truck },
       { id: 'reports', label: 'Laporan', icon: FileText },
