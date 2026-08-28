@@ -11,7 +11,8 @@ import {
   ChevronRight, 
   X,
   SlidersHorizontal,
-  CheckCircle2
+  CheckCircle2,
+  RotateCw
 } from 'lucide-react';
 import { inventoryService } from '../services/inventoryService';
 import { transactionService } from '../services/transactionService';
@@ -57,6 +58,10 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   const [isSubmittingAdjustment, setIsSubmittingAdjustment] = useState(false);
   const [adjustmentError, setAdjustmentError] = useState<string | null>(null);
   const [adjustmentSuccess, setAdjustmentSuccess] = useState<string | null>(null);
+
+  // Sync / Recalculate State
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatusBanner, setSyncStatusBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const departments = ['Housekeeping', 'Resto', 'Teknik', 'Front Office', 'General'];
 
@@ -246,6 +251,30 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
     }
   };
 
+  const handleSyncAllStocks = async () => {
+    setIsSyncing(true);
+    setSyncStatusBanner(null);
+    try {
+      const res = await inventoryService.recalculateAllStocks();
+      await fetchItemsData();
+      setSyncStatusBanner({
+        type: 'success',
+        message: `Sinkronisasi berhasil! ${res.updated > 0 ? `${res.updated} barang diperbaiki nilainya.` : 'Semua stok sudah akurat sesuai rumus (Stok Awal + Masuk - Keluar).'}`
+      });
+      setTimeout(() => {
+        setSyncStatusBanner(null);
+      }, 5000);
+    } catch (err: any) {
+      console.error('Error syncing stocks:', err);
+      setSyncStatusBanner({
+        type: 'error',
+        message: 'Gagal melakukan sinkronisasi stok: ' + (err.message || 'Error')
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const getStockBadge = (current: number, min: number) => {
     if (current <= 0) {
       return (
@@ -287,6 +316,16 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
           </button>
 
           <button
+            onClick={handleSyncAllStocks}
+            disabled={isSyncing}
+            className="flex-1 md:flex-none bg-[#55B685]/10 hover:bg-[#55B685]/20 text-[#55B685] font-extrabold py-2.5 px-3.5 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border border-[#55B685]/30 min-h-[44px] cursor-pointer disabled:opacity-50"
+            title="Sinkronkan & Audit Seluruh Stok dengan Mutasi Transaksi"
+          >
+            <RotateCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
+            <span>{isSyncing ? 'Sinkronisasi...' : 'Sinkronisasi Stok'}</span>
+          </button>
+
+          <button
             onClick={() => openAdjustmentModal()}
             className="flex-1 md:flex-none bg-[#6D9EEB]/10 hover:bg-[#6D9EEB]/20 text-[#6D9EEB] font-extrabold py-2.5 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border border-[#6D9EEB]/30 min-h-[44px] cursor-pointer"
             title="Koreksi Stok Fisik"
@@ -304,6 +343,18 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
           </button>
         </div>
       </div>
+
+      {syncStatusBanner && (
+        <div className={cn(
+          "p-4 rounded-xl text-xs font-bold flex items-center gap-2.5 animate-in fade-in slide-in-from-top-2 border",
+          syncStatusBanner.type === 'success' 
+            ? "bg-[#55B685]/10 text-[#55B685] border-[#55B685]/30" 
+            : "bg-[#EB5757]/10 text-[#EB5757] border-[#EB5757]/30"
+        )}>
+          {syncStatusBanner.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+          <span>{syncStatusBanner.message}</span>
+        </div>
+      )}
 
       {/* Search & Department Filters */}
       <div className="bg-[#252B34] p-3 md:p-4 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] space-y-3">

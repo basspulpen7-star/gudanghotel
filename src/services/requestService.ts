@@ -777,15 +777,24 @@ export const requestService = {
       // ignore
     }
 
+    const masterItems = await inventoryService.getCachedItems();
+
     // 1. Try atomic PostgreSQL RPC execution first (1 Single Network Request)
     try {
-      const itemsPayload = itemsToProcess.map(it => ({
-        item_id: it.item_id || null,
-        item_name: it.item_name,
-        quantity: Number(it.quantity || 0),
-        unit: it.unit || 'pcs',
-        notes: it.notes || ''
-      }));
+      const itemsPayload = itemsToProcess.map(it => {
+        let matchedId = it.item_id || null;
+        if (!matchedId && masterItems) {
+          const found = masterItems.find(m => m.name.toLowerCase() === it.item_name.toLowerCase());
+          if (found) matchedId = found.id;
+        }
+        return {
+          item_id: matchedId,
+          item_name: it.item_name,
+          quantity: Number(it.quantity || 0),
+          unit: it.unit || 'pcs',
+          notes: it.notes || ''
+        };
+      });
 
       const { data: rpcRes, error: rpcErr } = await warehouseSupabase.rpc('complete_hk_request', {
         p_request_id: request.id,
@@ -801,7 +810,9 @@ export const requestService = {
           list[index].status = 'SELESAI';
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
         }
+        inventoryService.invalidateCache();
         queryCache.invalidate('requests');
+        queryCache.invalidate('requests:all');
         queryCache.invalidate('items');
         queryCache.invalidate('dashboard');
         return;
@@ -814,43 +825,59 @@ export const requestService = {
     await this.updateStatus(request.id, 'SELESAI');
 
     try {
-      const masterItems = await inventoryService.getCachedItems();
-
       for (const reqItem of itemsToProcess) {
         const qtyToDeduct = Number(reqItem.quantity || 0);
         if (qtyToDeduct <= 0) continue;
 
         let matchedItemId = reqItem.item_id;
-        let matchedCurrentStock = 0;
-
-        if (masterItems) {
-          const found = matchedItemId
-            ? masterItems.find(m => m.id === matchedItemId)
-            : masterItems.find(m => m.name.toLowerCase() === reqItem.item_name.toLowerCase());
-
-          if (found) {
-            matchedItemId = found.id;
-            matchedCurrentStock = found.current_stock || 0;
+        let matchedItem = masterItems ? masterItems.find(m => m.id === matchedItemId) : null;
+        
+        if (!matchedItem && masterItems) {
+          matchedItem = masterItems.find(m => m.name.toLowerCase() === reqItem.item_name.toLowerCase()) || null;
+          if (matchedItem) {
+            matchedItemId = matchedItem.id;
           }
         }
 
+        const matchedCurrentStock = matchedItem ? (matchedItem.current_stock || 0) : 0;
+
         if (matchedItemId) {
+          // Determine department tag (e.g. if item belongs to Resto or request/item notes mention Resto)
+          const isResto = (matchedItem?.department && /resto|kitchen|dapur|f&b|food|beverage/i.test(matchedItem.department)) ||
+            (reqItem.notes && /resto/i.test(reqItem.notes)) ||
+            (request.notes && /resto/i.test(request.notes));
+
+          const deptTag = isResto ? 'Resto' : (request.department || 'Housekeeping');
+          const noteDetail = `Fulfillment Permintaan HK ${request.request_number || request.id} (${reqItem.item_name})${reqItem.notes ? ` - ${reqItem.notes}` : ''}`;
+
           await warehouseSupabase.from('transactions').insert([{
             id: crypto.randomUUID ? crypto.randomUUID() : `tx-${Date.now()}-${Math.random()}`,
             item_id: matchedItemId,
             type: 'OUT',
             quantity: qtyToDeduct,
-            department: 'Housekeeping',
-            notes: `Fulfillment Permintaan HK ${request.request_number || request.id}`,
+            department: deptTag,
+            notes: noteDetail,
             user_id: userId,
             created_at: new Date().toISOString()
           }]);
 
-          const targetStock = Math.max(0, matchedCurrentStock - qtyToDeduct);
+          // Fetch fresh item from DB to calculate new stock accurately
+          const { data: freshDbItem } = await warehouseSupabase
+            .from('items')
+            .select('id, initial_stock, current_stock')
+            .eq('id', matchedItemId)
+            .single();
+
+          const currentDbStock = freshDbItem ? (freshDbItem.current_stock ?? 0) : matchedCurrentStock;
+          const targetStock = Math.max(0, currentDbStock - qtyToDeduct);
           await warehouseSupabase.from('items').update({ current_stock: targetStock }).eq('id', matchedItemId);
         }
       }
       inventoryService.invalidateCache();
+      queryCache.invalidate('requests');
+      queryCache.invalidate('requests:all');
+      queryCache.invalidate('items');
+      queryCache.invalidate('dashboard');
     } catch (err: any) {
       console.warn('[REQUEST SERVICE] Auto outgoing transaction fallback notice:', err?.message || err);
     }

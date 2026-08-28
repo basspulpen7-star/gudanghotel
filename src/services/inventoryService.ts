@@ -21,6 +21,73 @@ export const inventoryService = {
   },
 
   /**
+   * Calculate and synchronize accurate current_stock for a list of items based on initial_stock and transactions
+   */
+  async syncAndEnrichItemsStock(items: Item[]): Promise<Item[]> {
+    if (!items || items.length === 0) return [];
+
+    try {
+      const itemIds = items.map(i => i.id);
+      const { data: txData, error: txError } = await supabase
+        .from('transactions')
+        .select('item_id, type, quantity')
+        .in('item_id', itemIds);
+
+      if (txError) {
+        console.warn('[INVENTORY SERVICE] Could not load transactions for stock sync:', txError.message);
+        return items;
+      }
+
+      // Group transactions by item_id
+      const inMap: Record<string, number> = {};
+      const outMap: Record<string, number> = {};
+
+      (txData || []).forEach(tx => {
+        const qty = Number(tx.quantity) || 0;
+        if (tx.type === 'IN') {
+          inMap[tx.item_id] = (inMap[tx.item_id] || 0) + qty;
+        } else if (tx.type === 'OUT') {
+          outMap[tx.item_id] = (outMap[tx.item_id] || 0) + qty;
+        }
+      });
+
+      const itemsToUpdateInDb: { id: string; current_stock: number }[] = [];
+
+      const enriched = items.map(item => {
+        const initial = Number(item.initial_stock || 0);
+        const totalIn = inMap[item.id] || 0;
+        const totalOut = outMap[item.id] || 0;
+        const calculatedStock = Math.max(0, initial + totalIn - totalOut);
+
+        if (item.current_stock !== calculatedStock) {
+          itemsToUpdateInDb.push({ id: item.id, current_stock: calculatedStock });
+        }
+
+        return {
+          ...item,
+          current_stock: calculatedStock
+        };
+      });
+
+      // Self-healing: asynchronously update DB for any drifted records
+      if (itemsToUpdateInDb.length > 0) {
+        Promise.all(
+          itemsToUpdateInDb.map(u => 
+            supabase.from('items').update({ current_stock: u.current_stock }).eq('id', u.id)
+          )
+        ).catch(err => {
+          console.warn('[INVENTORY SERVICE] Background stock self-healing notice:', err);
+        });
+      }
+
+      return enriched;
+    } catch (err) {
+      console.warn('[INVENTORY SERVICE] Error enriching stock:', err);
+      return items;
+    }
+  },
+
+  /**
    * Fetch all active items with cache (TTL 60s) to prevent repeated requests on navigation & dropdowns
    */
   async getCachedItems(forceRefresh = false): Promise<Item[]> {
@@ -33,11 +100,73 @@ export const inventoryService = {
           .order('name', { ascending: true });
 
         if (error) throw error;
-        return (data || []) as Item[];
+        const rawItems = (data || []) as Item[];
+        return await this.syncAndEnrichItemsStock(rawItems);
       },
-      60000, // 60 seconds TTL
+      30000, // 30 seconds TTL
       forceRefresh
     );
+  },
+
+  /**
+   * Recalculate all item stocks in database based on initial_stock + SUM(IN) - SUM(OUT)
+   */
+  async recalculateAllStocks(): Promise<{ total: number; updated: number }> {
+    try {
+      // 1. Try server-side RPC if available
+      const { data: rpcData, error: rpcError } = await supabase.rpc('recalculate_all_item_stocks');
+      if (!rpcError && rpcData) {
+        this.invalidateCache();
+        return { total: rpcData.total || 0, updated: rpcData.updated || 0 };
+      }
+    } catch (e) {
+      // ignore, proceed with client-side recalculation
+    }
+
+    // Client-side full audit and recalculation
+    const { data: allItems, error: itemsErr } = await supabase
+      .from('items')
+      .select('id, name, initial_stock, current_stock');
+
+    if (itemsErr) throw itemsErr;
+    if (!allItems || allItems.length === 0) return { total: 0, updated: 0 };
+
+    const { data: allTx, error: txErr } = await supabase
+      .from('transactions')
+      .select('item_id, type, quantity');
+
+    if (txErr) throw txErr;
+
+    const inMap: Record<string, number> = {};
+    const outMap: Record<string, number> = {};
+
+    (allTx || []).forEach(tx => {
+      const qty = Number(tx.quantity) || 0;
+      if (tx.type === 'IN') {
+        inMap[tx.item_id] = (inMap[tx.item_id] || 0) + qty;
+      } else if (tx.type === 'OUT') {
+        outMap[tx.item_id] = (outMap[tx.item_id] || 0) + qty;
+      }
+    });
+
+    let updatedCount = 0;
+    for (const item of allItems) {
+      const initial = Number(item.initial_stock || 0);
+      const totalIn = inMap[item.id] || 0;
+      const totalOut = outMap[item.id] || 0;
+      const calculatedStock = Math.max(0, initial + totalIn - totalOut);
+
+      if (item.current_stock !== calculatedStock) {
+        await supabase
+          .from('items')
+          .update({ current_stock: calculatedStock })
+          .eq('id', item.id);
+        updatedCount++;
+      }
+    }
+
+    this.invalidateCache();
+    return { total: allItems.length, updated: updatedCount };
   },
 
   /**
@@ -98,13 +227,15 @@ export const inventoryService = {
         const todayIso = todayStart.toISOString();
 
         const [itemsRes, todayInRes, todayOutRes, txRes] = await Promise.all([
-          supabase.from('items').select('id, name, department, unit, current_stock, min_stock'),
+          supabase.from('items').select('id, name, department, unit, initial_stock, current_stock, min_stock'),
           supabase.from('transactions').select('quantity').eq('type', 'IN').gte('created_at', todayIso),
           supabase.from('transactions').select('quantity').eq('type', 'OUT').gte('created_at', todayIso),
           supabase.from('transactions').select('id, item_id, type, quantity, department, notes, created_at, user_id, items(id, name, unit)').order('created_at', { ascending: false }).limit(recentTxLimit)
         ]);
 
-        const allItems = (itemsRes.data || []) as Item[];
+        const rawItems = (itemsRes.data || []) as Item[];
+        const allItems = await this.syncAndEnrichItemsStock(rawItems);
+
         const lowStockItems = allItems
           .filter(item => Number(item.current_stock) <= Number(item.min_stock))
           .sort((a, b) => Number(a.current_stock) - Number(b.current_stock))
@@ -130,7 +261,7 @@ export const inventoryService = {
   },
 
   /**
-   * Fetch paginated items with required columns only
+   * Fetch paginated items with required columns and guaranteed accurate stock formula
    */
   async getItems(options: GetItemsOptions = {}) {
     const {
@@ -166,7 +297,10 @@ export const inventoryService = {
     const { data, error, count } = await query;
     if (error) throw error;
 
-    let result = (data || []) as Item[];
+    let rawItems = (data || []) as Item[];
+    // Enrich with exact ledger calculation: initial_stock + SUM(IN) - SUM(OUT)
+    let result = await this.syncAndEnrichItemsStock(rawItems);
+
     if (lowStockOnly) {
       result = result.filter(item => item.current_stock <= item.min_stock);
     }

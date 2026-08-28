@@ -297,7 +297,54 @@ AS $$
   ORDER BY i.name ASC;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_stock_report(TIMESTAMPTZ, TIMESTAMPTZ) TO anon, authenticated, service_role;`;
+GRANT EXECUTE ON FUNCTION public.get_stock_report(TIMESTAMPTZ, TIMESTAMPTZ) TO anon, authenticated, service_role;
+
+-- 5. RPC: recalculate_all_item_stocks()
+-- Menyinkronkan seluruh stok barang di tabel items dengan mutasi transaksi (Stok Awal + Masuk - Keluar)
+CREATE OR REPLACE FUNCTION public.recalculate_all_item_stocks()
+RETURNS JSON
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_updated_count INT := 0;
+  v_total_count INT := 0;
+BEGIN
+  WITH computed_stocks AS (
+    SELECT 
+      i.id AS item_id,
+      GREATEST(0, (
+        COALESCE(i.initial_stock, 0) + 
+        COALESCE(SUM(CASE WHEN t.type = 'IN' THEN t.quantity ELSE 0 END), 0) - 
+        COALESCE(SUM(CASE WHEN t.type = 'OUT' THEN t.quantity ELSE 0 END), 0)
+      )) AS real_stock
+    FROM public.items i
+    LEFT JOIN public.transactions t ON t.item_id = i.id
+    GROUP BY i.id, i.initial_stock
+  ),
+  updated_rows AS (
+    UPDATE public.items it
+    SET current_stock = cs.real_stock
+    FROM computed_stocks cs
+    WHERE it.id = cs.item_id AND it.current_stock <> cs.real_stock
+    RETURNING it.id
+  )
+  SELECT 
+    (SELECT COUNT(*) FROM public.items),
+    (SELECT COUNT(*) FROM updated_rows)
+  INTO v_total_count, v_updated_count;
+
+  RETURN json_build_object(
+    'success', true,
+    'total', v_total_count,
+    'updated', v_updated_count,
+    'message', 'Sinkronisasi stok barang berhasil diperbarui.'
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.recalculate_all_item_stocks() TO anon, authenticated, service_role;`;
 
   // SQL Batch 3: Analytical Views & Storage Stats
   const sqlBatch3 = `-- ====================================================================

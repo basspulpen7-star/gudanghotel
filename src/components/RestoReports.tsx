@@ -129,12 +129,13 @@ export function RestoReports() {
 
       if (txErr) throw txErr;
 
-      // Filter transactions that belong to Resto items or marked as Resto department
+      // Filter transactions that belong to Resto items or marked as Resto department or notes mentioning resto
       const relevantTx = (allTx || []).filter((tx: any) => {
         if (restoItemIds.has(tx.item_id)) return true;
         if (isRestoDepartment(tx.department)) return true;
         const it = Array.isArray(tx.items) ? tx.items[0] : tx.items;
         if (it && isRestoDepartment(it.department)) return true;
+        if (tx.notes && isRestoDepartment(tx.notes)) return true;
         return false;
       });
 

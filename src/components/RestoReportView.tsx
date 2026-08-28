@@ -29,6 +29,21 @@ import autoTable from 'jspdf-autotable';
 
 type RestoPeriod = 'today' | 'yesterday' | '7days' | 'this_month' | 'last_month' | 'custom_date' | 'custom_month';
 
+const isRestoDepartment = (deptName?: string | null): boolean => {
+  if (!deptName) return false;
+  const d = deptName.toLowerCase().trim();
+  return d.includes('resto') || 
+         d.includes('kitchen') || 
+         d.includes('dapur') || 
+         d.includes('f&b') || 
+         d.includes('fb') ||
+         d.includes('food') || 
+         d.includes('beverage') ||
+         d.includes('restoran') ||
+         d.includes('sarapan') ||
+         d.includes('breakfast');
+};
+
 export function RestoReportView() {
   const [period, setPeriod] = useState<RestoPeriod>('today');
   const [customDate, setCustomDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -120,13 +135,21 @@ export function RestoReportView() {
           )
         `)
         .eq('type', 'OUT')
-        .ilike('department', '%resto%')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTransactions(data || []);
+
+      const filtered = (data || []).filter((tx: any) => {
+        if (isRestoDepartment(tx.department)) return true;
+        const it = Array.isArray(tx.items) ? tx.items[0] : tx.items;
+        if (it && isRestoDepartment(it.department)) return true;
+        if (tx.notes && isRestoDepartment(tx.notes)) return true;
+        return false;
+      });
+
+      setTransactions(filtered);
     } catch (err: any) {
       console.error('Error fetching resto report data:', err);
     } finally {

@@ -66,6 +66,7 @@ interface ReportsProps {
 export function Reports({ onNavigateToResto }: ReportsProps) {
   const [reportType, setReportType] = useState<ReportType>('daily');
   const [reportCategory, setReportCategory] = useState<ReportCategory>('stock');
+  const [selectedDept, setSelectedDept] = useState<string>('ALL');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
   const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -73,6 +74,15 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
   const [items, setItems] = useState<Item[]>([]);
   const [itemStats, setItemStats] = useState<Record<string, { initial: number; in: number; out: number; final: number }>>({});
   const [loading, setLoading] = useState(true);
+
+  const departments = [
+    { value: 'ALL', label: 'Semua Departemen' },
+    { value: 'Housekeeping', label: 'Housekeeping' },
+    { value: 'Resto', label: 'Resto / F&B' },
+    { value: 'Front Office', label: 'Front Office' },
+    { value: 'Teknisi', label: 'Teknisi' },
+    { value: 'General', label: 'General' }
+  ];
 
   const getLocalStart = (type: ReportType, currDate: Date, sDateStr: string) => {
     if (type === 'daily') return startOfDay(currDate);
@@ -100,7 +110,7 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
     } else {
       fetchTransactions();
     }
-  }, [reportType, currentDate, reportCategory, startDate, endDate]);
+  }, [reportType, currentDate, reportCategory, startDate, endDate, selectedDept]);
 
   const fetchStockData = async () => {
     setLoading(true);
@@ -119,9 +129,14 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
         const stats: Record<string, { initial: number; in: number; out: number; final: number }> = {};
 
         data.forEach((row: any) => {
-          // EXCLUDE RESTO ITEMS
-          if (isRestoDepartment(row.department)) {
-            return;
+          if (selectedDept !== 'ALL') {
+            const rowDept = (row.department || '').toLowerCase();
+            const target = selectedDept.toLowerCase();
+            if (target === 'resto') {
+              if (!isRestoDepartment(row.department)) return;
+            } else {
+              if (!rowDept.includes(target)) return;
+            }
           }
 
           mappedItems.push({
@@ -165,7 +180,15 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
       if (transError) throw transError;
 
       const stats: Record<string, { initial: number; in: number; out: number; final: number }> = {};
-      const filteredItemsData = (itemsData || []).filter(item => !isRestoDepartment(item.department));
+      const filteredItemsData = (itemsData || []).filter(item => {
+        if (selectedDept === 'ALL') return true;
+        const itemDept = (item.department || '').toLowerCase();
+        const target = selectedDept.toLowerCase();
+        if (target === 'resto') {
+          return isRestoDepartment(item.department);
+        }
+        return itemDept.includes(target);
+      });
 
       filteredItemsData.forEach(item => {
         let beforeIn = 0;
@@ -214,16 +237,26 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
     try {
       const { data, error } = await supabase
         .from('transactions')
-        .select('id, item_id, type, quantity, notes, created_at, items(id, name, unit, department)')
+        .select('id, item_id, type, quantity, department, notes, created_at, items(id, name, unit, department)')
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString())
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       if (data) {
-        // Filter out transactions of resto items
-        const filteredTrans = data.filter((tx: any) => !isRestoDepartment(tx.items?.department));
-        setTransactions(filteredTrans);
+        const filteredTrans = (data || []).filter((tx: any) => {
+          if (selectedDept === 'ALL') return true;
+          const tDept = (tx.department || '').toLowerCase();
+          const iDept = (tx.items?.department || '').toLowerCase();
+          const target = selectedDept.toLowerCase();
+
+          if (target === 'resto') {
+            return isRestoDepartment(tx.department) || isRestoDepartment(tx.items?.department) || isRestoDepartment(tx.notes);
+          }
+          return tDept.includes(target) || iDept.includes(target);
+        });
+
+        setTransactions(filteredTrans as unknown as Transaction[]);
       }
     } catch (error: any) {
       console.error('Error fetching transactions:', error);
@@ -274,7 +307,8 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
     else if (reportCategory === 'incoming') categoryStr = 'Barang Masuk';
     else categoryStr = 'Barang Keluar';
 
-    const title = `Laporan ${categoryStr} - ${periodStr}`;
+    const deptStr = selectedDept === 'ALL' ? 'Semua Departemen' : selectedDept;
+    const title = `Laporan ${categoryStr} (${deptStr}) - ${periodStr}`;
     
     doc.setFontSize(16);
     doc.setTextColor(42, 48, 58);
@@ -288,7 +322,7 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
         const stats = itemStats[item.id] as any || { initial: 0, in: 0, out: 0, final: 0 };
         return [
           item.name,
-          item.department,
+          item.department || '-',
           stats.initial.toString(),
           stats.in.toString(),
           stats.out.toString(),
@@ -311,13 +345,14 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
       const tableData = displayedTransactions.map(tx => [
         format(new Date(tx.created_at), 'dd/MM HH:mm'),
         tx.items?.name || '-',
-        tx.quantity.toString(),
+        tx.department || tx.items?.department || '-',
+        (tx.type === 'IN' ? '+' : '-') + tx.quantity.toString(),
         tx.notes || '-'
       ]);
 
       autoTable(doc, {
         startY: 46,
-        head: [['Waktu', 'Barang', 'Jumlah', 'Catatan']],
+        head: [['Waktu', 'Barang', 'Dept', 'Jumlah', 'Catatan']],
         body: tableData,
         theme: 'grid',
         headStyles: { fillColor: [42, 48, 58] },
@@ -361,7 +396,22 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
             <p className="text-xs md:text-sm text-[#8E99A6] mt-0.5 font-medium">Analisis pergerakan mutasi dan riwayat stok barang hotel</p>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2.5 w-full md:w-auto flex-wrap">
+          {/* Department Filter */}
+          <div className="relative w-full sm:w-auto">
+            <select
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="w-full sm:w-auto bg-[#20252D] border border-[#3A424D] text-[#F1F3F5] px-3 py-2 rounded-xl text-xs font-extrabold focus:outline-none focus:border-[#C89B3C] cursor-pointer"
+            >
+              {departments.map(d => (
+                <option key={d.value} value={d.value} className="bg-[#20252D] text-[#F1F3F5]">
+                  {d.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex gap-1.5 bg-[#20252D] p-1 rounded-xl border border-[#3A424D] w-full sm:w-auto">
             <button 
               onClick={() => setReportCategory('stock')}
@@ -506,6 +556,9 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
             {reportCategory === 'stock' ? 'Rincian Stok Barang (Awal, Masuk, Keluar, Akhir)' : 
              reportCategory === 'incoming' ? 'Rincian Riwayat Barang Masuk' : 'Rincian Riwayat Barang Keluar'}
           </h3>
+          <span className="text-xs text-[#8E99A6] font-semibold bg-[#2A303A] px-2.5 py-1 rounded-lg border border-[#3A424D]">
+            {departments.find(d => d.value === selectedDept)?.label}
+          </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[600px] text-xs">
@@ -525,6 +578,7 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
                   <>
                     <th className="px-4 py-3">Waktu</th>
                     <th className="px-4 py-3">Barang</th>
+                    <th className="px-4 py-3">Dept</th>
                     <th className="px-4 py-3 text-center">Jumlah</th>
                     <th className="px-4 py-3">Catatan</th>
                   </>
@@ -533,16 +587,20 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
             </thead>
             <tbody className="divide-y divide-[#343B46]">
               {loading ? (
-                <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-[#8E99A6] font-medium">Memuat data laporan...</td></tr>
+                <tr><td colSpan={reportCategory === 'stock' ? 7 : 5} className="px-6 py-8 text-center text-[#8E99A6] font-medium">Memuat data laporan...</td></tr>
               ) : (reportCategory === 'stock' ? items : displayedTransactions).length === 0 ? (
-                <tr><td colSpan={reportCategory === 'stock' ? 7 : 4} className="px-6 py-8 text-center text-[#8E99A6] font-medium">Tidak ada data di periode ini.</td></tr>
+                <tr><td colSpan={reportCategory === 'stock' ? 7 : 5} className="px-6 py-8 text-center text-[#8E99A6] font-medium">Tidak ada data di periode ini.</td></tr>
               ) : reportCategory === 'stock' ? (
                 items.map((item) => {
                   const stats = itemStats[item.id] as any || { initial: 0, in: 0, out: 0, final: 0 };
                   return (
                     <tr key={item.id} className="hover:bg-[#2A303A]/70 transition-colors">
                       <td className="px-4 py-3 font-bold text-[#F1F3F5]">{item.name}</td>
-                      <td className="px-4 py-3 text-[#8E99A6] font-medium">{item.department}</td>
+                      <td className="px-4 py-3 text-[#8E99A6] font-medium">
+                        <span className="bg-[#20252D] px-2 py-0.5 rounded text-[11px] border border-[#3A424D]">
+                          {item.department || 'General'}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-center text-[#D8DEE6] font-semibold">{stats.initial}</td>
                       <td className="px-4 py-3 text-center text-[#55B685] font-bold">+{stats.in}</td>
                       <td className="px-4 py-3 text-center text-[#E0B85A] font-bold">-{stats.out}</td>
@@ -557,7 +615,12 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
                     <td className="px-4 py-3 text-[#8E99A6] font-mono text-[11px]">
                       {format(new Date(tx.created_at), 'dd/MM HH:mm')}
                     </td>
-                    <td className="px-4 py-3 font-bold text-[#F1F3F5]">{tx.items?.name}</td>
+                    <td className="px-4 py-3 font-bold text-[#F1F3F5]">{tx.items?.name || '-'}</td>
+                    <td className="px-4 py-3 text-[#8E99A6] font-medium">
+                      <span className="bg-[#20252D] px-2 py-0.5 rounded text-[11px] border border-[#3A424D]">
+                        {tx.department || tx.items?.department || 'General'}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-center font-black text-[#F1F3F5]">
                       <span className={tx.type === 'IN' ? 'text-[#55B685]' : 'text-[#E0B85A]'}>
                         {tx.type === 'IN' ? '+' : '-'}{tx.quantity}
