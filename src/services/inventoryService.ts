@@ -21,7 +21,66 @@ export const inventoryService = {
   },
 
   /**
-   * Calculate and synchronize accurate current_stock for a list of items based on initial_stock and transactions
+   * Calculate and synchronize accurate current_stock for a specific list of item IDs based on ledger transactions
+   * This is a targeted manual/on-demand recalculation to avoid unnecessary background write storms.
+   */
+  async recalculateStockForItems(itemIds: string[]): Promise<{ total: number; updated: number }> {
+    if (!itemIds || itemIds.length === 0) return { total: 0, updated: 0 };
+
+    try {
+      const { data: targetItems, error: itemsErr } = await supabase
+        .from('items')
+        .select('id, name, initial_stock, current_stock')
+        .in('id', itemIds);
+
+      if (itemsErr) throw itemsErr;
+      if (!targetItems || targetItems.length === 0) return { total: 0, updated: 0 };
+
+      const { data: txData, error: txError } = await supabase
+        .from('transactions')
+        .select('item_id, type, quantity')
+        .in('item_id', itemIds);
+
+      if (txError) throw txError;
+
+      const inMap: Record<string, number> = {};
+      const outMap: Record<string, number> = {};
+
+      (txData || []).forEach(tx => {
+        const qty = Number(tx.quantity) || 0;
+        if (tx.type === 'IN') {
+          inMap[tx.item_id] = (inMap[tx.item_id] || 0) + qty;
+        } else if (tx.type === 'OUT') {
+          outMap[tx.item_id] = (outMap[tx.item_id] || 0) + qty;
+        }
+      });
+
+      let updatedCount = 0;
+      for (const item of targetItems) {
+        const initial = Number(item.initial_stock || 0);
+        const totalIn = inMap[item.id] || 0;
+        const totalOut = outMap[item.id] || 0;
+        const calculatedStock = Math.max(0, initial + totalIn - totalOut);
+
+        if (item.current_stock !== calculatedStock) {
+          await supabase
+            .from('items')
+            .update({ current_stock: calculatedStock })
+            .eq('id', item.id);
+          updatedCount++;
+        }
+      }
+
+      this.invalidateCache();
+      return { total: targetItems.length, updated: updatedCount };
+    } catch (err) {
+      console.warn('[INVENTORY SERVICE] Error recalculating stock for items:', err);
+      return { total: itemIds.length, updated: 0 };
+    }
+  },
+
+  /**
+   * Helper to calculate and enrich stock for in-memory items (used on-demand / in audit tools)
    */
   async syncAndEnrichItemsStock(items: Item[]): Promise<Item[]> {
     if (!items || items.length === 0) return [];
@@ -51,36 +110,17 @@ export const inventoryService = {
         }
       });
 
-      const itemsToUpdateInDb: { id: string; current_stock: number }[] = [];
-
-      const enriched = items.map(item => {
+      return items.map(item => {
         const initial = Number(item.initial_stock || 0);
         const totalIn = inMap[item.id] || 0;
         const totalOut = outMap[item.id] || 0;
         const calculatedStock = Math.max(0, initial + totalIn - totalOut);
-
-        if (item.current_stock !== calculatedStock) {
-          itemsToUpdateInDb.push({ id: item.id, current_stock: calculatedStock });
-        }
 
         return {
           ...item,
           current_stock: calculatedStock
         };
       });
-
-      // Self-healing: asynchronously update DB for any drifted records
-      if (itemsToUpdateInDb.length > 0) {
-        Promise.all(
-          itemsToUpdateInDb.map(u => 
-            supabase.from('items').update({ current_stock: u.current_stock }).eq('id', u.id)
-          )
-        ).catch(err => {
-          console.warn('[INVENTORY SERVICE] Background stock self-healing notice:', err);
-        });
-      }
-
-      return enriched;
     } catch (err) {
       console.warn('[INVENTORY SERVICE] Error enriching stock:', err);
       return items;
@@ -88,7 +128,7 @@ export const inventoryService = {
   },
 
   /**
-   * Fetch all active items with cache (TTL 60s) to prevent repeated requests on navigation & dropdowns
+   * Fetch all active items with cache (TTL 30s) to prevent repeated requests on navigation & dropdowns
    */
   async getCachedItems(forceRefresh = false): Promise<Item[]> {
     return queryCache.fetchWithCache<Item[]>(
@@ -100,8 +140,7 @@ export const inventoryService = {
           .order('name', { ascending: true });
 
         if (error) throw error;
-        const rawItems = (data || []) as Item[];
-        return await this.syncAndEnrichItemsStock(rawItems);
+        return (data || []) as Item[];
       },
       30000, // 30 seconds TTL
       forceRefresh
@@ -234,7 +273,7 @@ export const inventoryService = {
         ]);
 
         const rawItems = (itemsRes.data || []) as Item[];
-        const allItems = await this.syncAndEnrichItemsStock(rawItems);
+        const allItems = rawItems;
 
         const lowStockItems = allItems
           .filter(item => Number(item.current_stock) <= Number(item.min_stock))
@@ -261,7 +300,7 @@ export const inventoryService = {
   },
 
   /**
-   * Fetch paginated items with required columns and guaranteed accurate stock formula
+   * Fetch paginated items with required columns directly from database
    */
   async getItems(options: GetItemsOptions = {}) {
     const {
@@ -297,9 +336,7 @@ export const inventoryService = {
     const { data, error, count } = await query;
     if (error) throw error;
 
-    let rawItems = (data || []) as Item[];
-    // Enrich with exact ledger calculation: initial_stock + SUM(IN) - SUM(OUT)
-    let result = await this.syncAndEnrichItemsStock(rawItems);
+    let result = (data || []) as Item[];
 
     if (lowStockOnly) {
       result = result.filter(item => item.current_stock <= item.min_stock);

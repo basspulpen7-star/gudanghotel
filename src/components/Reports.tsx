@@ -51,11 +51,14 @@ const isRestoDepartment = (deptName?: string | null): boolean => {
     d.includes('resto') ||
     d.includes('restoran') ||
     d.includes('f&b') ||
+    d.includes('fb') ||
     d.includes('food') ||
     d.includes('kitchen') ||
     d.includes('dapur') ||
     d.includes('bar') ||
-    d.includes('beverage')
+    d.includes('beverage') ||
+    d.includes('sarapan') ||
+    d.includes('breakfast')
   );
 };
 
@@ -78,7 +81,6 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
   const departments = [
     { value: 'ALL', label: 'Semua Departemen' },
     { value: 'Housekeeping', label: 'Housekeeping' },
-    { value: 'Resto', label: 'Resto / F&B' },
     { value: 'Front Office', label: 'Front Office' },
     { value: 'Teknisi', label: 'Teknisi' },
     { value: 'General', label: 'General' }
@@ -129,14 +131,13 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
         const stats: Record<string, { initial: number; in: number; out: number; final: number }> = {};
 
         data.forEach((row: any) => {
+          // Exclude Resto items because Resto has its own separate report
+          if (isRestoDepartment(row.department)) return;
+
           if (selectedDept !== 'ALL') {
             const rowDept = (row.department || '').toLowerCase();
             const target = selectedDept.toLowerCase();
-            if (target === 'resto') {
-              if (!isRestoDepartment(row.department)) return;
-            } else {
-              if (!rowDept.includes(target)) return;
-            }
+            if (!rowDept.includes(target)) return;
           }
 
           mappedItems.push({
@@ -181,12 +182,12 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
 
       const stats: Record<string, { initial: number; in: number; out: number; final: number }> = {};
       const filteredItemsData = (itemsData || []).filter(item => {
+        // Exclude Resto items because Resto has its own separate report
+        if (isRestoDepartment(item.department)) return false;
+
         if (selectedDept === 'ALL') return true;
         const itemDept = (item.department || '').toLowerCase();
         const target = selectedDept.toLowerCase();
-        if (target === 'resto') {
-          return isRestoDepartment(item.department);
-        }
         return itemDept.includes(target);
       });
 
@@ -245,14 +246,15 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
       if (error) throw error;
       if (data) {
         const filteredTrans = (data || []).filter((tx: any) => {
+          // Exclude Resto transactions because Resto has its own separate report
+          if (isRestoDepartment(tx.department) || isRestoDepartment(tx.items?.department) || isRestoDepartment(tx.notes)) {
+            return false;
+          }
+
           if (selectedDept === 'ALL') return true;
           const tDept = (tx.department || '').toLowerCase();
           const iDept = (tx.items?.department || '').toLowerCase();
           const target = selectedDept.toLowerCase();
-
-          if (target === 'resto') {
-            return isRestoDepartment(tx.department) || isRestoDepartment(tx.items?.department) || isRestoDepartment(tx.notes);
-          }
           return tDept.includes(target) || iDept.includes(target);
         });
 

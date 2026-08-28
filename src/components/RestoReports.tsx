@@ -259,26 +259,6 @@ export function RestoReports() {
 
   const totalCriticalCount = criticalItems.length;
 
-  // Chart data for Top Resto Items (Max 8 items)
-  const chartData = useMemo(() => {
-    const dataWithActivity = items
-      .map(it => {
-        const stats = itemStats[it.id] || { initial: 0, in: 0, out: 0, final: 0 };
-        return {
-          name: it.name.length > 15 ? it.name.substring(0, 15) + '...' : it.name,
-          fullName: it.name,
-          in: stats.in,
-          out: stats.out,
-          totalActivity: stats.in + stats.out
-        };
-      })
-      .filter(d => d.totalActivity > 0)
-      .sort((a, b) => b.totalActivity - a.totalActivity)
-      .slice(0, 8);
-
-    return dataWithActivity;
-  }, [items, itemStats]);
-
   // PDF Export specifically designed for Restaurant / Kitchen
   const exportToPDF = () => {
     const doc = new jsPDF();
@@ -717,63 +697,6 @@ export function RestoReports() {
           </div>
         </div>
       </div>
-
-      {/* Chart Section: Top Resto Items Activity */}
-      {chartData.length > 0 && (activeTab === 'stock' || isStaffGudang) && (
-        <div className="bg-[#252B34] p-4 sm:p-6 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-sm font-black text-[#F1F3F5] flex items-center gap-2">
-                <span>Aktivitas Barang Resto Teratas</span>
-              </h3>
-              <p className="text-xs text-[#8E99A6] mt-0.5 font-medium">Perbandingan pasokan masuk vs pemakaian resto pada periode ini</p>
-            </div>
-          </div>
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#343B46" />
-                <XAxis 
-                  dataKey="name" 
-                  tick={{ fontSize: 11, fill: '#8E99A6' }} 
-                  interval={0}
-                  angle={-15}
-                  textAnchor="end"
-                />
-                <YAxis tick={{ fontSize: 11, fill: '#8E99A6' }} />
-                <Tooltip 
-                  contentStyle={{ 
-                    borderRadius: '12px', 
-                    border: '1px solid #3A424D', 
-                    backgroundColor: '#20252D',
-                    color: '#F1F3F5',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-                    fontSize: '12px' 
-                  }}
-                  formatter={(value: any, name: any) => [
-                    `${value} item`,
-                    name === 'in' ? 'Bahan Masuk' : 'Pemakaian Resto'
-                  ]}
-                  labelFormatter={(label, payload) => {
-                    if (payload && payload[0]) {
-                      return (payload[0].payload as any).fullName;
-                    }
-                    return label;
-                  }}
-                />
-                <Legend 
-                  verticalAlign="top" 
-                  align="right" 
-                  wrapperStyle={{ paddingBottom: '10px', fontSize: '12px' }}
-                  formatter={(value) => (value === 'in' ? 'Bahan Masuk' : 'Pemakaian Resto')}
-                />
-                <Bar dataKey="in" name="in" fill="#55B685" radius={[4, 4, 0, 0]} barSize={16} />
-                <Bar dataKey="out" name="out" fill="#E0B85A" radius={[4, 4, 0, 0]} barSize={16} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
 
       {/* Main Table View */}
       <div className="bg-[#252B34] rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)] overflow-hidden">

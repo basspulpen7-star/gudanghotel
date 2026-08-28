@@ -345,8 +345,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Role resolution strictly from user.user_metadata.role or profile.role
-  const rawRole = String(user?.user_metadata?.role || profile?.role || '').toLowerCase().trim();
+  // Role resolution strictly from profile.role (database source of truth).
+  // user_metadata.role is ONLY used as a temporary fallback while profile is still loading / null.
+  const resolvedRole = profile?.role 
+    ? profile.role 
+    : ((profileLoading || !profile) && user?.user_metadata?.role 
+        ? user.user_metadata.role 
+        : 'staff');
+
+  const rawRole = String(resolvedRole || '').toLowerCase().trim();
   
   let userRole: UserRole = 'staff';
   if (rawRole === 'admin') {

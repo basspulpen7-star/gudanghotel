@@ -131,6 +131,11 @@ DECLARE
   v_item_name TEXT;
   v_processed_count INT := 0;
 BEGIN
+  -- Role-check: Admin / Logistik only
+  IF public.get_my_role() NOT IN ('admin', 'logistik') THEN
+    RAISE EXCEPTION 'Akses ditolak: Hanya role Admin dan Logistik yang berhak memproses permintaan barang.';
+  END IF;
+
   SELECT request_number INTO v_req_num FROM public.requests WHERE id::text = p_request_id;
   IF v_req_num IS NULL THEN
     v_req_num := p_request_id;
@@ -178,7 +183,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.complete_hk_request(TEXT, JSONB, UUID) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.complete_hk_request(TEXT, JSONB, UUID) TO authenticated;
 
 -- 3. RPC: complete_purchase_order()
 CREATE OR REPLACE FUNCTION public.complete_purchase_order(
@@ -197,6 +202,11 @@ DECLARE
   v_supplier_name TEXT := 'Supplier';
   v_processed_count INT := 0;
 BEGIN
+  -- Role-check: Admin / Logistik only
+  IF public.get_my_role() NOT IN ('admin', 'logistik') THEN
+    RAISE EXCEPTION 'Akses ditolak: Hanya role Admin dan Logistik yang berhak memproses Purchase Order.';
+  END IF;
+
   SELECT * INTO v_po FROM public.purchase_orders WHERE id = p_po_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Purchase Order % tidak ditemukan', p_po_id;
@@ -242,7 +252,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.complete_purchase_order(UUID, UUID) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.complete_purchase_order(UUID, UUID) TO authenticated;
 
 -- 4. RPC: get_stock_report()
 CREATE OR REPLACE FUNCTION public.get_stock_report(
@@ -344,7 +354,55 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.recalculate_all_item_stocks() TO anon, authenticated, service_role;`;
+GRANT EXECUTE ON FUNCTION public.recalculate_all_item_stocks() TO anon, authenticated, service_role;
+
+-- 6. RPC: delete_transaction_and_revert_stock()
+CREATE OR REPLACE FUNCTION public.delete_transaction_and_revert_stock(
+  p_transaction_id TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_trans RECORD;
+  v_target_trans_id UUID;
+BEGIN
+  BEGIN
+    v_target_trans_id := p_transaction_id::UUID;
+  EXCEPTION WHEN OTHERS THEN
+    v_target_trans_id := NULL;
+  END;
+
+  SELECT * INTO v_trans 
+  FROM public.transactions 
+  WHERE (v_target_trans_id IS NOT NULL AND id = v_target_trans_id) OR id::TEXT = p_transaction_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Transaksi dengan ID % tidak ditemukan', p_transaction_id;
+  END IF;
+
+  IF v_trans.type = 'IN' THEN
+    UPDATE public.items
+    SET current_stock = GREATEST(0, current_stock - v_trans.quantity)
+    WHERE id = v_trans.item_id;
+  ELSIF v_trans.type = 'OUT' THEN
+    UPDATE public.items
+    SET current_stock = current_stock + v_trans.quantity
+    WHERE id = v_trans.item_id;
+  END IF;
+
+  DELETE FROM public.transactions WHERE id = v_trans.id;
+
+  RETURN jsonb_build_object(
+    'success', true,
+    'message', 'Transaksi berhasil dihapus dan stok dikembalikan.'
+  );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.delete_transaction_and_revert_stock(TEXT) TO anon, authenticated, service_role;`;
 
   // SQL Batch 3: Analytical Views & Storage Stats
   const sqlBatch3 = `-- ====================================================================
@@ -509,7 +567,7 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.preview_or_prune_old_transactions(INT, BOOLEAN) TO anon, authenticated, service_role;`;
+GRANT EXECUTE ON FUNCTION public.preview_or_prune_old_transactions(INT, BOOLEAN) TO service_role;`;
 
   // SQL Full Schema
   const sqlSetup = `-- ==========================================================
@@ -656,20 +714,10 @@ ALTER TABLE requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE request_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE breakfast_records ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Authenticated users can access suppliers" ON suppliers FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can access items" ON items FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can access transactions" ON transactions FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can access purchase_orders" ON purchase_orders FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can access purchase_order_items" ON purchase_order_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "Allow access to requests" ON requests FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY "Allow access to request_items" ON request_items FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY "Authenticated users can access breakfast_records" ON breakfast_records FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
-CREATE POLICY "Allow all for authenticated" ON profiles FOR ALL TO authenticated USING (true) WITH CHECK (true);
-
-GRANT ALL ON TABLE public.requests TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.request_items TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.items TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.transactions TO anon, authenticated, service_role;`;
+-- Catatan Keamanan:
+-- Gunakan file migration_fix_rls.sql, migration_fix_rls_breakfast.sql, dan migration_rpc_role_hardening.sql
+-- untuk menerapkan kebijakan RLS dan RPC role-check yang telah diperkeras.
+-- TIDAK ADA akses tulis/modifikasi yang diberikan ke role anon.`;
 
   useEffect(() => {
     checkTables();
@@ -1147,6 +1195,14 @@ GRANT ALL ON TABLE public.transactions TO anon, authenticated, service_role;`;
               <Copy className="w-3.5 h-3.5" />
               {copiedKey === 'schema' ? 'Tersalin!' : 'Salin Skema Master'}
             </button>
+          </div>
+
+          <div className="p-3.5 rounded-xl border bg-amber-50 border-amber-200 text-amber-900 text-xs flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <p>
+              <strong>Peringatan Keamanan:</strong> SQL di bawah ini hanya sebagai referensi struktur tabel master. 
+              <strong> JANGAN</strong> jalankan ulang bagian RLS/GRANT permisif lama. Gunakan file migration resmi di folder repo (seperti <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">migration_fix_rls.sql</code>, <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">migration_fix_rls_breakfast.sql</code>, dan <code className="font-mono bg-amber-100 px-1 py-0.5 rounded">migration_rpc_role_hardening.sql</code>) untuk konfigurasi hak akses produksi.
+            </p>
           </div>
           
           <div className="bg-gray-900 p-4 rounded-2xl border border-gray-800 h-[420px] overflow-y-auto font-mono text-xs text-emerald-400">
