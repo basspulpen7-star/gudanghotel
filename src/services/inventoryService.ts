@@ -10,6 +10,15 @@ export interface GetItemsOptions {
   limit?: number;
 }
 
+export interface TransferStockParams {
+  sourceItemId: string;
+  targetDepartment: string;
+  targetItemId?: string;
+  quantity: number;
+  notes?: string;
+  userId: string;
+}
+
 export const inventoryService = {
   /**
    * Invalidate inventory-related cache
@@ -425,5 +434,113 @@ export const inventoryService = {
     const { error } = await supabase.from('items').delete().eq('id', id);
     if (error) throw error;
     this.invalidateCache();
+  },
+
+  /**
+   * Transfer stock between items/departments (e.g., Housekeeping to Resto)
+   */
+  async transferStock(params: TransferStockParams) {
+    const { sourceItemId, targetDepartment, targetItemId, quantity, notes, userId } = params;
+    if (!sourceItemId) throw new Error('Barang asal harus dipilih');
+    if (!targetDepartment) throw new Error('Departemen tujuan harus dipilih');
+    if (!quantity || quantity <= 0) throw new Error('Jumlah transfer harus lebih dari 0');
+
+    // 1. Fetch source item
+    const { data: sourceItem, error: sourceErr } = await supabase
+      .from('items')
+      .select('id, name, department, unit, current_stock, min_stock')
+      .eq('id', sourceItemId)
+      .single();
+
+    if (sourceErr || !sourceItem) throw new Error('Barang asal tidak ditemukan');
+
+    if ((sourceItem.current_stock || 0) < quantity) {
+      throw new Error(`Stok ${sourceItem.name} (${sourceItem.department}) tidak mencukupi. Stok tersedia: ${sourceItem.current_stock} ${sourceItem.unit || 'pcs'}.`);
+    }
+
+    // 2. Find or create target item in target department
+    let destinationItem: Item | null = null;
+
+    if (targetItemId) {
+      const { data: foundTarget, error: targetErr } = await supabase
+        .from('items')
+        .select('*')
+        .eq('id', targetItemId)
+        .maybeSingle();
+      if (!targetErr && foundTarget) {
+        destinationItem = foundTarget as unknown as Item;
+      }
+    }
+
+    if (!destinationItem) {
+      // Search for item with matching name in target department
+      const { data: matchItems } = await supabase
+        .from('items')
+        .select('*')
+        .ilike('department', `%${targetDepartment}%`)
+        .ilike('name', sourceItem.name)
+        .limit(1);
+
+      if (matchItems && matchItems.length > 0) {
+        destinationItem = matchItems[0] as unknown as Item;
+      }
+    }
+
+    // If still no destination item found in target department, create a new item automatically
+    if (!destinationItem) {
+      const newDestId = crypto.randomUUID();
+      const newDestPayload = {
+        id: newDestId,
+        name: sourceItem.name,
+        department: targetDepartment,
+        unit: sourceItem.unit || 'pcs',
+        initial_stock: 0,
+        current_stock: 0,
+        min_stock: sourceItem.min_stock || 5
+      };
+
+      const { error: createErr } = await supabase.from('items').insert([newDestPayload]);
+      if (createErr) {
+        throw new Error(`Gagal membuat barang ${sourceItem.name} di departemen ${targetDepartment}: ${createErr.message}`);
+      }
+
+      destinationItem = newDestPayload as unknown as Item;
+    }
+
+    if (sourceItem.id === destinationItem.id) {
+      throw new Error('Barang asal dan barang tujuan tidak boleh sama');
+    }
+
+    const { transactionService } = await import('./transactionService');
+
+    // 3. Create OUT transaction for Source Item
+    const outNotes = `Transfer stok ke ${destinationItem.department} (${destinationItem.name})${notes ? ` - ${notes}` : ''}`;
+    await transactionService.createTransaction({
+      itemId: sourceItem.id,
+      type: 'OUT',
+      quantity,
+      department: sourceItem.department,
+      notes: outNotes,
+      userId
+    });
+
+    // 4. Create IN transaction for Destination Item
+    const inNotes = `Transfer stok dari ${sourceItem.department} (${sourceItem.name})${notes ? ` - ${notes}` : ''}`;
+    await transactionService.createTransaction({
+      itemId: destinationItem.id,
+      type: 'IN',
+      quantity,
+      department: destinationItem.department,
+      notes: inNotes,
+      userId
+    });
+
+    this.invalidateCache();
+
+    return {
+      sourceItem,
+      destinationItem,
+      quantity
+    };
   }
 };

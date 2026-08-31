@@ -12,8 +12,10 @@ import {
   X,
   SlidersHorizontal,
   CheckCircle2,
-  RotateCw
+  RotateCw,
+  ArrowLeftRight
 } from 'lucide-react';
+import { TransferStockModal } from './TransferStockModal';
 import { inventoryService } from '../services/inventoryService';
 import { transactionService } from '../services/transactionService';
 import { supabase } from '../lib/supabase';
@@ -58,6 +60,9 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   const [isSubmittingAdjustment, setIsSubmittingAdjustment] = useState(false);
   const [adjustmentError, setAdjustmentError] = useState<string | null>(null);
   const [adjustmentSuccess, setAdjustmentSuccess] = useState<string | null>(null);
+
+  // Transfer Stok State
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   // Sync / Recalculate State
   const [isSyncing, setIsSyncing] = useState(false);
@@ -323,6 +328,15 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
           >
             <RotateCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
             <span>{isSyncing ? 'Sinkronisasi...' : 'Sinkronisasi Stok'}</span>
+          </button>
+
+          <button
+            onClick={() => setIsTransferModalOpen(true)}
+            className="flex-1 md:flex-none bg-[#C89B3C]/10 hover:bg-[#C89B3C]/20 text-[#E0B85A] font-extrabold py-2.5 px-4 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border border-[#C89B3C]/30 min-h-[44px] cursor-pointer"
+            title="Transfer Stok antar Departemen (misal: HK ke Resto)"
+          >
+            <ArrowLeftRight className="w-4 h-4" />
+            <span>Transfer Stok</span>
           </button>
 
           <button
@@ -845,6 +859,15 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
           </div>
         </div>
       )}
+
+      {/* Transfer Stock Modal */}
+      <TransferStockModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        defaultSourceDept="Housekeeping"
+        defaultTargetDept="Resto"
+        onSuccess={() => fetchItemsData()}
+      />
     </div>
   );
 }

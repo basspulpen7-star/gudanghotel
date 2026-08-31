@@ -15,8 +15,10 @@ import {
   X, 
   RefreshCw,
   ShoppingBag,
-  Sparkles
+  Sparkles,
+  ArrowLeftRight
 } from 'lucide-react';
+import { TransferStockModal } from './TransferStockModal';
 import { format } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
 
@@ -63,6 +65,7 @@ export function RestoTakeGoods({ user, profile, onNavigateToHistory }: RestoTake
   // Today's summary and recent 3 transactions
   const [todaySummary, setTodaySummary] = useState<{ count: number; totalQty: number }>({ count: 0, totalQty: 0 });
   const [recentTakes, setRecentTakes] = useState<Transaction[]>([]);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -254,17 +257,27 @@ export function RestoTakeGoods({ user, profile, onNavigateToHistory }: RestoTake
             <h2 className="text-xl font-black text-[#F1F3F5] tracking-tight">Ambil Barang</h2>
             <p className="text-xs text-[#8E99A6] font-medium mt-0.5">Pengambilan barang langsung dari Gudang</p>
           </div>
-          <button
-            onClick={() => {
-              loadItems(true);
-              loadTodayActivity();
-            }}
-            disabled={loading}
-            title="Muat Ulang Stok"
-            className="p-2 text-[#8E99A6] hover:text-[#E0B85A] hover:bg-[#2A303A] rounded-xl transition-all cursor-pointer"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#E0B85A]' : ''}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsTransferModalOpen(true)}
+              className="px-3 py-2 bg-[#C89B3C]/15 hover:bg-[#C89B3C]/25 text-[#E0B85A] border border-[#C89B3C]/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Transfer Stok dari Housekeeping (HK) / Dept lain"
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+              <span className="hidden sm:inline">Transfer Stok HK</span>
+            </button>
+            <button
+              onClick={() => {
+                loadItems(true);
+                loadTodayActivity();
+              }}
+              disabled={loading}
+              title="Muat Ulang Stok"
+              className="p-2 text-[#8E99A6] hover:text-[#E0B85A] hover:bg-[#2A303A] rounded-xl transition-all cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#E0B85A]' : ''}`} />
+            </button>
+          </div>
         </div>
 
         {/* Compact Daily Activity Counter */}
@@ -277,6 +290,26 @@ export function RestoTakeGoods({ user, profile, onNavigateToHistory }: RestoTake
             Total keluar: {todaySummary.totalQty} item
           </span>
         </div>
+      </div>
+
+      {/* Quick HK Transfer Card Banner */}
+      <div className="bg-gradient-to-r from-[#C89B3C]/15 via-[#252B34] to-[#252B34] rounded-2xl p-3.5 border border-[#C89B3C]/35 flex items-center justify-between gap-3 shadow-xs">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="p-2 bg-[#C89B3C]/20 border border-[#C89B3C]/40 text-[#E0B85A] rounded-xl shrink-0">
+            <ArrowLeftRight className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-xs font-black text-[#F1F3F5] truncate">Transfer Stok HK → Resto</h4>
+            <p className="text-[11px] text-[#8E99A6] truncate">Ambil persediaan Air Galon HK atau item HK lainnya untuk Resto</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsTransferModalOpen(true)}
+          className="px-3.5 py-1.5 bg-[#C89B3C] hover:bg-[#E0B85A] text-[#171A1F] rounded-xl text-xs font-black shrink-0 transition-all cursor-pointer shadow-xs"
+        >
+          Transfer Stok
+        </button>
       </div>
 
       {/* Success Confirmation Card */}
@@ -624,6 +657,17 @@ export function RestoTakeGoods({ user, profile, onNavigateToHistory }: RestoTake
         </div>
       )}
 
+      {/* Transfer Stock Modal */}
+      <TransferStockModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        defaultSourceDept="Housekeeping"
+        defaultTargetDept="Resto"
+        onSuccess={() => {
+          loadItems(true);
+          loadTodayActivity();
+        }}
+      />
     </div>
   );
 }
