@@ -16,8 +16,11 @@ import {
   ArrowLeftRight
 } from 'lucide-react';
 import { TransferStockModal } from './TransferStockModal';
+import { LinenReconciliationModal } from './LinenReconciliationModal';
 import { inventoryService } from '../services/inventoryService';
 import { transactionService } from '../services/transactionService';
+import { seedLaundryItems, SeedResult } from '../scripts/seedLaundryItems';
+import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Item } from '../types';
 import { cn } from '../lib/utils';
@@ -27,6 +30,7 @@ interface InventoryProps {
 }
 
 export function Inventory({ globalSearch = '' }: InventoryProps) {
+  const { isAdmin } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
   const [selectedDept, setSelectedDept] = useState<string>('Semua');
   const [searchQuery, setSearchQuery] = useState(globalSearch);
@@ -36,6 +40,10 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItemsCount, setTotalItemsCount] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Seeding Laundry State
+  const [isSeedingLaundry, setIsSeedingLaundry] = useState(false);
+  const [seedResultMsg, setSeedResultMsg] = useState<string | null>(null);
 
   // Form & Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -64,11 +72,14 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
   // Transfer Stok State
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
+  // Linen Reconciliation State
+  const [isLinenReconModalOpen, setIsLinenReconModalOpen] = useState(false);
+
   // Sync / Recalculate State
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatusBanner, setSyncStatusBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const departments = ['Housekeeping', 'Resto', 'Teknik', 'Front Office', 'General'];
+  const departments = ['Housekeeping', 'Resto', 'Teknik', 'Front Office', 'General', 'Laundry'];
 
   // Sync initial search query
   useEffect(() => {
@@ -151,6 +162,23 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
     setAdjustmentError(null);
     setAdjustmentSuccess(null);
     setIsAdjustmentModalOpen(true);
+  };
+
+  const handleRunSeedLaundry = async () => {
+    setIsSeedingLaundry(true);
+    setSeedResultMsg(null);
+    try {
+      const res: SeedResult = await seedLaundryItems();
+      inventoryService.invalidateCache();
+      await fetchItemsData();
+      setSeedResultMsg(`Berhasil seed laundry! Ditambahkan: ${res.insertedCount}, Diperbarui: ${res.updatedCount}, Dilewati: ${res.skippedCount} (Total: ${res.total})`);
+      setTimeout(() => setSeedResultMsg(null), 8000);
+    } catch (err: any) {
+      console.error('Error seeding laundry items:', err);
+      setSeedResultMsg(`Gagal seed laundry: ${err?.message || err}`);
+    } finally {
+      setIsSeedingLaundry(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -304,6 +332,13 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
 
   return (
     <div className="space-y-4 animate-in fade-in duration-300 pb-20 md:pb-6 font-sans">
+      {seedResultMsg && (
+        <div className="p-4 rounded-2xl bg-purple-500/15 border border-purple-500/35 text-purple-300 text-xs font-bold flex items-center justify-between">
+          <span>{seedResultMsg}</span>
+          <button onClick={() => setSeedResultMsg(null)} className="text-purple-400 hover:text-white px-2 py-1">✕</button>
+        </div>
+      )}
+
       {/* Header & Main Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#252B34] p-4 md:p-6 rounded-2xl border border-[#343B46] shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
         <div>
@@ -319,6 +354,29 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
           >
             <Activity className={cn("w-5 h-5", loading && "animate-spin text-[#C89B3C]")} />
           </button>
+
+          {isAdmin && (
+            <button
+              onClick={handleRunSeedLaundry}
+              disabled={isSeedingLaundry}
+              className="flex-1 md:flex-none bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 font-extrabold py-2.5 px-3.5 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border border-purple-500/30 min-h-[44px] cursor-pointer disabled:opacity-50"
+              title="Seed atau Inisialisasi Data Item Laundry dari Modul Linen"
+            >
+              <RotateCw className={cn("w-4 h-4", isSeedingLaundry && "animate-spin")} />
+              <span>{isSeedingLaundry ? 'Seeding...' : 'Seed Data Laundry'}</span>
+            </button>
+          )}
+
+          {selectedDept === 'Laundry' && (
+            <button
+              onClick={() => setIsLinenReconModalOpen(true)}
+              className="flex-1 md:flex-none bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-extrabold py-2.5 px-3.5 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all border border-amber-500/30 min-h-[44px] cursor-pointer"
+              title="Rekonsiliasi / Sinkron Ulang Stok Laundry dengan Stok Bersih Modul Linen"
+            >
+              <ArrowLeftRight className="w-4 h-4 text-amber-400" />
+              <span>Sinkron Ulang Laundry</span>
+            </button>
+          )}
 
           <button
             onClick={handleSyncAllStocks}
@@ -866,6 +924,13 @@ export function Inventory({ globalSearch = '' }: InventoryProps) {
         onClose={() => setIsTransferModalOpen(false)}
         defaultSourceDept="Housekeeping"
         defaultTargetDept="Resto"
+        onSuccess={() => fetchItemsData()}
+      />
+
+      {/* Linen Reconciliation Modal */}
+      <LinenReconciliationModal
+        isOpen={isLinenReconModalOpen}
+        onClose={() => setIsLinenReconModalOpen(false)}
         onSuccess={() => fetchItemsData()}
       />
     </div>

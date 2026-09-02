@@ -22,7 +22,8 @@ import {
   Building2,
   UtensilsCrossed,
   ShoppingBag,
-  Clock
+  Clock,
+  BedDouble
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { supabase } from '../lib/supabase';
@@ -74,6 +75,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
     menuItems = [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'inventory', label: 'Stok', icon: Package },
+      { id: 'linen', label: 'Linen', icon: BedDouble },
       { id: 'incoming', label: 'Masuk', icon: ArrowDownCircle },
       { id: 'outgoing', label: 'Keluar', icon: ArrowUpCircle },
       { id: 'housekeeping_request', label: 'Permintaan Masuk HK', icon: ClipboardList },
@@ -82,6 +84,7 @@ export function Layout({ children, currentView, setView, user, profile, searchTe
       { id: 'suppliers', label: 'Supplier', icon: Truck },
       { id: 'reports', label: 'Laporan', icon: FileText },
       { id: 'resto_reports', label: 'Laporan Resto', icon: UtensilsCrossed },
+      { id: 'laundry_reports', label: 'Laporan Laundry', icon: BedDouble },
     ];
 
     if (isAdmin) {

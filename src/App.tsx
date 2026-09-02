@@ -8,6 +8,7 @@ import { IncomingGoods } from './components/IncomingGoods';
 import { OutgoingGoods } from './components/OutgoingGoods';
 import { Reports } from './components/Reports';
 import { RestoReports } from './components/RestoReports';
+import { LaundryReports } from './components/LaundryReports';
 import { RestoTakeGoods } from './components/RestoTakeGoods';
 import { RestoHistory } from './components/RestoHistory';
 import { RestoReportView } from './components/RestoReportView';
@@ -16,6 +17,7 @@ import { UserManagement } from './components/UserManagement';
 import { DatabaseSetup } from './components/DatabaseSetup';
 import { Settings } from './components/Settings';
 import { HousekeepingRequest } from './components/HousekeepingRequest';
+import { Linen } from './components/Linen';
 import { Login } from './components/Login';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { Hotel, ShieldAlert } from 'lucide-react';
@@ -23,12 +25,14 @@ import { Hotel, ShieldAlert } from 'lucide-react';
 type View = 
   | 'dashboard' 
   | 'inventory' 
+  | 'linen'
   | 'suppliers' 
   | 'incoming' 
   | 'outgoing' 
   | 'housekeeping_request'
   | 'reports' 
   | 'resto_reports'
+  | 'laundry_reports'
   | 'resto_take'
   | 'resto_history'
   | 'settings' 
@@ -45,6 +49,23 @@ function MainApp() {
     isHKUser ? 'housekeeping_request' : isRestoUser ? 'resto_take' : 'dashboard'
   );
   const [globalSearch, setGlobalSearch] = useState('');
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
+
+  // Listen for background cross-database sync warnings
+  useEffect(() => {
+    const handleSyncWarning = (e: any) => {
+      const msg = e.detail?.message || 'Peringatan sinkronisasi data Laundry/Linen';
+      setSyncWarning(msg);
+      setTimeout(() => {
+        setSyncWarning(null);
+      }, 7000);
+    };
+
+    window.addEventListener('laundry-sync-warning', handleSyncWarning);
+    return () => {
+      window.removeEventListener('laundry-sync-warning', handleSyncWarning);
+    };
+  }, []);
 
   // Safeguard: Role-based view authorization and initial routing
   useEffect(() => {
@@ -105,6 +126,8 @@ function MainApp() {
         return <Dashboard user={user} profile={profile} onNavigate={(v) => setCurrentView(v as View)} />;
       case 'inventory':
         return <Inventory globalSearch={globalSearch} />;
+      case 'linen':
+        return <Linen />;
       case 'suppliers':
         return <Suppliers globalSearch={globalSearch} />;
       case 'incoming':
@@ -114,9 +137,16 @@ function MainApp() {
       case 'housekeeping_request':
         return <HousekeepingRequest globalSearch={globalSearch} />;
       case 'reports':
-        return <Reports onNavigateToResto={() => setCurrentView('resto_reports')} />;
+        return (
+          <Reports 
+            onNavigateToResto={() => setCurrentView('resto_reports')} 
+            onNavigateToLaundry={() => setCurrentView('laundry_reports')} 
+          />
+        );
       case 'resto_reports':
         return <RestoReports />;
+      case 'laundry_reports':
+        return <LaundryReports />;
       case 'resto_take':
         return (
           <RestoTakeGoods 
@@ -189,6 +219,21 @@ function MainApp() {
       searchTerm={globalSearch}
       setSearchTerm={setGlobalSearch}
     >
+      {syncWarning && (
+        <div className="fixed top-4 right-4 z-[9999] max-w-md bg-amber-500/95 text-[#12161A] p-4 rounded-2xl shadow-2xl border border-amber-300 font-sans flex items-start gap-3 animate-in fade-in slide-in-from-top-4">
+          <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
+          <div className="flex-1 text-xs">
+            <p className="font-black">Peringatan Sinkronisasi Laundry / Linen</p>
+            <p className="font-medium mt-0.5 leading-relaxed">{syncWarning}</p>
+          </div>
+          <button
+            onClick={() => setSyncWarning(null)}
+            className="text-[#12161A]/80 hover:text-black font-black text-xs p-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {renderView()}
       <PWAInstallPrompt />
     </Layout>

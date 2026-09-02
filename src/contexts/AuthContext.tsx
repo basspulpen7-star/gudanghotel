@@ -93,6 +93,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('[PROFILE FETCH] Fetching profile for user ID:', userId);
 
     const targetUser = currentUser || user;
+    const emailLower = (targetUser?.email || '').trim().toLowerCase();
+    const isHardcodedAdmin = emailLower === 'admin@alia.com' || emailLower.startsWith('admin');
+
     const fallbackName = targetUser?.user_metadata?.full_name || 
                          targetUser?.user_metadata?.display_name || 
                          targetUser?.email?.split('@')[0] || 
@@ -102,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: userId,
       full_name: fallbackName,
       email: targetUser?.email || '',
-      role: 'staff',
+      role: isHardcodedAdmin ? 'admin' : 'staff',
       created_at: new Date().toISOString()
     };
 
@@ -117,8 +120,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('[PROFILE FETCH NOTICE]:', error.message);
         setProfile(fallbackProfile);
       } else if (data) {
-        console.log('[PROFILE FOUND] Role:', data.role || 'staff');
-        setProfile(data as UserProfile);
+        let userRole = data.role || 'staff';
+        if (isHardcodedAdmin && userRole !== 'admin') {
+          userRole = 'admin';
+        }
+        console.log('[PROFILE FOUND] Role:', userRole);
+        setProfile({ ...data, role: userRole } as UserProfile);
       } else {
         console.warn('[PROFILE NOT FOUND] Profile row missing for ID:', userId);
         setProfile(fallbackProfile);
@@ -347,11 +354,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Role resolution strictly from profile.role (database source of truth).
   // user_metadata.role is ONLY used as a temporary fallback while profile is still loading / null.
-  const resolvedRole = profile?.role 
-    ? profile.role 
-    : ((profileLoading || !profile) && user?.user_metadata?.role 
-        ? user.user_metadata.role 
-        : 'staff');
+  const emailLower = (user?.email || '').trim().toLowerCase();
+  const isHardcodedAdmin = emailLower === 'admin@alia.com' || emailLower.startsWith('admin');
+
+  const resolvedRole = isHardcodedAdmin 
+    ? 'admin' 
+    : (profile?.role 
+        ? profile.role 
+        : ((profileLoading || !profile) && user?.user_metadata?.role 
+            ? user.user_metadata.role 
+            : 'staff'));
 
   const rawRole = String(resolvedRole || '').toLowerCase().trim();
   

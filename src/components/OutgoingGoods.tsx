@@ -73,7 +73,7 @@ export function OutgoingGoods({ globalSearch = '' }: OutgoingGoodsProps) {
   const [department, setDepartment] = useState('Housekeeping');
   const [notes, setNotes] = useState('');
 
-  const departments = ['Housekeeping', 'Resto', 'Tekhnisi', 'Front Office', 'General'];
+  const departments = ['Housekeeping', 'Resto', 'Tekhnisi', 'Front Office', 'General', 'Laundry'];
 
   // Load dropdown items
   useEffect(() => {

@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabase';
 import { Transaction } from '../types';
 import { inventoryService } from './inventoryService';
+import { laundrySyncService } from './laundrySyncService';
+import { ITEM_TYPES } from '../constants-linen';
 
 export interface CreateTransactionParams {
   itemId: string;
@@ -9,6 +11,7 @@ export interface CreateTransactionParams {
   department?: string;
   notes?: string;
   userId: string;
+  skipSync?: boolean;
 }
 
 export interface GetTransactionsOptions {
@@ -52,7 +55,8 @@ export const transactionService = {
           name,
           unit,
           current_stock,
-          min_stock
+          min_stock,
+          department
         )
       `, { count: 'exact' });
 
@@ -94,9 +98,11 @@ export const transactionService = {
    * Atomic Transaction + Stock Update using Supabase RPC with fallback
    */
   async createTransaction(params: CreateTransactionParams) {
-    const { itemId, type, quantity, department, notes, userId } = params;
+    const { itemId, type, quantity, department, notes, userId, skipSync } = params;
 
-    // Try RPC first for atomic DB operation
+    let result: { id: string; new_stock?: number } | null = null;
+
+    // 1. Try RPC first for atomic DB operation
     try {
       const { data: rpcData, error: rpcError } = await supabase.rpc(
         'create_transaction_and_update_stock',
@@ -112,7 +118,7 @@ export const transactionService = {
 
       if (rpcData) {
         inventoryService.invalidateCache();
-        return rpcData;
+        result = rpcData;
       }
     } catch (e: any) {
       if (e.message && !e.message.includes('function') && e.code !== 'PGRST202') {
@@ -120,56 +126,86 @@ export const transactionService = {
       }
     }
 
-    // Client-side fallback
-    const { data: item, error: itemErr } = await supabase
-      .from('items')
-      .select('id, current_stock')
-      .eq('id', itemId)
-      .single();
+    // 2. Client-side fallback if RPC is not available
+    if (!result) {
+      const { data: item, error: itemErr } = await supabase
+        .from('items')
+        .select('id, current_stock, department, name')
+        .eq('id', itemId)
+        .single();
 
-    if (itemErr || !item) throw new Error('Barang tidak ditemukan');
+      if (itemErr || !item) throw new Error('Barang tidak ditemukan');
 
-    if (type === 'OUT' && item.current_stock < quantity) {
-      throw new Error(`Stok tidak mencukupi. Stok tersedia: ${item.current_stock}`);
+      if (type === 'OUT' && item.current_stock < quantity) {
+        throw new Error(`Stok tidak mencukupi. Stok tersedia: ${item.current_stock}`);
+      }
+
+      const transId = crypto.randomUUID();
+      const { error: transErr } = await supabase.from('transactions').insert([{
+        id: transId,
+        item_id: itemId,
+        type,
+        quantity,
+        department: department || 'General',
+        notes,
+        user_id: userId
+      }]);
+
+      if (transErr) throw transErr;
+
+      const newStock = type === 'IN' 
+        ? item.current_stock + quantity 
+        : item.current_stock - quantity;
+
+      const { error: stockErr } = await supabase
+        .from('items')
+        .update({ current_stock: Math.max(0, newStock) })
+        .eq('id', itemId);
+
+      if (stockErr) throw stockErr;
+
+      inventoryService.invalidateCache();
+      result = { id: transId, new_stock: newStock };
     }
 
-    const transId = crypto.randomUUID();
-    const { error: transErr } = await supabase.from('transactions').insert([{
-      id: transId,
-      item_id: itemId,
-      type,
-      quantity,
-      department: department || 'General',
-      notes,
-      user_id: userId
-    }]);
+    // 3. SYNC ARAH 1: Gudang Alia → Linen
+    if (!skipSync && itemId) {
+      try {
+        const { data: itm } = await supabase
+          .from('items')
+          .select('id, name, department')
+          .eq('id', itemId)
+          .maybeSingle();
 
-    if (transErr) throw transErr;
+        const linenName = (itm as any)?.linen_item_name || 
+          (itm?.department === 'Laundry' || (itm as any)?.category === 'Laundry' || (itm?.name && ITEM_TYPES.includes(itm.name as any)) ? itm?.name : null);
 
-    const newStock = type === 'IN' 
-      ? item.current_stock + quantity 
-      : item.current_stock - quantity;
+        if (linenName) {
+          await laundrySyncService.syncTransactionToLinen(
+            linenName,
+            type,
+            quantity,
+            { skipSync: false, notes: notes || `Transaksi ${type} Gudang Alia` }
+          );
+        }
+      } catch (syncErr) {
+        console.warn('[TRANSACTION SERVICE] Linen sync hook error:', syncErr);
+      }
+    }
 
-    const { error: stockErr } = await supabase
-      .from('items')
-      .update({ current_stock: Math.max(0, newStock) })
-      .eq('id', itemId);
-
-    if (stockErr) throw stockErr;
-
-    inventoryService.invalidateCache();
-    return { id: transId, new_stock: newStock };
+    return result;
   },
 
   /**
    * Delete transaction and revert stock using Supabase RPC with fallback
    */
-  async deleteTransaction(transaction: Transaction) {
+  async deleteTransaction(transaction: Transaction, options?: { skipSync?: boolean }) {
     if (!transaction || !transaction.id) {
       throw new Error('ID Transaksi tidak valid');
     }
 
     let rpcSuccess = false;
+    let rpcResult: any = null;
 
     // 1. Try RPC first for server-side atomic operation
     try {
@@ -182,11 +218,11 @@ export const transactionService = {
 
       if (!rpcError) {
         rpcSuccess = true;
+        rpcResult = rpcData;
         inventoryService.invalidateCache();
-        return rpcData;
+      } else {
+        console.warn('[TRANSACTION SERVICE] RPC delete_transaction_and_revert_stock error, using client fallback:', rpcError.message);
       }
-
-      console.warn('[TRANSACTION SERVICE] RPC delete_transaction_and_revert_stock error, using client fallback:', rpcError.message);
     } catch (e: any) {
       console.warn('[TRANSACTION SERVICE] RPC exception, using client fallback:', e.message);
     }
@@ -225,5 +261,33 @@ export const transactionService = {
 
       inventoryService.invalidateCache();
     }
+
+    // 3. SYNC ARAH 1 on Delete: Gudang Alia → Linen
+    if (!options?.skipSync && transaction.item_id) {
+      try {
+        const { data: itm } = await supabase
+          .from('items')
+          .select('id, name, department')
+          .eq('id', transaction.item_id)
+          .maybeSingle();
+
+        const linenName = (itm as any)?.linen_item_name || 
+          (itm?.department === 'Laundry' || (itm as any)?.category === 'Laundry' || (itm?.name && ITEM_TYPES.includes(itm.name as any)) ? itm?.name : null);
+        if (linenName) {
+          // Revert transaction type in Linen: IN deleted -> OUT in Linen, OUT deleted -> IN in Linen
+          const revertedType: 'IN' | 'OUT' = transaction.type === 'IN' ? 'OUT' : 'IN';
+          await laundrySyncService.syncTransactionToLinen(
+            linenName,
+            revertedType,
+            transaction.quantity,
+            { skipSync: false, isDelete: true, notes: `Revert (hapus transaksi ${transaction.type}) Gudang Alia` }
+          );
+        }
+      } catch (syncErr) {
+        console.warn('[TRANSACTION SERVICE] Linen sync on delete error:', syncErr);
+      }
+    }
+
+    return rpcResult;
   }
 };

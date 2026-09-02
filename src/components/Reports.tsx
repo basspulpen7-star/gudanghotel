@@ -14,7 +14,8 @@ import {
   Package,
   Inbox,
   UtensilsCrossed,
-  ArrowRight
+  ArrowRight,
+  BedDouble
 } from 'lucide-react';
 import { 
   format, 
@@ -64,9 +65,10 @@ const isRestoDepartment = (deptName?: string | null): boolean => {
 
 interface ReportsProps {
   onNavigateToResto?: () => void;
+  onNavigateToLaundry?: () => void;
 }
 
-export function Reports({ onNavigateToResto }: ReportsProps) {
+export function Reports({ onNavigateToResto, onNavigateToLaundry }: ReportsProps) {
   const [reportType, setReportType] = useState<ReportType>('daily');
   const [reportCategory, setReportCategory] = useState<ReportCategory>('stock');
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
@@ -83,7 +85,8 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
     { value: 'Housekeeping', label: 'Housekeeping' },
     { value: 'Front Office', label: 'Front Office' },
     { value: 'Teknisi', label: 'Teknisi' },
-    { value: 'General', label: 'General' }
+    { value: 'General', label: 'General' },
+    { value: 'Laundry', label: 'Laundry' }
   ];
 
   const getLocalStart = (type: ReportType, currDate: Date, sDateStr: string) => {
@@ -383,6 +386,28 @@ export function Reports({ onNavigateToResto }: ReportsProps) {
             className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-[#E6B85C] to-[#C89B3C] hover:brightness-110 text-[#171A1F] rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
           >
             <span>Buka Laporan Resto</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Laundry Specialized Report Banner / Shortcut */}
+      {onNavigateToLaundry && (
+        <div className="bg-[#252B34] border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 p-2 flex items-center justify-center shrink-0 shadow-inner text-blue-400">
+              <BedDouble className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-xs font-black text-[#F1F3F5] uppercase tracking-wider">Laporan Khusus Linen & Laundry</h4>
+              <p className="text-xs text-[#8E99A6] font-medium">Lihat laporan mutasi stok linen, pencucian, dan pemakaian kamar hotel secara terpisah.</p>
+            </div>
+          </div>
+          <button
+            onClick={onNavigateToLaundry}
+            className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-sm shrink-0 cursor-pointer"
+          >
+            <span>Buka Laporan Laundry</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

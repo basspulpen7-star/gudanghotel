@@ -46,7 +46,7 @@ export function TransferStockModal({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const departments = ['Housekeeping', 'Resto', 'Front Office', 'Teknisi', 'General'];
+  const departments = ['Housekeeping', 'Resto', 'Front Office', 'Teknisi', 'General', 'Laundry'];
 
   useEffect(() => {
     if (isOpen) {

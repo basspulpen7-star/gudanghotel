@@ -106,6 +106,84 @@ CREATE TABLE IF NOT EXISTS public.breakfast_records (
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW())
 );
 
+-- 11. TABEL LINEN CLEAN ITEMS (STOK BERSIH)
+CREATE TABLE IF NOT EXISTS public.linen_clean_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    item_name TEXT UNIQUE,
+    firebase_id TEXT DEFAULT 'local-dev',
+    uid UUID REFERENCES auth.users(id),
+    quantity NUMERIC DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW())
+);
+
+-- 12. TABEL LINEN ROOM ITEMS (LINEN DI KAMAR / KOTOR)
+CREATE TABLE IF NOT EXISTS public.linen_room_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    firebase_id TEXT DEFAULT 'local-dev',
+    uid UUID REFERENCES auth.users(id),
+    date DATE NOT NULL,
+    item_name TEXT NOT NULL,
+    quantity NUMERIC NOT NULL DEFAULT 0,
+    room_number TEXT,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW())
+);
+
+-- 13. TABEL LINEN NEW ITEMS (STOK BARANG BARU / CADANGAN)
+CREATE TABLE IF NOT EXISTS public.linen_new_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    item_name TEXT UNIQUE,
+    firebase_id TEXT DEFAULT 'local-dev',
+    uid UUID REFERENCES auth.users(id),
+    quantity NUMERIC DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW())
+);
+
+-- 14. TABEL LINEN NEW ITEM TRANSACTIONS (MUTASI BARANG BARU)
+CREATE TABLE IF NOT EXISTS public.linen_new_item_transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    firebase_id TEXT DEFAULT 'local-dev',
+    uid UUID REFERENCES auth.users(id),
+    date DATE NOT NULL,
+    item_name TEXT NOT NULL,
+    quantity NUMERIC NOT NULL DEFAULT 0,
+    type TEXT NOT NULL,
+    incoming_id UUID,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW())
+);
+
+-- 15. TABEL LINEN INCOMING ITEMS (LOG BARANG MASUK)
+CREATE TABLE IF NOT EXISTS public.linen_incoming_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    firebase_id TEXT DEFAULT 'local-dev',
+    uid UUID REFERENCES auth.users(id),
+    date DATE NOT NULL,
+    item_name TEXT NOT NULL,
+    quantity NUMERIC NOT NULL DEFAULT 0,
+    source TEXT DEFAULT 'Laundry',
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW())
+);
+
+-- 16. TABEL LINEN OUTGOING ITEMS (LOG BARANG KELUAR)
+CREATE TABLE IF NOT EXISTS public.linen_outgoing_items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    firebase_id TEXT DEFAULT 'local-dev',
+    uid UUID REFERENCES auth.users(id),
+    date DATE NOT NULL,
+    item_name TEXT NOT NULL,
+    quantity NUMERIC NOT NULL DEFAULT 0,
+    destination TEXT DEFAULT 'Laundry',
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()),
+    updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW())
+);
+
 -- ==============================================================================
 -- OTOMATISASI TRIGGER PROFILE DARI AUTH.USERS
 -- ==============================================================================
@@ -140,6 +218,12 @@ ALTER TABLE public.purchase_order_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.request_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.breakfast_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.linen_clean_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.linen_room_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.linen_new_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.linen_new_item_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.linen_incoming_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.linen_outgoing_items ENABLE ROW LEVEL SECURITY;
 
 -- Kebijakan Akses Penuh untuk Pengguna Terautentikasi (Authenticated Users)
 CREATE POLICY "Authenticated full access to profiles" ON public.profiles FOR ALL TO authenticated USING (true) WITH CHECK (true);
@@ -151,3 +235,9 @@ CREATE POLICY "Authenticated full access to purchase_order_items" ON public.purc
 CREATE POLICY "Authenticated full access to requests" ON public.requests FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Authenticated full access to request_items" ON public.request_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Authenticated full access to breakfast_records" ON public.breakfast_records FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access to linen_clean_items" ON public.linen_clean_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access to linen_room_items" ON public.linen_room_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access to linen_new_items" ON public.linen_new_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access to linen_new_item_transactions" ON public.linen_new_item_transactions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access to linen_incoming_items" ON public.linen_incoming_items FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Full access to linen_outgoing_items" ON public.linen_outgoing_items FOR ALL TO authenticated USING (true) WITH CHECK (true);

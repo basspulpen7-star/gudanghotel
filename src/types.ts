@@ -2,10 +2,12 @@ export interface Item {
   id: string;
   name: string;
   department: string;
+  category?: string;
   unit: string;
   initial_stock: number;
   current_stock: number;
   min_stock: number;
+  linen_item_name?: string | null;
   created_at: string;
 }
 

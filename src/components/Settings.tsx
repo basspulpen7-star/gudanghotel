@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Mail, Shield, Camera, Save, Loader2, LogOut, Smartphone, Download, Database, RefreshCw, HardDrive, CheckCircle2, AlertCircle } from 'lucide-react';
 import { backupService } from '../services/backupService';
 import { queryCache } from '../lib/queryCache';
+import { migrateLinenData } from '../services/migrationService';
 
 interface SettingsProps {
   user: any;
@@ -25,8 +26,39 @@ export function Settings({ user, profile, onProfileUpdate }: SettingsProps) {
   const [cacheStats, setCacheStats] = useState(queryCache.getStats());
   const [cacheCleared, setCacheCleared] = useState(false);
 
+  useEffect(() => {
+    console.log('[SETTINGS] Component mounted. isAdmin:', isAdmin, 'role:', role);
+  }, [isAdmin, role]);
+
+  // Migration states
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [showMigrationConfirm, setShowMigrationConfirm] = useState(false);
+  const [migrationLogs, setMigrationLogs] = useState<string[]>([]);
+  const [migrationStatus, setMigrationStatus] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
   const handleLogout = async () => {
     await signOut();
+  };
+
+  const startMigration = async () => {
+    console.log('[SETTINGS] startMigration triggered');
+    setShowMigrationConfirm(false);
+    setIsMigrating(true);
+    setMigrationLogs(['Menyiapkan proses migrasi...']);
+    setMigrationStatus(null);
+
+    try {
+      await migrateLinenData((msg) => {
+        console.log('[MIGRATION LOG]', msg);
+        setMigrationLogs(prev => [...prev, msg]);
+      });
+      setMigrationStatus({ type: 'success', text: 'Migrasi data linen berhasil diselesaikan!' });
+    } catch (err: any) {
+      console.error('[SETTINGS] Migration error:', err);
+      setMigrationStatus({ type: 'error', text: `Gagal migrasi: ${err.message}` });
+    } finally {
+      setIsMigrating(false);
+    }
   };
 
   const handleExportJson = async () => {
@@ -259,6 +291,84 @@ export function Settings({ user, profile, onProfileUpdate }: SettingsProps) {
               </button>
             </div>
           </div>
+
+          {/* Migration Center - Admin Only */}
+          {isAdmin && (
+            <div className="bg-[#252B34] border border-[#343B46] rounded-2xl p-5 md:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.18)] space-y-4">
+              <div>
+                <h4 className="text-sm font-black text-[#F1F3F5] mb-0.5 flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 text-[#E0B85A]" />
+                  Migrasi Data Linen Lama
+                </h4>
+                <p className="text-[#8E99A6] text-xs">
+                  Pindahkan data dari database linen terpisah (yjmjlxscvwnkoewvielo) ke database terpadu Gudang Alia.
+                </p>
+              </div>
+
+              {migrationStatus && (
+                <div className={`p-3.5 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                  migrationStatus.type === 'success' ? 'bg-[#55B685]/15 text-[#55B685] border border-[#55B685]/30' : 'bg-[#EB5757]/15 text-[#F87171] border border-[#EB5757]/30'
+                }`}>
+                  {migrationStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4 text-[#55B685] shrink-0" /> : <AlertCircle className="w-4 h-4 text-[#EB5757] shrink-0" />}
+                  <span>{migrationStatus.text}</span>
+                </div>
+              )}
+
+              {migrationLogs.length > 0 && (
+                <div className="bg-[#20252D] p-3 rounded-xl border border-[#3A424D] max-h-40 overflow-y-auto font-mono text-[10px] space-y-1">
+                  {migrationLogs.map((log, i) => (
+                    <div key={i} className="text-[#8E99A6] border-b border-[#343B46]/30 pb-1 last:border-0">
+                      <span className="text-[#E0B85A] mr-2">[{new Date().toLocaleTimeString()}]</span>
+                      {log}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="pt-1">
+                {showMigrationConfirm ? (
+                  <div className="flex flex-col gap-3 p-4 bg-[#E0B85A]/10 border border-[#E0B85A]/30 rounded-xl">
+                    <p className="text-xs font-bold text-[#E0B85A]">
+                      Apakah Anda yakin? Data dari database lama akan ditambahkan ke database baru tanpa menghapus data yang sudah ada.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={startMigration}
+                        className="flex-1 bg-[#55B685] hover:bg-[#63C794] text-white py-2 rounded-lg font-black text-[10px] transition-all"
+                      >
+                        Ya, Pindahkan Sekarang
+                      </button>
+                      <button
+                        onClick={() => setShowMigrationConfirm(false)}
+                        className="flex-1 bg-[#3A424D] hover:bg-[#464F5B] text-[#F1F3F5] py-2 rounded-lg font-black text-[10px] transition-all"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isMigrating}
+                    onClick={() => setShowMigrationConfirm(true)}
+                    className="flex items-center justify-center gap-2 bg-[#C89B3C] hover:bg-[#E0B85A] text-[#171A1F] px-5 py-2.5 rounded-xl font-black text-xs transition-all shadow-md disabled:opacity-50 min-h-[44px] cursor-pointer"
+                  >
+                    {isMigrating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Sedang Memindahkan Data...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Jalankan Migrasi Sekarang</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Cache & Quota Management */}
           <div className="bg-[#252B34] border border-[#343B46] rounded-2xl p-5 md:p-6 shadow-[0_4px_20px_rgba(0,0,0,0.18)] space-y-4">

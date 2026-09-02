@@ -50,7 +50,7 @@ export function Transactions({ initialType = 'ALL', globalSearch = '', user }: T
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const departments = ['Housekeeping', 'Resto', 'Teknik', 'Front Office', 'General', 'Pembelian PO'];
+  const departments = ['Housekeeping', 'Resto', 'Teknik', 'Front Office', 'General', 'Pembelian PO', 'Laundry'];
 
   // Sync initialType or globalSearch if props change
   useEffect(() => {
