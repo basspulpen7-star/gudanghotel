@@ -215,14 +215,29 @@ function ReportCleanTab({ state }: { state: LinenState }) {
       };
 
       const incoming = getQuantity(state.incomingItems, isItemInPeriod);
-      const outgoingLaundry = getQuantity(state.outgoingItems, item => isItemInPeriod(item) && item.destination === 'Laundry');
-      const outgoingAfkir = getQuantity(state.outgoingItems, item => isItemInPeriod(item) && item.destination === 'Afkir');
-      const outgoingTakenHk = getQuantity(state.outgoingItems, item => isItemInPeriod(item) && item.destination === 'Diambil HK');
+      const outgoingLaundry = getQuantity(state.outgoingItems, item => isItemInPeriod(item) && (
+        item.destination === 'Laundry' || (item.destination || '').toLowerCase().includes('laundry')
+      ));
+      const outgoingAfkir = getQuantity(state.outgoingItems, item => isItemInPeriod(item) && (
+        item.destination === 'Afkir' || (item.destination || '').toLowerCase().includes('afkir')
+      ));
+      const outgoingTakenHk = getQuantity(state.outgoingItems, item => isItemInPeriod(item) && (
+        item.destination === 'Diambil HK' || item.destination === 'HK' || item.destination === 'Housekeeping' || (item.destination || '').toLowerCase().includes('hk')
+      ));
       const roomUsage = getQuantity(state.roomItems, isItemInPeriod);
       const outgoingTotal = outgoingLaundry + outgoingAfkir + outgoingTakenHk;
 
       const incomingAfter = getQuantity(state.incomingItems, isItemAfterPeriod);
-      const outgoingAfter = getQuantity(state.outgoingItems, item => isItemAfterPeriod(item) && (item.destination === 'Laundry' || item.destination === 'Afkir' || item.destination === 'Diambil HK'));
+      const outgoingAfter = getQuantity(state.outgoingItems, item => isItemAfterPeriod(item) && (
+        item.destination === 'Laundry' || 
+        item.destination === 'Afkir' || 
+        item.destination === 'Diambil HK' || 
+        item.destination === 'HK' || 
+        item.destination === 'Housekeeping' || 
+        (item.destination || '').toLowerCase().includes('hk') ||
+        (item.destination || '').toLowerCase().includes('laundry') ||
+        (item.destination || '').toLowerCase().includes('afkir')
+      ));
       const roomUsageAfter = getQuantity(state.roomItems, isItemAfterPeriod);
 
       const total = currentStock - incomingAfter + outgoingAfter + roomUsageAfter;
@@ -406,7 +421,7 @@ function ReportAfkirTab({ state }: { state: LinenState }) {
 
   const afkirItems = useMemo(() => {
     return state.outgoingItems.filter((item: any) => {
-      const isAfkir = item.destination === 'Afkir';
+      const isAfkir = item.destination === 'Afkir' || (item.destination || '').toLowerCase().includes('afkir');
       const nameMatch = filter.itemName === 'Semua' || item.itemName === filter.itemName;
 
       let dateMatch = true;
@@ -493,7 +508,10 @@ function ReportTakenHkTab({ state }: { state: LinenState }) {
 
   const takenHkItems = useMemo(() => {
     return state.outgoingItems.filter((item: any) => {
-      const isTakenHk = item.destination === 'Diambil HK';
+      const isTakenHk = item.destination === 'Diambil HK' || 
+                        item.destination === 'HK' || 
+                        item.destination === 'Housekeeping' || 
+                        (item.destination || '').toLowerCase().includes('hk');
       const nameMatch = filter.itemName === 'Semua' || item.itemName === filter.itemName;
 
       let dateMatch = true;
@@ -582,7 +600,9 @@ function ReportTotalTab({ state }: { state: LinenState }) {
         .filter(ri => ri.itemName === type)
         .reduce((acc, ri) => acc + Number(ri.quantity || 0), 0);
 
-      const laundryItems = (state.outgoingItems || []).filter(item => item.itemName === type && item.destination === 'Laundry');
+      const laundryItems = (state.outgoingItems || []).filter(item => item.itemName === type && (
+        item.destination === 'Laundry' || (item.destination || '').toLowerCase().includes('laundry')
+      ));
       let diLaundry = 0;
       if (laundryItems.length > 0) {
         const latestDate = laundryItems[0].date;
@@ -592,11 +612,18 @@ function ReportTotalTab({ state }: { state: LinenState }) {
       }
 
       const afkir = (state.outgoingItems || [])
-        .filter(item => item.itemName === type && item.destination === 'Afkir')
+        .filter(item => item.itemName === type && (
+          item.destination === 'Afkir' || (item.destination || '').toLowerCase().includes('afkir')
+        ))
         .reduce((acc, item) => acc + Number(item.quantity || 0), 0);
 
       const takenHk = (state.outgoingItems || [])
-        .filter(item => item.itemName === type && item.destination === 'Diambil HK')
+        .filter(item => item.itemName === type && (
+          item.destination === 'Diambil HK' || 
+          item.destination === 'HK' || 
+          item.destination === 'Housekeeping' || 
+          (item.destination || '').toLowerCase().includes('hk')
+        ))
         .reduce((acc, item) => acc + Number(item.quantity || 0), 0);
 
       const totalAset = terpasang + bersih + diLaundry + takenHk + barangBaruStock - afkir;

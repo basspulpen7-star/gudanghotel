@@ -25,12 +25,28 @@ export const migrateLinenData = async (onProgress: (msg: string) => void) => {
       console.log(`[MIGRATION] Processing table: ${table.old}`);
       onProgress(`Mengambil data dari ${table.old}...`);
       
-      const { data: oldData, error: fetchError } = await oldLinenClient
-        .from(table.old)
-        .select('*');
+      let oldData: any[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (fetchError) {
-        throw new Error(`Gagal mengambil data ${table.old}: ${fetchError.message}`);
+      while (hasMore) {
+        const { data: chunk, error: fetchError } = await oldLinenClient
+          .from(table.old)
+          .select('*')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (fetchError) {
+          throw new Error(`Gagal mengambil data ${table.old}: ${fetchError.message}`);
+        }
+
+        if (chunk && chunk.length > 0) {
+          oldData.push(...chunk);
+          if (chunk.length < pageSize) hasMore = false;
+          else page++;
+        } else {
+          hasMore = false;
+        }
       }
 
       if (oldData && oldData.length > 0) {

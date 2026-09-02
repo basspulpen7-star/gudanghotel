@@ -31,13 +31,13 @@ export function LinenDashboard({ state, onNavigate }: LinenDashboardProps) {
       .filter((item: any) => item.date === today)
       .reduce((acc: number, item: any) => acc + Number(item.quantity || 0), 0);
     const totalLaundry = (state.outgoingItems || [])
-      .filter((item: any) => item.destination === 'Laundry' && item.date === today)
+      .filter((item: any) => (item.destination === 'Laundry' || (item.destination || '').toLowerCase().includes('laundry')) && item.date === today)
       .reduce((acc: number, item: any) => acc + Number(item.quantity || 0), 0);
     const totalTakenHk = (state.outgoingItems || [])
-      .filter((item: any) => item.destination === 'Diambil HK' && item.date === today)
+      .filter((item: any) => (item.destination === 'Diambil HK' || item.destination === 'HK' || item.destination === 'Housekeeping' || (item.destination || '').toLowerCase().includes('hk')) && item.date === today)
       .reduce((acc: number, item: any) => acc + Number(item.quantity || 0), 0);
     const totalAfkir = (state.outgoingItems || [])
-      .filter((item: any) => item.destination === 'Afkir' && item.date === today)
+      .filter((item: any) => (item.destination === 'Afkir' || (item.destination || '').toLowerCase().includes('afkir')) && item.date === today)
       .reduce((acc: number, item: any) => acc + Number(item.quantity || 0), 0);
 
     return { totalClean, totalNew, totalIncoming, totalLaundry, totalTakenHk, totalAfkir };

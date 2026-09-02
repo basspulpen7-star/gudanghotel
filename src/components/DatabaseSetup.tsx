@@ -461,8 +461,8 @@ BEGIN
     'tables', (
       SELECT json_agg(t) FROM (
         SELECT 
-          relname AS table_name,
-          n_live_tup AS row_count,
+          c.relname AS table_name,
+          s.n_live_tup AS row_count,
           pg_size_pretty(pg_total_relation_size(c.oid)) AS total_size,
           pg_total_relation_size(c.oid) AS size_bytes
         FROM pg_class c

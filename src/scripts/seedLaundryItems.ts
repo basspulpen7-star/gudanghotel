@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-import { supabaseLinen } from '../lib/supabaseLinen';
 import { ITEM_TYPES } from '../constants-linen';
 
 export interface SeedResult {
@@ -11,7 +10,7 @@ export interface SeedResult {
 
 /**
  * Seed Laundry Items Service / Script
- * Reads clean items from Linen Supabase project (yjmjlxscvwnkoewvielo)
+ * Reads clean items from Gudang Alia's local linen_clean_items table
  * and seeds them into Gudang Alia items table (project qdsieavuhgvxrqtaytlt).
  * 
  * Safe to run in Browser (Vite environment) and idempotent.
@@ -24,15 +23,15 @@ export async function seedLaundryItems(): Promise<SeedResult> {
   let skippedCount = 0;
 
   try {
-    // 1. Fetch current clean items stock from Linen database (consolidated project)
+    // 1. Fetch current clean items stock from Gudang Alia local linen database
     const cleanMap = new Map<string, number>();
     try {
-      const { data: cleanItems, error: cleanError } = await supabaseLinen
+      const { data: cleanItems, error: cleanError } = await supabase
         .from('linen_clean_items')
         .select('*');
 
       if (cleanError) {
-        console.warn('⚠️ [SEED] Could not fetch clean_items from Supabase Linen:', cleanError.message);
+        console.warn('⚠️ [SEED] Could not fetch clean_items from Supabase:', cleanError.message);
       } else if (cleanItems) {
         cleanItems.forEach((c: any) => {
           const name = c.itemName || c.item_name;

@@ -64,9 +64,15 @@ export function LaundryReports() {
     return { start, end };
   }, [reportType, currentDate, startDate, endDate]);
 
+  const toNoonDate = (dateStr: string) => {
+    if (!dateStr) return new Date(0);
+    const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    return new Date(`${cleanDate}T12:00:00`);
+  };
+
   const filterByDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return isWithinInterval(d, dateInterval);
+    if (!dateStr) return false;
+    return isWithinInterval(toNoonDate(dateStr), dateInterval);
   };
 
   const filteredIncoming = useMemo(() => {
@@ -83,11 +89,11 @@ export function LaundryReports() {
     ITEM_TYPES.forEach(type => {
       // Calculate transactions before the start of the period
       const inBefore = (state.incomingItems || [])
-        .filter(i => i.itemName === type && new Date(i.date) < dateInterval.start)
+        .filter(i => i.itemName === type && toNoonDate(i.date) < dateInterval.start)
         .reduce((acc, i) => acc + Number(i.quantity || 0), 0);
       
       const outBefore = (state.outgoingItems || [])
-        .filter(o => o.itemName === type && new Date(o.date) < dateInterval.start)
+        .filter(o => o.itemName === type && toNoonDate(o.date) < dateInterval.start)
         .reduce((acc, o) => acc + Number(o.quantity || 0), 0);
       
       // Calculate transactions during the period
@@ -100,7 +106,12 @@ export function LaundryReports() {
         .reduce((acc, o) => acc + Number(o.quantity || 0), 0);
 
       const outHkPeriod = (state.outgoingItems || [])
-        .filter(o => o.itemName === type && filterByDate(o.date) && o.destination === 'Diambil HK')
+        .filter(o => o.itemName === type && filterByDate(o.date) && (
+          o.destination === 'Diambil HK' || 
+          o.destination === 'HK' || 
+          o.destination === 'Pasang Kamar / HK' || 
+          (o.destination || '').toLowerCase().includes('hk')
+        ))
         .reduce((acc, o) => acc + Number(o.quantity || 0), 0);
 
       const outAfkirPeriod = (state.outgoingItems || [])
@@ -114,11 +125,11 @@ export function LaundryReports() {
       const currentQty = cleanItem ? Number(cleanItem.quantity || 0) : 0;
       
       const inAfter = (state.incomingItems || [])
-        .filter(i => i.itemName === type && new Date(i.date) > dateInterval.end)
+        .filter(i => i.itemName === type && toNoonDate(i.date) > dateInterval.end)
         .reduce((acc, i) => acc + Number(i.quantity || 0), 0);
       
       const outAfter = (state.outgoingItems || [])
-        .filter(o => o.itemName === type && new Date(o.date) > dateInterval.end)
+        .filter(o => o.itemName === type && toNoonDate(o.date) > dateInterval.end)
         .reduce((acc, o) => acc + Number(o.quantity || 0), 0);
 
       // Reconstruct historical final stock for the selected period

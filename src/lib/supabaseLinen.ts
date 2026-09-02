@@ -1,8 +1,12 @@
-import { warehouseSupabase, warehouseUrl, warehouseKey } from './supabaseWarehouse';
+import { warehouseSupabase } from './supabaseWarehouse';
 
-// Point Linen Supabase Client to Warehouse database to consolidate into one database project
-export const linenUrl = warehouseUrl;
-export const linenKey = warehouseKey;
+/**
+ * DATABASE ISOLATION NOTICE:
+ * Linen Master database (yjmjlxscvwnkoewvielo) has been fully isolated and is protected from external modifications.
+ * All Linen operations inside Gudang Alia application now run on Gudang Alia's dedicated database (qdsieavuhgvxrqtaytlt)
+ * using the isolated `linen_*` tables.
+ */
 export const supabaseLinen = warehouseSupabase;
 
-console.log('[LINEN CLIENT CONSOLIDATED] Now using Warehouse Supabase Project');
+console.log('[DATABASE ISOLATED] Gudang Alia Linen module operates independently on local database (qdsieavuhgvxrqtaytlt). Linen Master database is untouched.');
+

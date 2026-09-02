@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabaseLinen } from '../lib/supabaseLinen';
+import { supabase } from '../lib/supabase';
 import { ITEM_TYPES } from '../constants-linen';
 import { laundrySyncService } from '../services/laundrySyncService';
 import { 
@@ -17,31 +17,47 @@ const STORAGE_KEY = 'gudang_alia_linen_state_cache_v1';
 const PAGE_SIZE = 1000;
 
 async function fetchAllSupabaseRowsPaginated(
-  tableName: string,
+  primaryTable: string,
+  fallbackTable: string,
   orderColumn: string = 'date',
   ascending: boolean = false
-): Promise<any[]> {
+): Promise<{ data: any[]; activeTable: string }> {
+  let activeTable = primaryTable;
   const allRows: any[] = [];
   let page = 0;
   let hasMore = true;
+
+  // Test if primary table exists
+  const { error: testErr } = await supabase.from(primaryTable).select('id').limit(1);
+  if (testErr && (testErr.message.includes('relation') || testErr.code === '42P01')) {
+    activeTable = fallbackTable;
+  }
 
   while (hasMore) {
     const from = page * PAGE_SIZE;
     const to = from + PAGE_SIZE - 1;
 
-    let query = supabaseLinen
-      .from(tableName)
+    let query = supabase
+      .from(activeTable)
       .select('*')
       .range(from, to);
 
     if (orderColumn) {
       query = query.order(orderColumn, { ascending });
+      // Add secondary order for stability when dates are identical
+      if (orderColumn !== 'created_at') {
+        query = query.order('created_at', { ascending });
+      }
     }
 
     const { data, error } = await query;
 
     if (error) {
-      console.error(`[LINEN PAGINATED] Error fetching ${tableName} page ${page}:`, error);
+      if (activeTable === primaryTable && fallbackTable) {
+        console.warn(`[LINEN PAGINATED] Primary table ${primaryTable} failed (${error.message}), trying fallback ${fallbackTable}`);
+        return fetchAllSupabaseRowsPaginated(fallbackTable, '', orderColumn, ascending);
+      }
+      console.error(`[LINEN PAGINATED] Error fetching ${activeTable} page ${page}:`, error);
       throw error;
     }
 
@@ -57,7 +73,23 @@ async function fetchAllSupabaseRowsPaginated(
     }
   }
 
-  return allRows;
+  return { data: allRows, activeTable };
+}
+
+async function executeLinenWrite(
+  primaryTable: string,
+  fallbackTable: string,
+  operation: (tableName: string) => PromiseLike<any> | any
+) {
+  try {
+    const res = await operation(primaryTable);
+    if (res?.error && (res.error.message?.includes('relation') || res.error.code === '42P01' || res.error.code === '42501')) {
+      console.warn(`[LINEN WRITE] Fallback from ${primaryTable} to ${fallbackTable}`);
+      await operation(fallbackTable);
+    }
+  } catch (e) {
+    console.warn(`[LINEN WRITE EXCEPTION]:`, e);
+  }
 }
 
 const getInitialState = (): LinenState => {
@@ -106,12 +138,12 @@ export function useLinenData() {
         inData,
         outData
       ] = await Promise.allSettled([
-        fetchAllSupabaseRowsPaginated('linen_room_items', 'date', false),
-        fetchAllSupabaseRowsPaginated('linen_clean_items', '', false),
-        fetchAllSupabaseRowsPaginated('linen_new_items', '', false),
-        fetchAllSupabaseRowsPaginated('linen_new_item_transactions', 'date', false),
-        fetchAllSupabaseRowsPaginated('linen_incoming_items', 'date', false),
-        fetchAllSupabaseRowsPaginated('linen_outgoing_items', 'date', false)
+        fetchAllSupabaseRowsPaginated('linen_room_items', 'room_items', 'date', false),
+        fetchAllSupabaseRowsPaginated('linen_clean_items', 'clean_items', '', false),
+        fetchAllSupabaseRowsPaginated('linen_new_items', 'new_items', '', false),
+        fetchAllSupabaseRowsPaginated('linen_new_item_transactions', 'new_item_transactions', 'date', false),
+        fetchAllSupabaseRowsPaginated('linen_incoming_items', 'incoming_items', 'date', false),
+        fetchAllSupabaseRowsPaginated('linen_outgoing_items', 'outgoing_items', 'date', false)
       ]);
 
       const mapRoomItems = (data: any[]): RoomItem[] => {
@@ -186,12 +218,12 @@ export function useLinenData() {
       };
 
       setState(prev => {
-        const roomItems = roomData.status === 'fulfilled' ? mapRoomItems(roomData.value) : prev.roomItems;
-        const cleanItems = cleanData.status === 'fulfilled' ? mapCleanItems(cleanData.value) : prev.cleanItems;
-        const newItems = newData.status === 'fulfilled' ? mapNewItems(newData.value) : prev.newItems;
-        const newItemTransactions = newTxData.status === 'fulfilled' ? mapNewTransactions(newTxData.value) : prev.newItemTransactions;
-        const incomingItems = inData.status === 'fulfilled' ? mapIncomingItems(inData.value) : prev.incomingItems;
-        const outgoingItems = outData.status === 'fulfilled' ? mapOutgoingItems(outData.value) : prev.outgoingItems;
+        const roomItems = roomData.status === 'fulfilled' ? mapRoomItems(roomData.value.data) : prev.roomItems;
+        const cleanItems = cleanData.status === 'fulfilled' ? mapCleanItems(cleanData.value.data) : prev.cleanItems;
+        const newItems = newData.status === 'fulfilled' ? mapNewItems(newData.value.data) : prev.newItems;
+        const newItemTransactions = newTxData.status === 'fulfilled' ? mapNewTransactions(newTxData.value.data) : prev.newItemTransactions;
+        const incomingItems = inData.status === 'fulfilled' ? mapIncomingItems(inData.value.data) : prev.incomingItems;
+        const outgoingItems = outData.status === 'fulfilled' ? mapOutgoingItems(outData.value.data) : prev.outgoingItems;
 
         const nextState = {
           roomItems,
@@ -220,39 +252,78 @@ export function useLinenData() {
   const addRoomItem = async (data: Omit<RoomItem, 'id'>) => {
     const newId = crypto.randomUUID();
     const newItem: RoomItem = { ...data, id: newId, created_at: new Date().toISOString() };
+    let updatedCleanQty = 0;
 
     setState(prev => {
-      const next = { ...prev, roomItems: [newItem, ...prev.roomItems] };
+      const cleanItem = prev.cleanItems.find(ci => ci.itemName === data.itemName);
+      updatedCleanQty = Math.max(0, (cleanItem?.quantity || 0) - Number(data.quantity || 0));
+      const next = {
+        ...prev,
+        roomItems: [newItem, ...prev.roomItems],
+        cleanItems: prev.cleanItems.map(ci =>
+          ci.itemName === data.itemName ? { ...ci, quantity: updatedCleanQty } : ci
+        )
+      };
       saveToLocal(next);
       return next;
     });
 
-    const { data: { user } } = await supabaseLinen.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     
     try {
-      await supabaseLinen.from('linen_room_items').insert([{
-        id: newId,
-        firebase_id: 'local-dev',
-        uid: user?.id,
-        date: data.date,
-        item_name: data.itemName,
-        quantity: data.quantity,
-        room_number: data.roomNumber
-      }]);
+      await executeLinenWrite('linen_room_items', 'room_items', t =>
+        supabase.from(t).insert([{
+          id: newId,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          date: data.date,
+          item_name: data.itemName,
+          quantity: data.quantity,
+          room_number: data.roomNumber
+        }])
+      );
+      await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+        supabase.from(t).upsert([{
+          item_name: data.itemName,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          quantity: updatedCleanQty,
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'item_name' })
+      );
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase insert room_items fallback:', e);
     }
   };
 
   const updateRoomItem = async (id: string, data: Partial<RoomItem>) => {
+    let updatedCleanQty: number | null = null;
+    let targetItemName = '';
+
     setState(prev => {
-      const next = {
-        ...prev,
-        roomItems: prev.roomItems.map(item => item.id === id ? { ...item, ...data } : item)
-      };
+      const old = prev.roomItems.find(item => item.id === id);
+      const nextRoomItems = prev.roomItems.map(item => item.id === id ? { ...item, ...data } : item);
+      let nextCleanItems = prev.cleanItems;
+
+      if (old && data.quantity !== undefined) {
+        targetItemName = old.itemName;
+        const diff = Number(data.quantity) - Number(old.quantity);
+        nextCleanItems = prev.cleanItems.map(ci => {
+          if (ci.itemName === old.itemName) {
+            const q = Math.max(0, (ci.quantity || 0) - diff);
+            updatedCleanQty = q;
+            return { ...ci, quantity: q };
+          }
+          return ci;
+        });
+      }
+
+      const next = { ...prev, roomItems: nextRoomItems, cleanItems: nextCleanItems };
       saveToLocal(next);
       return next;
     });
+
+    const { data: { user } } = await supabase.auth.getUser();
 
     try {
       const payload: any = {};
@@ -261,24 +332,72 @@ export function useLinenData() {
       if (data.quantity !== undefined) payload.quantity = data.quantity;
       if (data.roomNumber !== undefined) payload.room_number = data.roomNumber;
 
-      await supabaseLinen.from('linen_room_items').update(payload).eq('id', id);
+      await executeLinenWrite('linen_room_items', 'room_items', t =>
+        supabase.from(t).update(payload).eq('id', id)
+      );
+
+      if (updatedCleanQty !== null && targetItemName) {
+        await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+          supabase.from(t).upsert([{
+            item_name: targetItemName,
+            firebase_id: 'local-dev',
+            uid: user?.id,
+            quantity: updatedCleanQty,
+            updated_at: new Date().toISOString()
+          }], { onConflict: 'item_name' })
+        );
+      }
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase update room_items fallback:', e);
     }
   };
 
   const deleteRoomItem = async (id: string) => {
+    let oldItem: RoomItem | undefined;
+    let restoredCleanQty: number | null = null;
+
     setState(prev => {
+      oldItem = prev.roomItems.find(item => item.id === id);
+      let nextCleanItems = prev.cleanItems;
+
+      if (oldItem) {
+        nextCleanItems = prev.cleanItems.map(ci => {
+          if (ci.itemName === oldItem!.itemName) {
+            const q = (ci.quantity || 0) + Number(oldItem!.quantity || 0);
+            restoredCleanQty = q;
+            return { ...ci, quantity: q };
+          }
+          return ci;
+        });
+      }
+
       const next = {
         ...prev,
-        roomItems: prev.roomItems.filter(item => item.id !== id)
+        roomItems: prev.roomItems.filter(item => item.id !== id),
+        cleanItems: nextCleanItems
       };
       saveToLocal(next);
       return next;
     });
 
+    const { data: { user } } = await supabase.auth.getUser();
+
     try {
-      await supabaseLinen.from('linen_room_items').delete().eq('id', id);
+      await executeLinenWrite('linen_room_items', 'room_items', t =>
+        supabase.from(t).delete().eq('id', id)
+      );
+
+      if (oldItem && restoredCleanQty !== null) {
+        await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+          supabase.from(t).upsert([{
+            item_name: oldItem!.itemName,
+            firebase_id: 'local-dev',
+            uid: user?.id,
+            quantity: restoredCleanQty,
+            updated_at: new Date().toISOString()
+          }], { onConflict: 'item_name' })
+        );
+      }
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase delete room_items fallback:', e);
     }
@@ -300,16 +419,18 @@ export function useLinenData() {
       return next;
     });
 
-    const { data: { user } } = await supabaseLinen.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     
     try {
-      await supabaseLinen.from('linen_clean_items').upsert([{
-        item_name: itemName,
-        firebase_id: 'local-dev',
-        uid: user?.id,
-        quantity,
-        updated_at: new Date().toISOString()
-      }], { onConflict: 'item_name' });
+      await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+        supabase.from(t).upsert([{
+          item_name: itemName,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          quantity,
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'item_name' })
+      );
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase update clean_items fallback:', e);
     }
@@ -334,32 +455,46 @@ export function useLinenData() {
   const addIncomingItem = async (data: Omit<IncomingItem, 'id'>, options?: { skipSync?: boolean }) => {
     const newId = crypto.randomUUID();
     const newItem: IncomingItem = { ...data, id: newId, created_at: new Date().toISOString() };
+    let newCleanQty = 0;
 
     setState(prev => {
+      const existingClean = prev.cleanItems.find(ci => ci.itemName === data.itemName);
+      newCleanQty = (existingClean?.quantity || 0) + Number(data.quantity || 0);
       const next = {
         ...prev,
         incomingItems: [newItem, ...prev.incomingItems],
         cleanItems: prev.cleanItems.map(ci => 
-          ci.itemName === data.itemName ? { ...ci, quantity: (ci.quantity || 0) + Number(data.quantity || 0) } : ci
+          ci.itemName === data.itemName ? { ...ci, quantity: newCleanQty } : ci
         )
       };
       saveToLocal(next);
       return next;
     });
 
-    const { data: { user } } = await supabaseLinen.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     
     try {
-      await supabaseLinen.from('linen_incoming_items').insert([{
-        id: newId,
-        firebase_id: 'local-dev',
-        uid: user?.id,
-        date: data.date,
-        item_name: data.itemName,
-        quantity: data.quantity,
-        source: data.source,
-        description: data.description || ''
-      }]);
+      await executeLinenWrite('linen_incoming_items', 'incoming_items', t =>
+        supabase.from(t).insert([{
+          id: newId,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          date: data.date,
+          item_name: data.itemName,
+          quantity: data.quantity,
+          source: data.source,
+          description: data.description || ''
+        }])
+      );
+      await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+        supabase.from(t).upsert([{
+          item_name: data.itemName,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          quantity: newCleanQty,
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'item_name' })
+      );
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase insert incoming_items fallback:', e);
     }
@@ -380,21 +515,36 @@ export function useLinenData() {
   };
 
   const updateIncomingItem = async (id: string, data: Partial<IncomingItem>) => {
+    let newCleanQty: number | null = null;
+    let targetItemName = '';
+
     setState(prev => {
       const old = prev.incomingItems.find(i => i.id === id);
+      let nextCleanItems = prev.cleanItems;
+
+      if (old && data.quantity !== undefined && old.itemName === (data.itemName || old.itemName)) {
+        targetItemName = old.itemName;
+        const diff = Number(data.quantity) - Number(old.quantity);
+        nextCleanItems = prev.cleanItems.map(ci => {
+          if (ci.itemName === old.itemName) {
+            const q = Math.max(0, (ci.quantity || 0) + diff);
+            newCleanQty = q;
+            return { ...ci, quantity: q };
+          }
+          return ci;
+        });
+      }
+
       const next = {
         ...prev,
-        incomingItems: prev.incomingItems.map(item => item.id === id ? { ...item, ...data } : item)
+        incomingItems: prev.incomingItems.map(item => item.id === id ? { ...item, ...data } : item),
+        cleanItems: nextCleanItems
       };
-      if (old && data.quantity !== undefined && old.itemName === (data.itemName || old.itemName)) {
-        const diff = Number(data.quantity) - Number(old.quantity);
-        next.cleanItems = next.cleanItems.map(ci =>
-          ci.itemName === old.itemName ? { ...ci, quantity: Math.max(0, (ci.quantity || 0) + diff) } : ci
-        );
-      }
       saveToLocal(next);
       return next;
     });
+
+    const { data: { user } } = await supabase.auth.getUser();
 
     try {
       const payload: any = {};
@@ -404,7 +554,21 @@ export function useLinenData() {
       if (data.source !== undefined) payload.source = data.source;
       if (data.description !== undefined) payload.description = data.description;
 
-      await supabaseLinen.from('linen_incoming_items').update(payload).eq('id', id);
+      await executeLinenWrite('linen_incoming_items', 'incoming_items', t =>
+        supabase.from(t).update(payload).eq('id', id)
+      );
+
+      if (newCleanQty !== null && targetItemName) {
+        await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+          supabase.from(t).upsert([{
+            item_name: targetItemName,
+            firebase_id: 'local-dev',
+            uid: user?.id,
+            quantity: newCleanQty,
+            updated_at: new Date().toISOString()
+          }], { onConflict: 'item_name' })
+        );
+      }
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase update incoming_items fallback:', e);
     }
@@ -412,22 +576,50 @@ export function useLinenData() {
 
   const deleteIncomingItem = async (id: string, options?: { skipSync?: boolean }) => {
     let oldItem: IncomingItem | undefined;
+    let newCleanQty: number | null = null;
 
     setState(prev => {
       oldItem = prev.incomingItems.find(i => i.id === id);
+      let nextCleanItems = prev.cleanItems;
+
+      if (oldItem) {
+        nextCleanItems = prev.cleanItems.map(ci => {
+          if (ci.itemName === oldItem!.itemName) {
+            const q = Math.max(0, (ci.quantity || 0) - Number(oldItem!.quantity || 0));
+            newCleanQty = q;
+            return { ...ci, quantity: q };
+          }
+          return ci;
+        });
+      }
+
       const next = {
         ...prev,
         incomingItems: prev.incomingItems.filter(item => item.id !== id),
-        cleanItems: oldItem ? prev.cleanItems.map(ci =>
-          ci.itemName === oldItem!.itemName ? { ...ci, quantity: Math.max(0, (ci.quantity || 0) - Number(oldItem!.quantity || 0)) } : ci
-        ) : prev.cleanItems
+        cleanItems: nextCleanItems
       };
       saveToLocal(next);
       return next;
     });
 
+    const { data: { user } } = await supabase.auth.getUser();
+
     try {
-      await supabaseLinen.from('linen_incoming_items').delete().eq('id', id);
+      await executeLinenWrite('linen_incoming_items', 'incoming_items', t =>
+        supabase.from(t).delete().eq('id', id)
+      );
+
+      if (oldItem && newCleanQty !== null) {
+        await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+          supabase.from(t).upsert([{
+            item_name: oldItem!.itemName,
+            firebase_id: 'local-dev',
+            uid: user?.id,
+            quantity: newCleanQty,
+            updated_at: new Date().toISOString()
+          }], { onConflict: 'item_name' })
+        );
+      }
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase delete incoming_items fallback:', e);
     }
@@ -451,32 +643,46 @@ export function useLinenData() {
   const addOutgoingItem = async (data: Omit<OutgoingItem, 'id'>, options?: { skipSync?: boolean }) => {
     const newId = crypto.randomUUID();
     const newItem: OutgoingItem = { ...data, id: newId, created_at: new Date().toISOString() };
+    let newCleanQty = 0;
 
     setState(prev => {
+      const existingClean = prev.cleanItems.find(ci => ci.itemName === data.itemName);
+      newCleanQty = Math.max(0, (existingClean?.quantity || 0) - Number(data.quantity || 0));
       const next = {
         ...prev,
         outgoingItems: [newItem, ...prev.outgoingItems],
         cleanItems: prev.cleanItems.map(ci =>
-          ci.itemName === data.itemName ? { ...ci, quantity: Math.max(0, (ci.quantity || 0) - Number(data.quantity || 0)) } : ci
+          ci.itemName === data.itemName ? { ...ci, quantity: newCleanQty } : ci
         )
       };
       saveToLocal(next);
       return next;
     });
 
-    const { data: { user } } = await supabaseLinen.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     
     try {
-      await supabaseLinen.from('linen_outgoing_items').insert([{
-        id: newId,
-        firebase_id: 'local-dev',
-        uid: user?.id,
-        date: data.date,
-        item_name: data.itemName,
-        quantity: data.quantity,
-        destination: data.destination,
-        description: data.description || ''
-      }]);
+      await executeLinenWrite('linen_outgoing_items', 'outgoing_items', t =>
+        supabase.from(t).insert([{
+          id: newId,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          date: data.date,
+          item_name: data.itemName,
+          quantity: data.quantity,
+          destination: data.destination,
+          description: data.description || ''
+        }])
+      );
+      await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+        supabase.from(t).upsert([{
+          item_name: data.itemName,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          quantity: newCleanQty,
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'item_name' })
+      );
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase insert outgoing_items fallback:', e);
     }
@@ -497,21 +703,36 @@ export function useLinenData() {
   };
 
   const updateOutgoingItem = async (id: string, data: Partial<OutgoingItem>) => {
+    let newCleanQty: number | null = null;
+    let targetItemName = '';
+
     setState(prev => {
       const old = prev.outgoingItems.find(o => o.id === id);
+      let nextCleanItems = prev.cleanItems;
+
+      if (old && data.quantity !== undefined && old.itemName === (data.itemName || old.itemName)) {
+        targetItemName = old.itemName;
+        const diff = Number(data.quantity) - Number(old.quantity);
+        nextCleanItems = prev.cleanItems.map(ci => {
+          if (ci.itemName === old.itemName) {
+            const q = Math.max(0, (ci.quantity || 0) - diff);
+            newCleanQty = q;
+            return { ...ci, quantity: q };
+          }
+          return ci;
+        });
+      }
+
       const next = {
         ...prev,
-        outgoingItems: prev.outgoingItems.map(item => item.id === id ? { ...item, ...data } : item)
+        outgoingItems: prev.outgoingItems.map(item => item.id === id ? { ...item, ...data } : item),
+        cleanItems: nextCleanItems
       };
-      if (old && data.quantity !== undefined && old.itemName === (data.itemName || old.itemName)) {
-        const diff = Number(data.quantity) - Number(old.quantity);
-        next.cleanItems = next.cleanItems.map(ci =>
-          ci.itemName === old.itemName ? { ...ci, quantity: Math.max(0, (ci.quantity || 0) - diff) } : ci
-        );
-      }
       saveToLocal(next);
       return next;
     });
+
+    const { data: { user } } = await supabase.auth.getUser();
 
     try {
       const payload: any = {};
@@ -521,7 +742,21 @@ export function useLinenData() {
       if (data.destination !== undefined) payload.destination = data.destination;
       if (data.description !== undefined) payload.description = data.description;
 
-      await supabaseLinen.from('linen_outgoing_items').update(payload).eq('id', id);
+      await executeLinenWrite('linen_outgoing_items', 'outgoing_items', t =>
+        supabase.from(t).update(payload).eq('id', id)
+      );
+
+      if (newCleanQty !== null && targetItemName) {
+        await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+          supabase.from(t).upsert([{
+            item_name: targetItemName,
+            firebase_id: 'local-dev',
+            uid: user?.id,
+            quantity: newCleanQty,
+            updated_at: new Date().toISOString()
+          }], { onConflict: 'item_name' })
+        );
+      }
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase update outgoing_items fallback:', e);
     }
@@ -529,22 +764,50 @@ export function useLinenData() {
 
   const deleteOutgoingItem = async (id: string, options?: { skipSync?: boolean }) => {
     let oldItem: OutgoingItem | undefined;
+    let newCleanQty: number | null = null;
 
     setState(prev => {
       oldItem = prev.outgoingItems.find(o => o.id === id);
+      let nextCleanItems = prev.cleanItems;
+
+      if (oldItem) {
+        nextCleanItems = prev.cleanItems.map(ci => {
+          if (ci.itemName === oldItem!.itemName) {
+            const q = (ci.quantity || 0) + Number(oldItem!.quantity || 0);
+            newCleanQty = q;
+            return { ...ci, quantity: q };
+          }
+          return ci;
+        });
+      }
+
       const next = {
         ...prev,
         outgoingItems: prev.outgoingItems.filter(item => item.id !== id),
-        cleanItems: oldItem ? prev.cleanItems.map(ci =>
-          ci.itemName === oldItem!.itemName ? { ...ci, quantity: (ci.quantity || 0) + Number(oldItem!.quantity || 0) } : ci
-        ) : prev.cleanItems
+        cleanItems: nextCleanItems
       };
       saveToLocal(next);
       return next;
     });
 
+    const { data: { user } } = await supabase.auth.getUser();
+
     try {
-      await supabaseLinen.from('linen_outgoing_items').delete().eq('id', id);
+      await executeLinenWrite('linen_outgoing_items', 'outgoing_items', t =>
+        supabase.from(t).delete().eq('id', id)
+      );
+
+      if (oldItem && newCleanQty !== null) {
+        await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+          supabase.from(t).upsert([{
+            item_name: oldItem!.itemName,
+            firebase_id: 'local-dev',
+            uid: user?.id,
+            quantity: newCleanQty,
+            updated_at: new Date().toISOString()
+          }], { onConflict: 'item_name' })
+        );
+      }
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase delete outgoing_items fallback:', e);
     }
@@ -573,32 +836,46 @@ export function useLinenData() {
       type: 'Stock In',
       created_at: new Date().toISOString()
     };
+    let newStockQty = 0;
 
     setState(prev => {
+      const existingNew = prev.newItems.find(ni => ni.itemName === data.itemName);
+      newStockQty = (existingNew?.quantity || 0) + Number(data.quantity || 0);
       const next = {
         ...prev,
         newItemTransactions: [newTx, ...prev.newItemTransactions],
         newItems: prev.newItems.map(ni =>
-          ni.itemName === data.itemName ? { ...ni, quantity: (ni.quantity || 0) + Number(data.quantity || 0) } : ni
+          ni.itemName === data.itemName ? { ...ni, quantity: newStockQty } : ni
         )
       };
       saveToLocal(next);
       return next;
     });
 
-    const { data: { user } } = await supabaseLinen.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     
     try {
-      await supabaseLinen.from('linen_new_item_transactions').insert([{
-        id: newId,
-        firebase_id: 'local-dev',
-        uid: user?.id,
-        date: data.date,
-        item_name: data.itemName,
-        quantity: data.quantity,
-        type: 'Stock In',
-        description: data.description || ''
-      }]);
+      await executeLinenWrite('linen_new_item_transactions', 'new_item_transactions', t =>
+        supabase.from(t).insert([{
+          id: newId,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          date: data.date,
+          item_name: data.itemName,
+          quantity: data.quantity,
+          type: 'Stock In',
+          description: data.description || ''
+        }])
+      );
+      await executeLinenWrite('linen_new_items', 'new_items', t =>
+        supabase.from(t).upsert([{
+          item_name: data.itemName,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          quantity: newStockQty,
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'item_name' })
+      );
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase insert new_item_transactions fallback:', e);
     }
@@ -625,27 +902,36 @@ export function useLinenData() {
       created_at: new Date().toISOString()
     };
 
+    let newStockQty = 0;
+    let newCleanQty = 0;
+
     setState(prev => {
+      const existingNew = prev.newItems.find(ni => ni.itemName === data.itemName);
+      newStockQty = Math.max(0, (existingNew?.quantity || 0) - Number(data.quantity || 0));
+
+      const existingClean = prev.cleanItems.find(ci => ci.itemName === data.itemName);
+      newCleanQty = (existingClean?.quantity || 0) + Number(data.quantity || 0);
+
       const next = {
         ...prev,
         newItemTransactions: [newTx, ...prev.newItemTransactions],
         incomingItems: [incomingItem, ...prev.incomingItems],
         newItems: prev.newItems.map(ni =>
-          ni.itemName === data.itemName ? { ...ni, quantity: Math.max(0, (ni.quantity || 0) - Number(data.quantity || 0)) } : ni
+          ni.itemName === data.itemName ? { ...ni, quantity: newStockQty } : ni
         ),
         cleanItems: prev.cleanItems.map(ci =>
-          ci.itemName === data.itemName ? { ...ci, quantity: (ci.quantity || 0) + Number(data.quantity || 0) } : ci
+          ci.itemName === data.itemName ? { ...ci, quantity: newCleanQty } : ci
         )
       };
       saveToLocal(next);
       return next;
     });
 
-    const { data: { user } } = await supabaseLinen.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
     
     try {
-      await Promise.all([
-        supabaseLinen.from('linen_new_item_transactions').insert([{
+      await executeLinenWrite('linen_new_item_transactions', 'new_item_transactions', t =>
+        supabase.from(t).insert([{
           id: txId,
           firebase_id: 'local-dev',
           uid: user?.id,
@@ -655,8 +941,10 @@ export function useLinenData() {
           type: 'Take to Clean',
           incoming_id: incomingId,
           description: data.description || ''
-        }]),
-        supabaseLinen.from('linen_incoming_items').insert([{
+        }])
+      );
+      await executeLinenWrite('linen_incoming_items', 'incoming_items', t =>
+        supabase.from(t).insert([{
           id: incomingId,
           firebase_id: 'local-dev',
           uid: user?.id,
@@ -666,7 +954,25 @@ export function useLinenData() {
           source: 'Barang Baru',
           description: data.description || 'Ambil dari stok barang baru'
         }])
-      ]);
+      );
+      await executeLinenWrite('linen_new_items', 'new_items', t =>
+        supabase.from(t).upsert([{
+          item_name: data.itemName,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          quantity: newStockQty,
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'item_name' })
+      );
+      await executeLinenWrite('linen_clean_items', 'clean_items', t =>
+        supabase.from(t).upsert([{
+          item_name: data.itemName,
+          firebase_id: 'local-dev',
+          uid: user?.id,
+          quantity: newCleanQty,
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'item_name' })
+      );
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase take to clean fallback:', e);
     }
@@ -704,7 +1010,9 @@ export function useLinenData() {
       if (data.type !== undefined) payload.type = data.type;
       if (data.description !== undefined) payload.description = data.description;
 
-      await supabaseLinen.from('linen_new_item_transactions').update(payload).eq('id', id);
+      await executeLinenWrite('linen_new_item_transactions', 'new_item_transactions', t =>
+        supabase.from(t).update(payload).eq('id', id)
+      );
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase update new_item_transactions fallback:', e);
     }
@@ -721,7 +1029,9 @@ export function useLinenData() {
     });
 
     try {
-      await supabaseLinen.from('linen_new_item_transactions').delete().eq('id', id);
+      await executeLinenWrite('linen_new_item_transactions', 'new_item_transactions', t =>
+        supabase.from(t).delete().eq('id', id)
+      );
     } catch (e) {
       console.warn('[LINEN HOOK] Supabase delete new_item_transactions fallback:', e);
     }

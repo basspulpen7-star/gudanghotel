@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase';
-import { supabaseLinen } from '../lib/supabaseLinen';
 import { ITEM_TYPES } from '../constants-linen';
 import { transactionService } from './transactionService';
 import { inventoryService } from './inventoryService';
@@ -37,8 +36,8 @@ export function notifySyncError(message: string, details?: any) {
 
 export const laundrySyncService = {
   /**
-   * SYNC ARAH 1: Gudang Alia → Linen
-   * Updates clean_items quantity in Supabase Linen and logs incoming/outgoing entry with source/dest 'Gudang Alia'.
+   * SYNC ARAH 1: Gudang Alia → Linen Module (Local Database)
+   * Updates linen_clean_items quantity in Supabase Gudang Alia and logs incoming/outgoing entry with source/dest 'Gudang Alia'.
    */
   async syncTransactionToLinen(
     linenItemName: string,
@@ -55,14 +54,21 @@ export const laundrySyncService = {
     }
 
     try {
-      // 1. Fetch current clean item in Supabase Linen (prefixed table)
-      const { data: cleanRows, error: fetchErr } = await supabaseLinen
+      // 1. Fetch current clean item in Supabase Gudang Alia (linen_clean_items)
+      let cleanRows: any[] | null = null;
+      let { data, error: fetchErr } = await supabase
         .from('linen_clean_items')
         .select('*')
         .or(`item_name.eq."${linenItemName}",itemName.eq."${linenItemName}"`);
 
-      if (fetchErr) {
-        console.warn('[LAUNDRY SYNC] Error fetching clean_item in Linen:', fetchErr.message);
+      if (fetchErr || !data) {
+        const fallback = await supabase
+          .from('clean_items')
+          .select('*')
+          .or(`item_name.eq."${linenItemName}",itemName.eq."${linenItemName}"`);
+        cleanRows = fallback.data;
+      } else {
+        cleanRows = data;
       }
 
       const existingRow = cleanRows && cleanRows.length > 0 ? cleanRows[0] : null;
@@ -72,18 +78,23 @@ export const laundrySyncService = {
         ? currentQty + quantity 
         : Math.max(0, currentQty - quantity);
 
-      // 2. Update clean_items in Linen (prefixed table)
-      const { error: upsertErr } = await supabaseLinen
+      // 2. Update clean_items in Linen
+      const upsertPayload = [{
+        item_name: linenItemName,
+        firebase_id: 'local-dev',
+        quantity: newQty,
+        updated_at: new Date().toISOString()
+      }];
+
+      let { error: upsertErr } = await supabase
         .from('linen_clean_items')
-        .upsert([{
-          item_name: linenItemName,
-          firebase_id: 'local-dev',
-          quantity: newQty,
-          updated_at: new Date().toISOString()
-        }], { onConflict: 'item_name' });
+        .upsert(upsertPayload, { onConflict: 'item_name' });
 
       if (upsertErr) {
-        throw upsertErr;
+        const { error: fbErr } = await supabase
+          .from('clean_items')
+          .upsert(upsertPayload, { onConflict: 'item_name' });
+        if (fbErr) throw fbErr;
       }
 
       // 3. Insert audit ledger row into incoming_items or outgoing_items
@@ -91,7 +102,7 @@ export const laundrySyncService = {
       const ledgerId = crypto.randomUUID();
 
       if (type === 'IN') {
-        await supabaseLinen.from('linen_incoming_items').insert([{
+        const incPayload = [{
           id: ledgerId,
           firebase_id: 'local-dev',
           date: todayStr,
@@ -99,9 +110,13 @@ export const laundrySyncService = {
           quantity,
           source: 'Gudang Alia',
           description: options.notes || 'Sinkronisasi dari transaksi masuk Gudang Alia'
-        }]);
+        }];
+        const { error: incErr } = await supabase.from('linen_incoming_items').insert(incPayload);
+        if (incErr) {
+          await supabase.from('incoming_items').insert(incPayload);
+        }
       } else {
-        await supabaseLinen.from('linen_outgoing_items').insert([{
+        const outPayload = [{
           id: ledgerId,
           firebase_id: 'local-dev',
           date: todayStr,
@@ -109,7 +124,11 @@ export const laundrySyncService = {
           quantity,
           destination: 'Gudang Alia',
           description: options.notes || 'Sinkronisasi dari transaksi keluar Gudang Alia'
-        }]);
+        }];
+        const { error: outErr } = await supabase.from('linen_outgoing_items').insert(outPayload);
+        if (outErr) {
+          await supabase.from('outgoing_items').insert(outPayload);
+        }
       }
 
       return true;
@@ -209,10 +228,18 @@ export const laundrySyncService = {
    */
   async getReconciliationData(): Promise<ReconciliationItem[]> {
     try {
-      // 1. Fetch Linen clean_items (prefixed table)
-      const { data: cleanData } = await supabaseLinen
+      // 1. Fetch Linen clean_items from Gudang Alia database
+      let cleanData: any[] | null = null;
+      let { data, error } = await supabase
         .from('linen_clean_items')
         .select('*');
+
+      if (error || !data) {
+        const fallback = await supabase.from('clean_items').select('*');
+        cleanData = fallback.data;
+      } else {
+        cleanData = data;
+      }
 
       const linenStockMap = new Map<string, number>();
       ITEM_TYPES.forEach(t => linenStockMap.set(t, 0));
@@ -289,12 +316,16 @@ export const laundrySyncService = {
           // Set Linen clean stock to match Gudang Alia (prefixed table)
           const targetStock = item.gudangAliaStock;
 
-          await supabaseLinen.from('linen_clean_items').upsert([{
+          const reconPayload = [{
             item_name: item.linenItemName,
             firebase_id: 'local-dev',
             quantity: targetStock,
             updated_at: new Date().toISOString()
-          }], { onConflict: 'item_name' });
+          }];
+          const { error: rErr } = await supabase.from('linen_clean_items').upsert(reconPayload, { onConflict: 'item_name' });
+          if (rErr) {
+            await supabase.from('clean_items').upsert(reconPayload, { onConflict: 'item_name' });
+          }
 
           successCount++;
         } else if (item.chosenSource === 'linen') {
